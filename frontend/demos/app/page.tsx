@@ -71,9 +71,6 @@ export default function DemosHomePage() {
               <Link href="/stats-demo">
                 <Button variant="outline" className="w-full justify-start h-12">Stats Section</Button>
               </Link>
-              <Link href="/feature-card-demo">
-                <Button variant="outline" className="w-full justify-start h-12">Feature Cards</Button>
-              </Link>
               <Link href="/logo-cloud-demo">
                 <Button variant="outline" className="w-full justify-start h-12">Logo Cloud</Button>
               </Link>

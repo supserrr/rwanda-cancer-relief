@@ -78,12 +78,13 @@ const SvgFollowScroll = () => {
       ref={ref}
       className="mx-auto flex h-[350vh] w-screen flex-col items-start overflow-hidden bg-background text-foreground"
     >
-      <div className="mt-42 relative flex w-full max-w-2xl flex-col items-start justify-start gap-6 text-left pl-6 lg:pl-12">
+      <div className="min-h-screen flex items-center relative w-full max-w-2xl">
+        <div className="relative flex flex-col items-start justify-start gap-6 text-left pl-6 lg:pl-12">
         <h1 className="font-jakarta-sans relative z-10 text-5xl font-medium tracking-[-0.02em] lg:text-7xl text-foreground">
-          Compassionate and Culturally Attuned Counselors You Can Trust
+          Compassionate Cancer Support, Wherever You Are
         </h1>
         <p className="font-jakarta-sans relative z-10 text-lg lg:text-xl font-normal text-muted-foreground leading-relaxed">
-          Connect with dedicated Rwandan counselors who understand the emotional, cultural, and social challenges faced by cancer patients and their families. Our trained professionals offer compassionate guidance through every stage of your journey, providing the same quality of care as in-person counseling, but accessible anywhere, anytime.
+          Living with cancer is not just a medical journey. It's an emotional one. Rwanda Cancer Relief offers counseling and culturally adapted resources to support patients and families through every step, accessible anytime, anywhere.
         </p>
         
         {/* CTA Buttons */}
@@ -106,6 +107,43 @@ const SvgFollowScroll = () => {
           className="absolute left-full top-0 z-0 -ml-96 hidden lg:block"
           scrollYProgress={scrollYProgress}
         />
+        </div>
+      </div>
+
+      {/* Section Title */}
+      <div className="relative w-full pt-20 text-center px-6">
+        <h2 className="font-jakarta-sans text-4xl lg:text-5xl font-semibold text-foreground mb-24">
+          Why This Platform Matters
+        </h2>
+      </div>
+
+      {/* Feature Spotlight - Positioned in scroll area */}
+      <div className="relative w-full pt-12 flex flex-col lg:flex-row gap-8 lg:gap-12 items-start pl-6 lg:pl-12 pr-6 lg:pr-12">
+        {/* Image on the left */}
+        <div className="relative z-10 flex-1 w-full lg:w-auto">
+          <img
+            src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800&h=600&fit=crop&auto=format&q=80"
+            alt="Compassionate counselor providing support"
+            className="w-full h-auto rounded-2xl shadow-2xl"
+          />
+        </div>
+
+        {/* Text Content on the right */}
+        <div className="relative flex flex-col items-start gap-6 text-left max-w-2xl">
+          <h2 className="font-jakarta-sans relative z-10 text-3xl lg:text-5xl font-medium text-foreground leading-tight tracking-[-0.02em]">
+            Compassionate and <span className="text-primary">Culturally Attuned</span> Counselors You Can Trust
+          </h2>
+          
+          <p className="font-jakarta-sans relative z-10 text-base lg:text-lg text-muted-foreground leading-relaxed">
+            Connect with dedicated Rwandan counselors who understand the emotional, cultural, and social challenges faced by cancer patients and their families. Our trained professionals offer compassionate guidance through every stage of your journey, providing the same quality of care as in-person counseling, but accessible anywhere, anytime.
+          </p>
+          
+          <div className="relative z-10 flex flex-row gap-3 lg:gap-4">
+            <a href="/counselors" className="inline-flex items-center justify-center px-6 py-3 lg:px-8 lg:py-4 text-sm lg:text-base font-semibold text-primary-foreground bg-primary rounded-full hover:opacity-90 transition-all duration-200 shadow-lg shadow-primary/20 whitespace-nowrap">
+              Find a Counselor
+            </a>
+          </div>
+        </div>
       </div>
     </section>
   );

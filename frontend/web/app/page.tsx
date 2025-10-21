@@ -21,29 +21,8 @@ export default function LandingPage() {
         <ThemeToggle />
       </div>
       
-      {/* SVG Scroll Animation */}
+      {/* Hero Section with SVG Scroll Animation + Feature Spotlight */}
       <SvgFollowScroll />
-      
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-        <h1 className="text-5xl font-bold mb-4">Rwanda Cancer Relief</h1>
-        <p className="text-xl text-muted-foreground mb-8 max-w-2xl">
-          Ready to build an amazing landing page together!
-        </p>
-        
-        <div className="flex gap-4">
-          <Button size="lg">Let's Start Building!</Button>
-          <a href="http://localhost:4000" target="_blank" rel="noopener noreferrer">
-            <Button size="lg" variant="outline">
-              View Component Demos →
-            </Button>
-          </a>
-        </div>
-
-        <p className="mt-8 text-sm text-muted-foreground">
-          All component demos are now at <strong>http://localhost:4000</strong>
-        </p>
-      </div>
 
       {/* Quick Access to Demos (Dev Only) */}
       {process.env.NODE_ENV === 'development' && (

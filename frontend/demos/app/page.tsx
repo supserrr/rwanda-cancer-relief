@@ -87,9 +87,6 @@ export default function DemosHomePage() {
               <Link href="/ai-demo">
                 <Button variant="outline" className="w-full justify-start h-12">AI Chat</Button>
               </Link>
-              <Link href="/orb-demo">
-                <Button variant="outline" className="w-full justify-start h-12">ElevenLabs Orb</Button>
-              </Link>
               <Link href="/audio-player-demo">
                 <Button variant="outline" className="w-full justify-start h-12">Audio Player</Button>
               </Link>

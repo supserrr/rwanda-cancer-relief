@@ -8,6 +8,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent } from '@workspace/ui/components/ui/card';
 import { ClockIcon } from '@workspace/ui/components/clock';
 import { ShieldCheckIcon } from '@workspace/ui/components/shield-check';
+import { FAQSection } from '@workspace/ui/components/ui/faqsection';
+import { Footer } from '@workspace/ui/components/ui/footer';
 
 /**
  * Props for the LinePath component.
@@ -282,7 +284,7 @@ export default function LandingPage() {
                       </svg>
                       <span className="font-jakarta-sans relative z-10 mx-auto block w-fit text-5xl font-semibold text-foreground">500+</span>
                     </div>
-                    <h2 className="font-jakarta-sans relative z-10 mt-6 text-center text-3xl font-semibold text-foreground">Patients Supported</h2>
+                    <h2 className="font-jakarta-sans relative z-10 mt-3 text-center text-3xl font-semibold text-foreground">Patients Supported</h2>
                   </CardContent>
                 </Card>
                 <Card className="relative col-span-full overflow-hidden sm:col-span-3 lg:col-span-2 bg-gradient-to-br from-primary/5 via-background to-primary/10 rounded-3xl border-primary/20">
@@ -304,11 +306,11 @@ export default function LandingPage() {
                       </svg>
                       <ShieldCheckIcon className="m-auto relative z-10 text-foreground" size={64} />
                     </div>
-                    <div className="relative z-10 mt-6 space-y-2 text-center">
-                      <h2 className="font-jakarta-sans text-lg font-medium text-foreground transition">
+                    <div className="relative z-10 mt-3 space-y-3 text-center">
+                      <h2 className="font-jakarta-sans text-xl font-semibold text-foreground transition">
                         A Safe Space for Healing
                       </h2>
-                      <p className="font-jakarta-sans text-muted-foreground">
+                      <p className="font-jakarta-sans text-sm text-muted-foreground leading-relaxed">
                         Your privacy and comfort matter deeply to us. Every conversation is protected, confidential, and held in a safe space where you can share freely without judgment.
                       </p>
                     </div>
@@ -333,9 +335,9 @@ export default function LandingPage() {
                       </svg>
                       <ClockIcon className="m-auto relative z-10 text-foreground" size={64} />
                     </div>
-                    <div className="relative z-10 mt-6 space-y-2 text-center">
-                      <h2 className="font-jakarta-sans text-lg font-medium text-foreground transition">Always Here When You Need Us</h2>
-                      <p className="font-jakarta-sans text-muted-foreground">
+                    <div className="relative z-10 mt-3 space-y-3 text-center">
+                      <h2 className="font-jakarta-sans text-xl font-semibold text-foreground transition">Always Here When You Need Us</h2>
+                      <p className="font-jakarta-sans text-sm text-muted-foreground leading-relaxed">
                         Life with cancer doesn't follow a schedule. That's why our counselors are available whenever you need support, day or night, wherever you are.
                       </p>
                     </div>
@@ -370,7 +372,120 @@ export default function LandingPage() {
         </div>
       </div>
     </div>
+
+        {/* FAQ Section - Inside scroll area */}
+        <div className="relative w-full pt-8 pb-20 px-6">
+          <FAQSection
+            title="Common Questions"
+            subtitle=""
+            description="Find answers to the most common questions about our platform, counseling services, and how we can support you."
+            buttonLabel=""
+            faqsLeft={[
+              {
+                question: "What is the Rwanda Cancer Relief counseling platform?",
+                answer: "The RCR counseling platform is an online space where cancer patients and their families can connect with trained counselors for emotional and psychological support. It provides access to culturally sensitive care, resources, and guidance throughout your healing journey."
+              },
+              {
+                question: "Who can use the platform?",
+                answer: "The platform is open to cancer patients, survivors, caregivers, and family members seeking emotional support. Counselors and healthcare professionals can also join to provide guidance and care."
+              },
+              {
+                question: "How do I get started?",
+                answer: "Simply create an account, answer a few short questions about your needs, and you'll be matched with a qualified counselor. You can then book a session or start chatting securely."
+              },
+              {
+                question: "Is the counseling confidential?",
+                answer: "Yes. Every conversation between you and your counselor is private and protected. We strictly follow confidentiality and data protection standards to keep your information safe."
+              },
+              {
+                question: "Do I need to visit a hospital or office for counseling?",
+                answer: "No. All sessions take place online through secure chat, audio, or video — so you can receive support from wherever you are, using your phone or computer."
+              }
+            ]}
+            faqsRight={[
+              {
+                question: "What kind of support can I receive?",
+                answer: "Our counselors provide emotional support for challenges like anxiety, fear, grief, family stress, or adjustment to treatment. The goal is to help you build resilience, find hope, and improve emotional well-being."
+              },
+              {
+                question: "Are the counselors trained professionals?",
+                answer: "Yes. All RCR counselors are trained professionals who understand both psychological care and the cultural realities of living with cancer in Rwanda."
+              },
+              {
+                question: "How much does it cost to use the platform?",
+                answer: "Some services may be free or subsidized through the Rwanda Cancer Relief program. Any costs will be clearly explained before you begin your session."
+              },
+              {
+                question: "Can I choose or change my counselor?",
+                answer: "Yes. You can request a new counselor if you feel you'd connect better with someone else. Our goal is to ensure you feel safe, understood, and supported."
+              },
+              {
+                question: "What if I need urgent help?",
+                answer: "If you're in crisis or need immediate assistance, the platform will guide you to emergency contacts and local support centers where you can get help right away."
+              }
+            ]}
+            className="max-w-7xl"
+          />
+        </div>
       </section>
+
+      {/* Footer */}
+      <Footer
+        logo={
+          <div className="relative w-8 h-8 flex items-center justify-center">
+            <span className="absolute w-2 h-2 rounded-full bg-primary top-0 left-1/2 transform -translate-x-1/2"></span>
+            <span className="absolute w-2 h-2 rounded-full bg-primary left-0 top-1/2 transform -translate-y-1/2"></span>
+            <span className="absolute w-2 h-2 rounded-full bg-primary right-0 top-1/2 transform -translate-y-1/2"></span>
+            <span className="absolute w-2 h-2 rounded-full bg-primary bottom-0 left-1/2 transform -translate-x-1/2"></span>
+          </div>
+        }
+        brandName="Rwanda Cancer Relief"
+        socialLinks={[
+          {
+            icon: (
+              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/>
+              </svg>
+            ),
+            href: "https://twitter.com",
+            label: "Twitter"
+          },
+          {
+            icon: (
+              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                <path fillRule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clipRule="evenodd"/>
+              </svg>
+            ),
+            href: "https://facebook.com",
+            label: "Facebook"
+          },
+          {
+            icon: (
+              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                <path fillRule="evenodd" d="M12.315 2c2.43 0 2.784.013 3.808.06 1.064.049 1.791.218 2.427.465a4.902 4.902 0 011.772 1.153 4.902 4.902 0 011.153 1.772c.247.636.416 1.363.465 2.427.048 1.067.06 1.407.06 4.123v.08c0 2.643-.012 2.987-.06 4.043-.049 1.064-.218 1.791-.465 2.427a4.902 4.902 0 01-1.153 1.772 4.902 4.902 0 01-1.772 1.153c-.636.247-1.363.416-2.427.465-1.067.048-1.407.06-4.123.06h-.08c-2.643 0-2.987-.012-4.043-.06-1.064-.049-1.791-.218-2.427-.465a4.902 4.902 0 01-1.772-1.153 4.902 4.902 0 01-1.153-1.772c-.247-.636-.416-1.363-.465-2.427-.047-1.024-.06-1.379-.06-3.808v-.63c0-2.43.013-2.784.06-3.808.049-1.064.218-1.791.465-2.427a4.902 4.902 0 011.153-1.772A4.902 4.902 0 015.45 2.525c.636-.247 1.363-.416 2.427-.465C8.901 2.013 9.256 2 11.685 2h.63zm-.081 1.802h-.468c-2.456 0-2.784.011-3.807.058-.975.045-1.504.207-1.857.344-.467.182-.8.398-1.15.748-.35.35-.566.683-.748 1.15-.137.353-.3.882-.344 1.857-.047 1.023-.058 1.351-.058 3.807v.468c0 2.456.011 2.784.058 3.807.045.975.207 1.504.344 1.857.182.466.399.8.748 1.15.35.35.683.566 1.15.748.353.137.882.3 1.857.344 1.054.048 1.37.058 4.041.058h.08c2.597 0 2.917-.01 3.96-.058.976-.045 1.505-.207 1.858-.344.466-.182.8-.398 1.15-.748.35-.35.566-.683.748-1.15.137-.353.3-.882.344-1.857.048-1.055.058-1.37.058-4.041v-.08c0-2.597-.01-2.917-.058-3.96-.045-.976-.207-1.505-.344-1.858a3.097 3.097 0 00-.748-1.15 3.098 3.098 0 00-1.15-.748c-.353-.137-.882-.3-1.857-.344-1.023-.047-1.351-.058-3.807-.058zM12 6.865a5.135 5.135 0 110 10.27 5.135 5.135 0 010-10.27zm0 1.802a3.333 3.333 0 100 6.666 3.333 3.333 0 000-6.666zm5.338-3.205a1.2 1.2 0 110 2.4 1.2 1.2 0 010-2.4z" clipRule="evenodd"/>
+              </svg>
+            ),
+            href: "https://instagram.com",
+            label: "Instagram"
+          }
+        ]}
+        mainLinks={[
+          { href: "/", label: "Home" },
+          { href: "/counselors", label: "Counselors" },
+          { href: "/about", label: "About" },
+          { href: "/get-help", label: "Get Help" },
+          { href: "/resources", label: "Resources" }
+        ]}
+        legalLinks={[
+          { href: "/privacy", label: "Privacy Policy" },
+          { href: "/terms", label: "Terms of Service" },
+          { href: "/contact", label: "Contact Us" }
+        ]}
+        copyright={{
+          text: "© 2025 Rwanda Cancer Relief",
+          license: "Compassionate care for all"
+        }}
+      />
 
       {/* Quick Access to Demos (Dev Only) */}
       {process.env.NODE_ENV === 'development' && (

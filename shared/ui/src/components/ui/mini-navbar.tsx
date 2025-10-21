@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 
 const AnimatedNavLink = ({ href, children }: { href: string; children: React.ReactNode }) => {
   return (
@@ -15,32 +15,10 @@ const AnimatedNavLink = ({ href, children }: { href: string; children: React.Rea
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
-  const [headerShapeClass, setHeaderShapeClass] = useState('rounded-full');
-  const shapeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
   };
-
-  useEffect(() => {
-    if (shapeTimeoutRef.current) {
-      clearTimeout(shapeTimeoutRef.current);
-    }
-
-    if (isOpen) {
-      setHeaderShapeClass('rounded-xl');
-    } else {
-      shapeTimeoutRef.current = setTimeout(() => {
-        setHeaderShapeClass('rounded-full');
-      }, 300);
-    }
-
-    return () => {
-      if (shapeTimeoutRef.current) {
-        clearTimeout(shapeTimeoutRef.current);
-      }
-    };
-  }, [isOpen]);
 
   const logoElement = (
     <div className="relative w-5 h-5 flex items-center justify-center">
@@ -58,7 +36,7 @@ export function Navbar() {
   ];
 
   const loginButtonElement = (
-    <button className="px-4 py-2 sm:px-3 text-xs sm:text-sm border border-primary/30 bg-background/80 text-foreground rounded-full hover:border-primary hover:bg-primary/10 hover:text-primary transition-all duration-200 w-full sm:w-auto">
+    <button className="px-4 py-2 sm:px-3 text-xs sm:text-sm border border-primary/30 bg-background/80 text-foreground rounded-full hover:border-primary hover:bg-primary/10 hover:text-primary transition-all duration-200 w-full sm:w-auto whitespace-nowrap">
       LogIn
     </button>
   );
@@ -71,7 +49,7 @@ export function Navbar() {
                      opacity-30 filter blur-lg pointer-events-none
                      transition-all duration-300 ease-out
                      group-hover:opacity-50 group-hover:blur-xl group-hover:-m-3"></div>
-       <button className="relative z-10 px-4 py-2 sm:px-3 text-xs sm:text-sm font-semibold text-primary-foreground bg-primary rounded-full hover:opacity-90 transition-all duration-200 w-full sm:w-auto">
+       <button className="relative z-10 px-4 py-2 sm:px-3 text-xs sm:text-sm font-semibold text-primary-foreground bg-primary rounded-full hover:opacity-90 transition-all duration-200 w-full sm:w-auto whitespace-nowrap">
          Signup
        </button>
     </div>
@@ -80,8 +58,8 @@ export function Navbar() {
   return (
     <header className={`fixed top-6 left-1/2 transform -translate-x-1/2 z-20
                        flex flex-col items-center
-                       pl-6 pr-6 py-3 backdrop-blur-md
-                       ${headerShapeClass}
+                       px-6 py-3 backdrop-blur-md
+                       rounded-2xl sm:rounded-full
                        border border-primary/20 bg-background/90
                        shadow-lg shadow-primary/10
                        w-[calc(100%-2rem)] sm:w-auto

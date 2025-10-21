@@ -56,9 +56,9 @@ export function Navbar() {
   );
 
   const navLinksData = [
-    { label: 'Manifesto', href: '#1' },
-    { label: 'Careers', href: '#2' },
-    { label: 'Discover', href: '#3' },
+    { label: 'Home', href: '/' },
+    { label: 'Counselors', href: '/counselors' },
+    { label: 'About', href: '/about' },
   ];
 
   const loginButtonElement = (

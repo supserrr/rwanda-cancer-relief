@@ -1,27 +1,24 @@
 import Link from "next/link"
 import { Button } from "@workspace/ui/components/button"
+import { Navbar } from "@workspace/ui/components/ui/mini-navbar"
+import { SvgFollowScroll } from "@workspace/ui/components/ui/svg-follow-scroll"
 
 /**
  * Rwanda Cancer Relief - Landing Page
  * 
- * Main homepage - Let's build this together!
- * 
- * Tell me what sections you want and I'll add them here.
+ * Main homepage - Building together!
  */
 export default function LandingPage() {
   return (
     <div className="min-h-screen flex flex-col">
       
-      {/* 
-        YOUR LANDING PAGE WILL GO HERE
-        
-        Just tell me what you want to add! For example:
-        - "Add a hero section at the top"
-        - "Put a features grid below that"
-        - "Add statistics section"
-        - "Add a footer at the bottom"
-      */}
+      {/* Navigation */}
+      <Navbar />
       
+      {/* SVG Scroll Animation */}
+      <SvgFollowScroll />
+      
+      {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
         <h1 className="text-5xl font-bold mb-4">Rwanda Cancer Relief</h1>
         <p className="text-xl text-muted-foreground mb-8 max-w-2xl">

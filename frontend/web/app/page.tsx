@@ -108,12 +108,12 @@ export default function LandingPage() {
                   
                   {/* CTA Buttons */}
                   <div className="relative z-10 flex flex-row gap-3 lg:gap-4">
-                    <a href="/get-help" className="inline-flex items-center justify-center px-6 py-3 lg:px-8 lg:py-4 text-sm lg:text-base font-semibold text-primary-foreground bg-primary rounded-full hover:opacity-90 transition-all duration-200 shadow-lg shadow-primary/20 whitespace-nowrap">
+                    <a href="/signup/patient" className="inline-flex items-center justify-center px-6 py-3 lg:px-8 lg:py-4 text-sm lg:text-base font-semibold text-primary-foreground bg-primary rounded-full hover:opacity-90 transition-all duration-200 shadow-lg shadow-primary/20 whitespace-nowrap">
                       Get Help
                     </a>
-                    <a href="/counselor" className="inline-flex items-center justify-center px-6 py-3 lg:px-8 lg:py-4 text-sm lg:text-base font-semibold text-primary bg-background border-2 border-primary rounded-full hover:bg-primary/10 transition-all duration-200 whitespace-nowrap">
-                      I'm a Counselor
-                    </a>
+                     <a href="/signup/counselor" className="inline-flex items-center justify-center px-6 py-3 lg:px-8 lg:py-4 text-sm lg:text-base font-semibold text-primary bg-background border-2 border-primary rounded-full hover:bg-primary/10 transition-all duration-200 whitespace-nowrap">
+                        I'm a Counselor
+                      </a>
                   </div>
                 </div>
               </div>
@@ -361,9 +361,9 @@ export default function LandingPage() {
                       Take the first step toward healing with the support of compassionate counselors who understand your experience.
                     </p>
                     <div className="pt-4">
-                      <a href="/get-help" className="inline-flex items-center justify-center px-8 py-4 text-base lg:text-lg font-semibold text-primary-foreground bg-primary rounded-full hover:opacity-90 transition-all duration-200 shadow-xl shadow-primary/30">
-                        Connect with a Counselor
-                      </a>
+                       <a href="/signup/patient" className="inline-flex items-center justify-center px-8 py-4 text-base lg:text-lg font-semibold text-primary-foreground bg-primary rounded-full hover:opacity-90 transition-all duration-200 shadow-xl shadow-primary/30">
+                          Connect with a Counselor
+                        </a>
                     </div>
                   </div>
                 </div>
@@ -441,7 +441,10 @@ export default function LandingPage() {
                 { href: "/counselors", label: "Find a Counselor" },
                 { href: "/about", label: "About Us" },
                 { href: "/resources", label: "Resources" },
-                { href: "/contact", label: "Contact" }
+                { href: "/contact", label: "Contact" },
+                { href: "/signin", label: "Sign In" },
+                { href: "/signup/patient", label: "Patient Sign Up" },
+                { href: "/signup/counselor", label: "Counselor Sign Up" }
               ]}
               legalLinks={[
                 { href: "/privacy", label: "Privacy Policy" },

@@ -36,9 +36,9 @@ export function Navbar() {
   ];
 
   const loginButtonElement = (
-    <button className="px-4 py-2 sm:px-3 text-xs sm:text-sm border border-primary/30 bg-background/80 text-foreground rounded-full hover:border-primary hover:bg-primary/10 hover:text-primary transition-all duration-200 w-full sm:w-auto whitespace-nowrap">
+    <a href="/signin" className="px-4 py-2 sm:px-3 text-xs sm:text-sm border border-primary/30 bg-background/80 text-foreground rounded-full hover:border-primary hover:bg-primary/10 hover:text-primary transition-all duration-200 w-full sm:w-auto whitespace-nowrap text-center">
       LogIn
-    </button>
+    </a>
   );
 
   const signupButtonElement = (
@@ -49,9 +49,9 @@ export function Navbar() {
                      opacity-30 filter blur-lg pointer-events-none
                      transition-all duration-300 ease-out
                      group-hover:opacity-50 group-hover:blur-xl group-hover:-m-3"></div>
-       <button className="relative z-10 px-4 py-2 sm:px-3 text-xs sm:text-sm font-semibold text-primary-foreground bg-primary rounded-full hover:opacity-90 transition-all duration-200 w-full sm:w-auto whitespace-nowrap">
+       <a href="/signup/patient" className="relative z-10 px-4 py-2 sm:px-3 text-xs sm:text-sm font-semibold text-primary-foreground bg-primary rounded-full hover:opacity-90 transition-all duration-200 w-full sm:w-auto whitespace-nowrap text-center block">
          Signup
-       </button>
+       </a>
     </div>
   );
 

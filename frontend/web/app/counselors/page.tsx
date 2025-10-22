@@ -75,7 +75,7 @@ const counselors: Counselor[] = [
     rating: 4.9,
     reviews: 156,
     availability: 'Available tomorrow',
-    photo: 'https://images.unsplash.com/photo-1594824388852-8a7b4b8b8b8b?w=400&h=400&fit=crop&auto=format&q=80',
+    photo: 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=400&h=400&fit=crop&auto=format&q=80',
     bio: 'Dr. Mukamana provides comprehensive support to families navigating cancer treatment, helping them access resources and cope with the emotional challenges of the journey.',
     education: 'MSW in Oncology Social Work, University of Cape Town',
     certifications: ['Licensed Social Worker', 'Oncology Social Work Specialist'],
@@ -276,7 +276,10 @@ export default function CounselorsPage() {
           { href: "/counselors", label: "Find a Counselor" },
           { href: "/about", label: "About Us" },
           { href: "/resources", label: "Resources" },
-          { href: "/contact", label: "Contact" }
+          { href: "/contact", label: "Contact" },
+          { href: "/signin", label: "Sign In" },
+          { href: "/signup/patient", label: "Patient Sign Up" },
+          { href: "/signup/counselor", label: "Counselor Sign Up" }
         ]}
         legalLinks={[
           { href: "/privacy", label: "Privacy Policy" },

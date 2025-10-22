@@ -403,7 +403,10 @@ export default function ContactPage() {
           { href: "/counselors", label: "Find a Counselor" },
           { href: "/about", label: "About Us" },
           { href: "/resources", label: "Resources" },
-          { href: "/contact", label: "Contact" }
+          { href: "/contact", label: "Contact" },
+          { href: "/signin", label: "Sign In" },
+          { href: "/signup/patient", label: "Patient Sign Up" },
+          { href: "/signup/counselor", label: "Counselor Sign Up" }
         ]}
         legalLinks={[
           { href: "/privacy", label: "Privacy Policy" },

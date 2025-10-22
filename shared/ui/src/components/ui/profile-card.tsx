@@ -16,6 +16,8 @@ interface ProfileCardProps {
   className?: string
   onFollow?: () => void
   isFollowing?: boolean
+  followButtonText?: string
+  followingButtonText?: string
 }
 
 export function ProfileCard({
@@ -29,6 +31,8 @@ export function ProfileCard({
   className,
   onFollow = () => {},
   isFollowing = false,
+  followButtonText = "Follow +",
+  followingButtonText = "Following",
 }: ProfileCardProps) {
   const [hovered, setHovered] = useState(false)
   const shouldReduceMotion = useReducedMotion()
@@ -232,7 +236,7 @@ export function ProfileCard({
             "transform-gpu"
           )}
         >
-          {isFollowing ? "Following" : "Follow +"}
+          {isFollowing ? followingButtonText : followButtonText}
         </motion.button>
       </motion.div>
     </motion.div>

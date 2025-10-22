@@ -75,7 +75,8 @@ export default function PatientSignUpPage() {
     const formData = new FormData(event.currentTarget);
     const data = Object.fromEntries(formData.entries());
     console.log("Patient Sign Up submitted:", data);
-    alert(`Patient Sign Up Submitted! Check the browser console for form data.`);
+    alert(`Account created successfully! Redirecting to onboarding...`);
+    window.location.href = '/onboarding/patient';
   };
 
   const handleGoogleSignUp = () => {
@@ -158,7 +159,7 @@ export default function PatientSignUpPage() {
               <span className="px-4 text-sm text-muted-foreground bg-background absolute">Or continue with</span>
             </div>
 
-            <button onClick={handleGoogleSignUp} className="animate-element animate-delay-800 w-full flex items-center justify-center gap-3 border border-border rounded-2xl py-4 hover:bg-secondary transition-colors">
+            <button onClick={handleGoogleSignUp} className="animate-element animate-delay-800 w-full flex items-center justify-center gap-3 border border-border rounded-2xl py-4 hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-all duration-200">
                 <GoogleIcon />
                 Continue with Google
             </button>

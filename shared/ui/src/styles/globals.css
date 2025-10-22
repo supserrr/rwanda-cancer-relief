@@ -230,28 +230,28 @@
   .animate-float {
     animation: float 6s ease-in-out infinite;
   }
-  
+
   .animate-element {
     opacity: 0;
     filter: blur(4px);
     transform: translateY(20px);
     animation: fadeSlideIn 0.6s ease-out forwards;
   }
-  
+
   .animate-slide-right {
     opacity: 0;
     filter: blur(4px);
     transform: translateX(20px);
     animation: slideRightIn 0.6s ease-out forwards;
   }
-  
+
   .animate-testimonial {
     opacity: 0;
     filter: blur(4px);
     transform: translateY(20px) scale(0.95);
     animation: testimonialIn 0.6s ease-out forwards;
   }
-  
+
   .animate-delay-100 { animation-delay: 0.1s; }
   .animate-delay-200 { animation-delay: 0.2s; }
   .animate-delay-300 { animation-delay: 0.3s; }

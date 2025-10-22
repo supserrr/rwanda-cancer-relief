@@ -1,16 +1,13 @@
-import { Geist, Geist_Mono } from "next/font/google"
+import { Ubuntu } from "next/font/google"
 
 import "@workspace/ui/globals.css"
 import { Providers } from "@/components/providers"
 
-const fontSans = Geist({
+const fontSans = Ubuntu({
   subsets: ["latin"],
+  weight: ["300", "400", "500", "700"],
+  style: ["normal", "italic"],
   variable: "--font-sans",
-})
-
-const fontMono = Geist_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
 })
 
 export default function RootLayout({
@@ -20,8 +17,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap" rel="stylesheet" />
+      </head>
       <body
-        className={`${fontSans.variable} ${fontMono.variable} font-sans antialiased overflow-x-hidden`}
+        className={`${fontSans.variable} font-sans antialiased overflow-x-hidden`}
+        style={{ fontFamily: 'Ubuntu, ui-sans-serif, system-ui, sans-serif' }}
       >
         <Providers>{children}</Providers>
       </body>

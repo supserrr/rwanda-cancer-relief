@@ -1,6 +1,10 @@
 'use client';
 
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { SignInPage, Testimonial } from "@workspace/ui/components/ui/sign-in";
+import { AuthService } from '@/lib/auth';
+import { validateSignInForm } from '@/lib/validations';
 
 const sampleTestimonials: Testimonial[] = [
   {
@@ -27,29 +31,72 @@ const sampleTestimonials: Testimonial[] = [
  * Sign In page component for Rwanda Cancer Relief
  */
 export default function SignInPageDemo() {
-  const handleSignIn = (event: React.FormEvent<HTMLFormElement>) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  const handleSignIn = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const data = Object.fromEntries(formData.entries());
-    console.log("Sign In submitted:", data);
-    alert(`Sign In Submitted! Check the browser console for form data.`);
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData(event.currentTarget);
+      const data = {
+        email: formData.get('email') as string,
+        password: formData.get('password') as string,
+        rememberMe: formData.get('rememberMe') === 'on'
+      };
+
+      // Validate form data
+      const validation = validateSignInForm(data);
+      if (!validation.isValid) {
+        setError(Object.values(validation.errors)[0] || 'Please check your input');
+        return;
+      }
+
+      // Authenticate user
+      const result = await AuthService.signIn(data);
+      
+      // Store auth data in localStorage (in a real app, this would be handled by the auth context)
+      localStorage.setItem('auth-token', result.token);
+      localStorage.setItem('user-data', JSON.stringify(result.user));
+      localStorage.setItem('user-role', result.user.role);
+
+      // Redirect to appropriate dashboard
+      const dashboardRoute = result.user.role === 'counselor' 
+        ? '/dashboard/counselor' 
+        : '/dashboard/patient';
+      
+      router.push(dashboardRoute);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sign in failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleGoogleSignIn = () => {
-    console.log("Continue with Google clicked");
-    alert("Continue with Google clicked");
+    // For now, just show a message - Google OAuth would be implemented here
+    alert("Google Sign-In will be implemented with OAuth integration");
   };
   
   const handleResetPassword = () => {
-    alert("Reset Password clicked");
+    // For now, just show a message - password reset would be implemented here
+    alert("Password reset functionality will be implemented");
   }
 
   const handleCreateAccount = () => {
-    alert("Create Account clicked");
+    router.push('/signup/patient');
   }
 
   return (
     <div className="bg-background text-foreground">
+      {error && (
+        <div className="fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50">
+          {error}
+        </div>
+      )}
       <SignInPage
         title={
           <span className="font-light text-foreground tracking-tighter">
@@ -64,6 +111,14 @@ export default function SignInPageDemo() {
         onResetPassword={handleResetPassword}
         onCreateAccount={handleCreateAccount}
       />
+      {isLoading && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-2 text-sm text-gray-600">Signing you in...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

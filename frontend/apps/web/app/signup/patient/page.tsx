@@ -1,7 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
+import { AuthService } from '@/lib/auth';
+import { validateSignUpForm } from '@/lib/validations';
 
 // --- HELPER COMPONENTS (ICONS) ---
 
@@ -69,14 +72,48 @@ const sampleTestimonials: Testimonial[] = [
 export default function PatientSignUpPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-  const handleSignUp = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSignUp = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const data = Object.fromEntries(formData.entries());
-    console.log("Patient Sign Up submitted:", data);
-    alert(`Account created successfully! Redirecting to onboarding...`);
-    window.location.href = '/onboarding/patient';
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData(event.currentTarget);
+      const data = {
+        name: formData.get('name') as string,
+        email: formData.get('email') as string,
+        password: formData.get('password') as string,
+        confirmPassword: formData.get('confirmPassword') as string,
+        role: 'patient' as const,
+        agreeToTerms: formData.get('agreeToTerms') === 'on'
+      };
+
+      // Validate form data
+      const validation = validateSignUpForm(data);
+      if (!validation.isValid) {
+        setError(Object.values(validation.errors)[0] || 'Please check your input');
+        return;
+      }
+
+      // Create user account
+      const result = await AuthService.signUp(data);
+      
+      // Store auth data in localStorage
+      localStorage.setItem('auth-token', result.token);
+      localStorage.setItem('user-data', JSON.stringify(result.user));
+      localStorage.setItem('user-role', result.user.role);
+
+      // Redirect to onboarding
+      router.push('/onboarding/patient');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Account creation failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleGoogleSignUp = () => {
@@ -90,6 +127,11 @@ export default function PatientSignUpPage() {
 
   return (
     <div className="h-[100dvh] flex flex-col md:flex-row font-jakarta-sans w-[100dvw]">
+      {error && (
+        <div className="fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50">
+          {error}
+        </div>
+      )}
       {/* Left column: sign-up form */}
       <section className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
@@ -107,7 +149,7 @@ export default function PatientSignUpPage() {
               <div className="animate-element animate-delay-300">
                 <label className="text-sm font-medium text-muted-foreground">Full Name</label>
                 <GlassInputWrapper>
-                  <input name="fullName" type="text" placeholder="Enter your full name" className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none" />
+                  <input name="name" type="text" placeholder="Enter your full name" className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none" />
                 </GlassInputWrapper>
               </div>
 
@@ -175,6 +217,15 @@ export default function PatientSignUpPage() {
       <section className="hidden md:block flex-1 relative p-4">
         <div className="animate-slide-right animate-delay-300 absolute inset-4 rounded-3xl bg-cover bg-center" style={{ backgroundImage: `url(https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=2160&q=80)` }}></div>
       </section>
+      
+      {isLoading && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-2 text-sm text-gray-600">Creating your account...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

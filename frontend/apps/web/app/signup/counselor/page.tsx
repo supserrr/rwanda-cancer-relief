@@ -1,7 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
+import { AuthService } from '@/lib/auth';
+import { validateSignUpForm } from '@/lib/validations';
 
 // --- HELPER COMPONENTS (ICONS) ---
 
@@ -69,14 +72,48 @@ const sampleTestimonials: Testimonial[] = [
 export default function CounselorSignUpPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-  const handleSignUp = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSignUp = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const data = Object.fromEntries(formData.entries());
-    console.log("Counselor Sign Up submitted:", data);
-    alert(`Account created successfully! Redirecting to application form...`);
-    window.location.href = '/onboarding/counselor';
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData(event.currentTarget);
+      const data = {
+        name: formData.get('name') as string,
+        email: formData.get('email') as string,
+        password: formData.get('password') as string,
+        confirmPassword: formData.get('confirmPassword') as string,
+        role: 'counselor' as const,
+        agreeToTerms: formData.get('agreeToTerms') === 'on'
+      };
+
+      // Validate form data
+      const validation = validateSignUpForm(data);
+      if (!validation.isValid) {
+        setError(Object.values(validation.errors)[0] || 'Please check your input');
+        return;
+      }
+
+      // Create user account
+      const result = await AuthService.signUp(data);
+      
+      // Store auth data in localStorage
+      localStorage.setItem('auth-token', result.token);
+      localStorage.setItem('user-data', JSON.stringify(result.user));
+      localStorage.setItem('user-role', result.user.role);
+
+      // Redirect to onboarding
+      router.push('/onboarding/counselor');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Account creation failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleGoogleSignUp = () => {

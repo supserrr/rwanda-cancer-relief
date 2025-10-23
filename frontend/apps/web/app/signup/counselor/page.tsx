@@ -144,7 +144,7 @@ export default function CounselorSignUpPage() {
               <div className="animate-element animate-delay-300">
                 <label className="text-sm font-medium text-muted-foreground">Full Name</label>
                 <GlassInputWrapper>
-                  <input name="fullName" type="text" placeholder="Enter your full name" className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none" />
+                  <input name="name" type="text" placeholder="Enter your full name" className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none" />
                 </GlassInputWrapper>
               </div>
 

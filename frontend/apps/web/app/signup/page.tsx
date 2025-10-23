@@ -1,69 +1,119 @@
-'use client';
+'use client'
 
-import { SignInPage, Testimonial } from "@workspace/ui/components/ui/sign-in";
-
-const sampleTestimonials: Testimonial[] = [
-  {
-    avatarSrc: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
-    name: "Emma Thompson",
-    handle: "@emmathompson",
-    text: "Joining RCR was the best decision I made. The community support and resources have been invaluable during my recovery."
-  },
-  {
-    avatarSrc: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face",
-    name: "James Wilson",
-    handle: "@jameswilson",
-    text: "The educational programs and peer support groups have helped me understand my condition better and connect with others."
-  },
-  {
-    avatarSrc: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face",
-    name: "Maria Rodriguez",
-    handle: "@mariarodriguez",
-    text: "RCR's holistic approach to cancer care goes beyond medical treatment. They truly care about your emotional and mental well-being."
-  },
-];
+// import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Button } from '@workspace/ui/components/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@workspace/ui/components/ui/card'
+import { Heart, User, Shield } from 'lucide-react'
 
 /**
- * Sign Up page component for Rwanda Cancer Relief
+ * Sign Up Page for Rwanda Cancer Relief Platform
+ * 
+ * Provides role selection for new users:
+ * - Patient signup
+ * - Counselor signup
  */
-export default function SignUpPageDemo() {
-  const handleSignUp = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const data = Object.fromEntries(formData.entries());
-    console.log("Sign Up submitted:", data);
-    alert(`Sign Up Submitted! Check the browser console for form data.`);
-  };
+export default function SignUpPage() {
+  const router = useRouter()
 
-  const handleGoogleSignUp = () => {
-    console.log("Continue with Google clicked");
-    alert("Continue with Google clicked");
-  };
-  
-  const handleResetPassword = () => {
-    alert("Reset Password clicked");
-  }
-
-  const handleSignIn = () => {
-    alert("Sign In clicked");
-  }
+  const signupOptions = [
+    {
+      title: 'I&apos;m a Patient',
+      description: 'I need counseling and emotional support for my cancer journey',
+      icon: User,
+      href: '/signup/patient',
+      color: 'bg-blue-500',
+      features: [
+        'Access to trained counselors',
+        '24/7 emotional support',
+        'Culturally sensitive care',
+        'Secure messaging platform'
+      ]
+    },
+    {
+      title: 'I&apos;m a Counselor',
+      description: 'I want to provide counseling and support to cancer patients',
+      icon: Shield,
+      href: '/signup/counselor',
+      color: 'bg-green-500',
+      features: [
+        'Connect with patients',
+        'Flexible scheduling',
+        'Professional resources',
+        'Support community'
+      ]
+    }
+  ]
 
   return (
-    <div className="bg-background text-foreground">
-      <SignInPage
-        title={
-          <span className="font-light text-foreground tracking-tighter">
-            Join <span className="font-semibold text-primary">Rwanda Cancer Relief</span>
-          </span>
-        }
-        description="Create your account and become part of our supportive community. Together, we can face any challenge."
-        heroImageSrc="https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=2160&q=80"
-        testimonials={sampleTestimonials}
-        onSignIn={handleSignUp}
-        onGoogleSignIn={handleGoogleSignUp}
-        onResetPassword={handleResetPassword}
-        onCreateAccount={handleSignIn}
-      />
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+      <div className="w-full max-w-4xl space-y-8">
+        {/* Header */}
+        <div className="text-center">
+          <div className="flex justify-center mb-4">
+            <div className="relative w-12 h-12 flex items-center justify-center">
+              <Heart className="w-8 h-8 text-primary" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold text-foreground">Join Rwanda Cancer Relief</h1>
+          <p className="text-muted-foreground mt-2">
+            Choose your role to get started with our platform
+          </p>
+        </div>
+
+        {/* Sign Up Options */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {signupOptions.map((option) => {
+            const Icon = option.icon
+            return (
+              <Card key={option.title} className="hover:shadow-lg transition-shadow cursor-pointer group">
+                <CardHeader>
+                  <div className="flex items-center space-x-4">
+                    <div className={`w-12 h-12 ${option.color} rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                      <Icon className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl">{option.title}</CardTitle>
+                      <CardDescription className="text-sm">
+                        {option.description}
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2 mb-6">
+                    {option.features.map((feature, index) => (
+                      <li key={index} className="flex items-center space-x-2 text-sm text-muted-foreground">
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full"></div>
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button 
+                    className="w-full" 
+                    onClick={() => router.push(option.href)}
+                  >
+                    Get Started
+                  </Button>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+
+        {/* Sign In Link */}
+        <div className="text-center">
+          <p className="text-sm text-muted-foreground">
+            Already have an account?{' '}
+            <a
+              href="/signin"
+              className="text-primary hover:underline font-medium"
+            >
+              Sign in here
+            </a>
+          </p>
+        </div>
+      </div>
     </div>
-  );
+  )
 }

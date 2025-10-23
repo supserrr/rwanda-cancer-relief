@@ -63,12 +63,12 @@ export default function SignInPageDemo() {
       localStorage.setItem('user-data', JSON.stringify(result.user));
       localStorage.setItem('user-role', result.user.role);
 
-      // Redirect to appropriate dashboard
-      const dashboardRoute = result.user.role === 'counselor' 
-        ? '/dashboard/counselor' 
-        : '/dashboard/patient';
+      // Redirect to appropriate onboarding
+      const onboardingRoute = result.user.role === 'counselor' 
+        ? '/onboarding/counselor' 
+        : '/onboarding/patient';
       
-      router.push(dashboardRoute);
+      router.push(onboardingRoute);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign in failed. Please try again.');
     } finally {

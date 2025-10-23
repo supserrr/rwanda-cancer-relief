@@ -13,10 +13,10 @@ import type { NextRequest } from 'next/server'
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   
-  // Get authentication status from cookies or headers
+  // For now, we'll allow all routes since authentication is handled client-side
   // In a real app, this would check JWT tokens or session data
-  const isAuthenticated = request.cookies.get('auth-token')?.value
-  const userRole = request.cookies.get('user-role')?.value || 'guest'
+  const isAuthenticated = false // Will be handled client-side
+  const userRole = 'guest'
   
   // Public routes that don't require authentication
   const publicRoutes = [
@@ -38,8 +38,7 @@ export function middleware(request: NextRequest) {
   
   // Protected routes that require authentication
   const protectedRoutes = [
-    '/dashboard',
-    '/onboarding'
+    '/dashboard'
   ]
   
   // Admin routes that require admin role

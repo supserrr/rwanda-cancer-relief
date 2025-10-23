@@ -107,12 +107,12 @@ export default function LandingPage() {
                   </p>
                   
                   {/* CTA Buttons */}
-                  <div className="relative z-10 flex flex-row gap-3 lg:gap-4">
-                    <a href="/signup/patient" className="inline-flex items-center justify-center px-6 py-3 lg:px-8 lg:py-4 text-sm lg:text-base font-semibold text-primary-foreground bg-primary rounded-full hover:opacity-90 transition-all duration-200 shadow-lg shadow-primary/20 whitespace-nowrap">
+                  <div className="relative z-10 flex flex-col sm:flex-row gap-3 lg:gap-4">
+                    <a href="/signup/patient" className="inline-flex items-center justify-center px-6 py-3 lg:px-8 lg:py-4 text-sm lg:text-base font-semibold text-primary-foreground bg-primary rounded-full hover:opacity-90 transition-all duration-200 shadow-lg shadow-primary/20">
                       Get Help
                     </a>
-                     <a href="/signup/counselor" className="inline-flex items-center justify-center px-6 py-3 lg:px-8 lg:py-4 text-sm lg:text-base font-semibold text-primary bg-background border-2 border-primary rounded-full hover:bg-primary/10 transition-all duration-200 whitespace-nowrap">
-                        I'm a Counselor
+                     <a href="/signup/counselor" className="inline-flex items-center justify-center px-6 py-3 lg:px-8 lg:py-4 text-sm lg:text-base font-semibold text-primary bg-background border-2 border-primary rounded-full hover:bg-primary/10 transition-all duration-200">
+                        I&apos;m a Counselor
                       </a>
                   </div>
                 </div>
@@ -151,7 +151,7 @@ export default function LandingPage() {
                   </p>
                   
                   <div className="relative z-10 flex flex-row gap-3 lg:gap-4">
-                    <a href="/counselors" className="inline-flex items-center justify-center px-6 py-3 lg:px-8 lg:py-4 text-sm lg:text-base font-semibold text-primary-foreground bg-primary rounded-full hover:opacity-90 transition-all duration-200 shadow-lg shadow-primary/20 whitespace-nowrap">
+                    <a href="/counselors" className="inline-flex items-center justify-center px-6 py-3 lg:px-8 lg:py-4 text-sm lg:text-base font-semibold text-primary-foreground bg-primary rounded-full hover:opacity-90 transition-all duration-200 shadow-lg shadow-primary/20">
                       Find a Counselor
                     </a>
                   </div>
@@ -361,7 +361,7 @@ export default function LandingPage() {
                       Take the first step toward healing with the support of compassionate counselors who understand your experience.
                     </p>
                     <div className="pt-4">
-                       <a href="/signup/patient" className="inline-flex items-center justify-center px-8 py-4 text-base lg:text-lg font-semibold text-primary-foreground bg-primary rounded-full hover:opacity-90 transition-all duration-200 shadow-xl shadow-primary/30">
+                       <a href="/signup/patient" className="inline-flex items-center justify-center px-6 py-3 sm:px-8 sm:py-4 text-sm sm:text-base lg:text-lg font-semibold text-primary-foreground bg-primary rounded-full hover:opacity-90 transition-all duration-200 shadow-xl shadow-primary/30 w-full sm:w-auto">
                           Connect with a Counselor
                         </a>
                     </div>

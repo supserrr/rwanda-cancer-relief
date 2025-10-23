@@ -19,296 +19,293 @@ import {
   BarChart3,
   Plus,
   Search,
-  Filter
+  Filter,
+  TrendingUp,
+  Eye,
+  DollarSign,
+  Package
 } from 'lucide-react';
 
 /**
- * Counselor dashboard page component
+ * Counselor dashboard page component - Dashy Style
  */
 export default function CounselorDashboardPage() {
   const [activeTab, setActiveTab] = useState('overview');
-  const [showApprovalSplash, setShowApprovalSplash] = useState(true); // Set to true for pending approval
+  const [showApprovalSplash, setShowApprovalSplash] = useState(false); // Set to false to show dashboard
 
   // Sample data - in real app this would come from API
-  const pendingApproval = true; // This would come from user status
-  const approvalStatus = 'pending'; // 'pending', 'approved', 'rejected'
+  const pendingApproval = false; // This would come from user status
+  const approvalStatus = 'approved'; // 'pending', 'approved', 'rejected'
 
-  const upcomingSessions = [
-    {
-      id: 1,
-      patient: 'Marie Uwimana',
-      type: 'Video Call',
-      date: '2024-01-15',
-      time: '10:00 AM',
-      status: 'confirmed',
-      duration: '60 min'
-    },
-    {
-      id: 2,
-      patient: 'Jean-Baptiste Nkurunziza',
-      type: 'Chat',
-      date: '2024-01-18',
-      time: '2:00 PM',
-      status: 'pending',
-      duration: '45 min'
-    }
-  ];
-
-  const recentMessages = [
-    {
-      id: 1,
-      patient: 'Marie Uwimana',
-      message: 'Thank you for the session yesterday. It really helped.',
-      time: '2 hours ago',
-      unread: true
-    },
-    {
-      id: 2,
-      patient: 'Jean-Baptiste Nkurunziza',
-      message: 'I have a question about the coping strategies we discussed.',
-      time: '1 day ago',
-      unread: false
-    }
-  ];
-
-  const patientStats = {
-    totalPatients: 12,
-    activeSessions: 8,
-    completedSessions: 45,
-    averageRating: 4.8
+  // Overview Cards Data
+  const overviewData = {
+    totalPatients: { value: 1234, growthRate: 12.5 },
+    activeSessions: { value: 89, growthRate: 8.2 },
+    completedSessions: { value: 456, growthRate: 15.3 },
+    averageRating: { value: 4.8, growthRate: 0.2 }
   };
 
-  // Approval Splash Screen
-  const renderApprovalSplash = () => (
-    <div className="min-h-screen w-full bg-background flex items-center justify-center py-4 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl w-full">
-        <Card className="w-full bg-gradient-to-br from-primary/5 via-background to-primary/10 rounded-3xl border-primary/20">
-          <CardHeader className="text-center relative">
-            {/* Decorative gradient blob */}
-            <div className="absolute top-0 right-0 w-48 h-48 bg-primary/10 rounded-full blur-3xl -z-0"></div>
-          </CardHeader>
-          <CardContent className="p-8 text-center relative z-10">
-          <div className="mb-6">
-            {approvalStatus === 'pending' && (
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Clock className="w-8 h-8 sm:w-10 sm:h-10 text-primary" />
-              </div>
-            )}
-            {approvalStatus === 'approved' && (
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-8 h-8 sm:w-10 sm:h-10 text-primary" />
-              </div>
-            )}
-            {approvalStatus === 'rejected' && (
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <AlertCircle className="w-8 h-8 sm:w-10 sm:h-10 text-primary" />
-              </div>
-            )}
-          </div>
-
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-4">
-            {approvalStatus === 'pending' && 'Application Under Review'}
-            {approvalStatus === 'approved' && 'Welcome to RCR!'}
-            {approvalStatus === 'rejected' && 'Application Status'}
-          </h1>
-
-          <p className="text-base sm:text-lg text-muted-foreground mb-6">
-            {approvalStatus === 'pending' && 
-              'Thank you for submitting your counselor application. Our team is currently reviewing your credentials and will get back to you within 3-5 business days. You will receive an email notification once your application has been processed.'
-            }
-            {approvalStatus === 'approved' && 
-              'Congratulations! Your application has been approved. You can now start providing support to patients in need.'
-            }
-            {approvalStatus === 'rejected' && 
-              'We appreciate your interest in joining Rwanda Cancer Relief. Unfortunately, we cannot approve your application at this time. Please contact our support team for more information.'
-            }
-          </p>
-
-          {approvalStatus === 'pending' && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-              <div className="flex items-center">
-                <AlertCircle className="w-5 h-5 text-yellow-600 mr-2" />
-                <p className="text-sm text-yellow-800">
-                  <strong>What happens next?</strong> Our admin team will review your credentials, 
-                  verify your documents, and check your references. This process typically takes 3-5 business days.
-                </p>
+  // Overview Card Component
+  const OverviewCard = ({ label, data, Icon, color }: { 
+    label: string; 
+    data: { value: number; growthRate: number }; 
+    Icon: any; 
+    color: string;
+  }) => {
+    const isDecreasing = data.growthRate < 0;
+    
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">{label}</p>
+              <p className="text-2xl font-bold text-foreground">{data.value}</p>
+              <div className="flex items-center mt-1">
+                <TrendingUp className={`w-4 h-4 ${isDecreasing ? 'text-red-500' : 'text-green-500'} mr-1`} />
+                <span className={`text-sm ${isDecreasing ? 'text-red-500' : 'text-green-500'}`}>
+                  {isDecreasing ? '' : '+'}{data.growthRate}%
+                </span>
               </div>
             </div>
-          )}
-
-          <div className="space-y-3">
-            {approvalStatus === 'pending' && (
-              <Button 
-                onClick={() => window.location.href = '/contact'}
-                variant="ghost"
-                className="w-full"
-              >
-                Contact Support
-              </Button>
-            )}
-            {approvalStatus === 'approved' && (
-              <Button 
-                onClick={() => setShowApprovalSplash(false)}
-                className="w-full"
-              >
-                Access Dashboard
-              </Button>
-            )}
-            {approvalStatus === 'rejected' && (
-              <>
-                <Button 
-                  onClick={() => window.location.href = '/contact'}
-                  className="w-full"
-                >
-                  Contact Support
-                </Button>
-                <Button 
-                  onClick={() => window.location.href = '/signup/counselor'}
-                  variant="outline"
-                  className="w-full"
-                >
-                  Reapply
-                </Button>
-              </>
-            )}
+            <div className={`p-3 ${color} rounded-lg`}>
+              <Icon className="w-6 h-6 text-white" />
+            </div>
           </div>
         </CardContent>
-        </Card>
-      </div>
-    </div>
+      </Card>
+    );
+  };
+
+  // Chart Placeholder Component
+  const ChartPlaceholder = ({ title, description, height = "h-80" }: { 
+    title: string; 
+    description: string; 
+    height?: string;
+  }) => (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className={`${height} flex items-center justify-center bg-muted/20 rounded-lg`}>
+          <div className="text-center">
+            <BarChart3 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">{title}</p>
+            <p className="text-sm text-muted-foreground">Chart component would go here</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  // Weekly Performance Component
+  const WeeklyPerformance = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle>Weekly Performance</CardTitle>
+        <CardDescription>This week's counseling metrics</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                <Users className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">New Patients</p>
+                <p className="text-sm text-muted-foreground">This week</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="font-bold text-lg">12</p>
+              <p className="text-sm text-green-500">+3 from last week</p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <MessageCircle className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <p className="font-medium">Messages Sent</p>
+                <p className="text-sm text-muted-foreground">This week</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="font-bold text-lg">89</p>
+              <p className="text-sm text-green-500">+15 from last week</p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Clock className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="font-medium">Hours Logged</p>
+                <p className="text-sm text-muted-foreground">This week</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="font-bold text-lg">42</p>
+              <p className="text-sm text-green-500">+8 from last week</p>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  // Top Channels Table Component
+  const TopChannels = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle>Top Patients</CardTitle>
+        <CardDescription>Most active patients this month</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {[
+            { name: 'Marie Uwimana', sessions: 12, revenue: '$2,400', growth: '+12%' },
+            { name: 'Jean-Baptiste Nkurunziza', sessions: 10, revenue: '$2,000', growth: '+8%' },
+            { name: 'Grace Mukamana', sessions: 8, revenue: '$1,600', growth: '+15%' },
+            { name: 'Paul Nkurunziza', sessions: 7, revenue: '$1,400', growth: '+5%' },
+            { name: 'Claire Uwimana', sessions: 6, revenue: '$1,200', growth: '+10%' }
+          ].map((patient, index) => (
+            <div key={index} className="flex items-center justify-between p-4 border border-border rounded-lg">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                  <Users className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h4 className="font-medium text-foreground">{patient.name}</h4>
+                  <p className="text-sm text-muted-foreground">{patient.sessions} sessions</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="font-bold text-foreground">{patient.revenue}</p>
+                <p className="text-sm text-green-500">{patient.growth}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  // Chats Card Component
+  const ChatsCard = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle>Recent Messages</CardTitle>
+        <CardDescription>Latest conversations with patients</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {[
+            { name: 'Marie Uwimana', message: 'Thank you for the session yesterday. It really helped.', time: '2 hours ago', unread: true },
+            { name: 'Jean-Baptiste Nkurunziza', message: 'I have a question about the coping strategies we discussed.', time: '1 day ago', unread: false },
+            { name: 'Grace Mukamana', message: 'Can we schedule another session for next week?', time: '2 days ago', unread: true }
+          ].map((message, index) => (
+            <div key={index} className="flex items-center justify-between p-4 border border-border rounded-lg">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                  <MessageCircle className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h4 className="font-medium text-foreground">{message.name}</h4>
+                  <p className="text-sm text-muted-foreground">{message.message}</p>
+                  <p className="text-xs text-muted-foreground">{message.time}</p>
+                </div>
+              </div>
+              {message.unread && (
+                <div className="w-2 h-2 bg-primary rounded-full"></div>
+              )}
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 
   const renderOverview = () => (
     <div className="space-y-6">
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Users className="w-6 h-6 text-primary" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Total Patients</p>
-                <p className="text-2xl font-bold text-foreground">{patientStats.totalPatients}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Calendar className="w-6 h-6 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Active Sessions</p>
-                <p className="text-2xl font-bold text-foreground">{patientStats.activeSessions}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <CheckCircle className="w-6 h-6 text-blue-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Completed</p>
-                <p className="text-2xl font-bold text-foreground">{patientStats.completedSessions}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Award className="w-6 h-6 text-purple-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Rating</p>
-                <p className="text-2xl font-bold text-foreground">{patientStats.averageRating}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Overview Cards - Dashy Style */}
+      <div className="grid gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4 2xl:gap-7.5">
+        <OverviewCard
+          label="Total Patients"
+          data={overviewData.totalPatients}
+          Icon={Users}
+          color="bg-primary"
+        />
+        <OverviewCard
+          label="Active Sessions"
+          data={overviewData.activeSessions}
+          Icon={Calendar}
+          color="bg-green-500"
+        />
+        <OverviewCard
+          label="Completed Sessions"
+          data={overviewData.completedSessions}
+          Icon={CheckCircle}
+          color="bg-blue-500"
+        />
+        <OverviewCard
+          label="Average Rating"
+          data={overviewData.averageRating}
+          Icon={Award}
+          color="bg-purple-500"
+        />
       </div>
 
-      {/* Upcoming Sessions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Upcoming Sessions
-          </CardTitle>
-          <CardDescription>Your scheduled counseling sessions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {upcomingSessions.map((session) => (
-              <div key={session.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    <MessageCircle className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-foreground">{session.patient}</h4>
-                    <p className="text-sm text-muted-foreground">{session.type} • {session.duration}</p>
-                    <p className="text-sm text-muted-foreground">{session.date} at {session.time}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={session.status === 'confirmed' ? 'default' : 'secondary'}>
-                    {session.status === 'confirmed' ? (
-                      <><CheckCircle className="w-3 h-3 mr-1" />Confirmed</>
-                    ) : (
-                      <><Clock className="w-3 h-3 mr-1" />Pending</>
-                    )}
-                  </Badge>
-                  <Button size="sm" variant="outline">Start Session</Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Charts and Analytics Section */}
+      <div className="grid grid-cols-12 gap-4 md:gap-6 2xl:gap-7.5">
+        {/* Main Chart */}
+        <div className="col-span-12 xl:col-span-7">
+          <ChartPlaceholder
+            title="Session Analytics"
+            description="Overview of your counseling sessions over time"
+          />
+        </div>
 
-      {/* Recent Messages */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageCircle className="w-5 h-5" />
-            Recent Messages
-          </CardTitle>
-          <CardDescription>Latest conversations with your patients</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {recentMessages.map((message) => (
-              <div key={message.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <Users className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-foreground">{message.patient}</h4>
-                    <p className="text-sm text-muted-foreground">{message.message}</p>
-                    <p className="text-xs text-muted-foreground">{message.time}</p>
-                  </div>
-                </div>
-                {message.unread && (
-                  <div className="w-2 h-2 bg-primary rounded-full"></div>
-                )}
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+        {/* Weekly Performance */}
+        <div className="col-span-12 xl:col-span-5">
+          <WeeklyPerformance />
+        </div>
+
+        {/* Used Devices Chart */}
+        <div className="col-span-12 xl:col-span-5">
+          <ChartPlaceholder
+            title="Session Types"
+            description="Distribution of session types"
+            height="h-64"
+          />
+        </div>
+
+        {/* Region Labels */}
+        <div className="col-span-12 xl:col-span-7">
+          <ChartPlaceholder
+            title="Patient Demographics"
+            description="Geographic distribution of patients"
+            height="h-64"
+          />
+        </div>
+
+        {/* Top Channels Table */}
+        <div className="col-span-12 grid xl:col-span-8">
+          <TopChannels />
+        </div>
+
+        {/* Chats Card */}
+        <div className="col-span-12 xl:col-span-4">
+          <ChatsCard />
+        </div>
+      </div>
     </div>
   );
 
@@ -493,7 +490,57 @@ export default function CounselorDashboardPage() {
 
   // Show approval splash screen if pending approval
   if (showApprovalSplash && pendingApproval) {
-    return renderApprovalSplash();
+    return (
+      <div className="min-h-screen w-full bg-background flex items-center justify-center py-4 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-2xl w-full">
+          <Card className="w-full bg-gradient-to-br from-primary/5 via-background to-primary/10 rounded-3xl border-primary/20">
+            <CardHeader className="text-center relative">
+              <div className="absolute top-0 right-0 w-48 h-48 bg-primary/10 rounded-full blur-3xl -z-0"></div>
+            </CardHeader>
+            <CardContent className="p-8 text-center relative z-10">
+              <div className="mb-6">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Clock className="w-8 h-8 sm:w-10 sm:h-10 text-primary" />
+                </div>
+              </div>
+
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-4">
+                Application Under Review
+              </h1>
+
+              <p className="text-base sm:text-lg text-muted-foreground mb-6">
+                Thank you for submitting your counselor application. Our team is currently reviewing your credentials and will get back to you within 3-5 business days. You will receive an email notification once your application has been processed.
+              </p>
+
+              <div className="bg-muted/20 border border-border rounded-lg p-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <div className="w-5 h-5 bg-primary/10 rounded-full flex items-center justify-center mt-0.5">
+                    <div className="w-2 h-2 bg-primary rounded-full"></div>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-foreground mb-1">What happens next?</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Our admin team will review your credentials, 
+                      verify your documents, and check your references. This process typically takes 3-5 business days.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Button 
+                  onClick={() => window.location.href = '/contact'}
+                  variant="ghost"
+                  className="w-full"
+                >
+                  Contact Support
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -503,8 +550,8 @@ export default function CounselorDashboardPage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Counselor Dashboard</h1>
-              <p className="text-muted-foreground">Manage your patients and sessions</p>
+              <h1 className="text-2xl font-bold text-foreground">Counselor Dashboard - DASHY STYLE</h1>
+              <p className="text-muted-foreground">Manage your patients and sessions - Updated with Dashy Style</p>
             </div>
             <div className="flex items-center gap-4">
               <Button variant="outline" size="sm">

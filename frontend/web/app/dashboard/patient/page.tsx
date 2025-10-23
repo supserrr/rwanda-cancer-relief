@@ -5,25 +5,35 @@ import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@workspace/ui/components/ui/card';
 import { Badge } from '@workspace/ui/components/ui/badge';
 import { 
-  Heart, 
+  Users, 
   MessageCircle, 
   Calendar, 
-  Users, 
   FileText, 
   Settings, 
   Bell,
-  Search,
-  Filter,
-  Plus,
-  Video,
-  Phone,
   Clock,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  UserCheck,
+  Award,
+  BarChart3,
+  Plus,
+  Search,
+  Filter,
+  TrendingUp,
+  Eye,
+  DollarSign,
+  Package,
+  Heart,
+  Shield,
+  BookOpen,
+  Phone,
+  Video,
+  MapPin
 } from 'lucide-react';
 
 /**
- * Patient dashboard page component
+ * Patient dashboard page component - Dash Style
  */
 export default function PatientDashboardPage() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -32,18 +42,18 @@ export default function PatientDashboardPage() {
   const upcomingSessions = [
     {
       id: 1,
-      counselor: 'Dr. Marie Uwimana',
-      type: 'Video Call',
+      counselor: 'Dr. Grace Mukamana',
       date: '2024-01-15',
       time: '10:00 AM',
+      type: 'Video Call',
       status: 'confirmed'
     },
     {
       id: 2,
-      counselor: 'Jean-Baptiste Nkurunziza',
-      type: 'Chat',
+      counselor: 'Dr. Jean-Baptiste Nkurunziza',
       date: '2024-01-18',
       time: '2:00 PM',
+      type: 'In-Person',
       status: 'pending'
     }
   ];
@@ -51,15 +61,15 @@ export default function PatientDashboardPage() {
   const recentMessages = [
     {
       id: 1,
-      counselor: 'Dr. Marie Uwimana',
-      message: 'How are you feeling today?',
+      counselor: 'Dr. Grace Mukamana',
+      message: 'How are you feeling today? Remember to practice the breathing exercises we discussed.',
       time: '2 hours ago',
       unread: true
     },
     {
       id: 2,
-      counselor: 'Jean-Baptiste Nkurunziza',
-      message: 'I\'ve sent you some resources about coping strategies.',
+      counselor: 'Dr. Jean-Baptiste Nkurunziza',
+      message: 'Your test results look good. Let\'s discuss them in our next session.',
       time: '1 day ago',
       unread: false
     }
@@ -71,159 +81,199 @@ export default function PatientDashboardPage() {
       name: 'Breast Cancer Support Group',
       members: 24,
       nextMeeting: '2024-01-20',
-      description: 'A supportive community for breast cancer patients and survivors'
+      description: 'A supportive community for women navigating breast cancer treatment.'
     },
     {
       id: 2,
-      name: 'Family Support Circle',
+      name: 'Family Support Network',
       members: 18,
       nextMeeting: '2024-01-22',
-      description: 'Support for families navigating cancer together'
+      description: 'Support for families affected by cancer.'
     }
   ];
 
+  const resources = [
+    {
+      id: 1,
+      title: 'Understanding Your Treatment',
+      type: 'Guide',
+      category: 'Medical Information',
+      description: 'Comprehensive guide to understanding your treatment plan and what to expect.'
+    },
+    {
+      id: 2,
+      title: 'Coping with Side Effects',
+      type: 'Resource',
+      category: 'Wellness',
+      description: 'Practical tips for managing treatment side effects and maintaining quality of life.'
+    },
+    {
+      id: 3,
+      title: 'Nutrition During Treatment',
+      type: 'Guide',
+      category: 'Lifestyle',
+      description: 'Nutritional guidance to support your body during cancer treatment.'
+    }
+  ];
+
+  // Overview Cards Component
+  const OverviewCard = ({ title, value, change, icon: Icon, color }: { 
+    title: string; 
+    value: string; 
+    change: string; 
+    icon: any; 
+    color: string;
+  }) => (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">{title}</p>
+            <p className="text-3xl font-bold text-foreground">{value}</p>
+            <p className="text-sm text-green-600 mt-1">{change}</p>
+          </div>
+          <div className={`p-3 ${color} rounded-lg`}>
+            <Icon className="w-8 h-8 text-white" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  // Chart Placeholder Component
+  const ChartPlaceholder = ({ title, description }: { 
+    title: string; 
+    description: string; 
+  }) => (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="h-64 flex items-center justify-center bg-muted/20 rounded-lg">
+          <div className="text-center">
+            <BarChart3 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">{title}</p>
+            <p className="text-sm text-muted-foreground">Chart component would go here</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   const renderOverview = () => (
     <div className="space-y-6">
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Calendar className="w-6 h-6 text-primary" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Upcoming Sessions</p>
-                <p className="text-2xl font-bold text-foreground">2</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <MessageCircle className="w-6 h-6 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Active Chats</p>
-                <p className="text-2xl font-bold text-foreground">3</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Users className="w-6 h-6 text-blue-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Support Groups</p>
-                <p className="text-2xl font-bold text-foreground">2</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <FileText className="w-6 h-6 text-purple-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Resources</p>
-                <p className="text-2xl font-bold text-foreground">12</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Main Metrics Cards - Dash Style */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <OverviewCard
+          title="Upcoming Sessions"
+          value="2"
+          change="+1 this week"
+          icon={Calendar}
+          color="bg-primary"
+        />
+        <OverviewCard
+          title="Active Chats"
+          value="3"
+          change="+2 this week"
+          icon={MessageCircle}
+          color="bg-green-500"
+        />
+        <OverviewCard
+          title="Support Groups"
+          value="2"
+          change="Joined this month"
+          icon={Users}
+          color="bg-blue-500"
+        />
+        <OverviewCard
+          title="Resources"
+          value="12"
+          change="+3 new this week"
+          icon={FileText}
+          color="bg-purple-500"
+        />
       </div>
 
-      {/* Upcoming Sessions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Upcoming Sessions
-          </CardTitle>
-          <CardDescription>Your scheduled counseling sessions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {upcomingSessions.map((session) => (
-              <div key={session.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    {session.type === 'Video Call' ? (
-                      <Video className="w-5 h-5 text-primary" />
-                    ) : (
-                      <MessageCircle className="w-5 h-5 text-primary" />
-                    )}
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-foreground">{session.counselor}</h4>
-                    <p className="text-sm text-muted-foreground">{session.type}</p>
-                    <p className="text-sm text-muted-foreground">{session.date} at {session.time}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={session.status === 'confirmed' ? 'default' : 'secondary'}>
-                    {session.status === 'confirmed' ? (
-                      <><CheckCircle className="w-3 h-3 mr-1" />Confirmed</>
-                    ) : (
-                      <><Clock className="w-3 h-3 mr-1" />Pending</>
-                    )}
-                  </Badge>
-                  <Button size="sm" variant="outline">Join</Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Monthly Progress Chart */}
+      <ChartPlaceholder
+        title="Monthly Progress"
+        description="Your counseling journey this month"
+      />
 
-      {/* Recent Messages */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageCircle className="w-5 h-5" />
-            Recent Messages
-          </CardTitle>
-          <CardDescription>Latest conversations with your counselors</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {recentMessages.map((message) => (
-              <div key={message.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <MessageCircle className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-foreground">{message.counselor}</h4>
-                    <p className="text-sm text-muted-foreground">{message.message}</p>
-                    <p className="text-xs text-muted-foreground">{message.time}</p>
-                  </div>
-                </div>
-                {message.unread && (
-                  <div className="w-2 h-2 bg-primary rounded-full"></div>
-                )}
+      {/* Quick Actions and Recent Activity */}
+      <div className="grid grid-cols-12 gap-4 md:gap-6">
+        {/* Quick Actions */}
+        <div className="col-span-12 xl:col-span-5">
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+              <CardDescription>Common tasks and shortcuts</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <Button className="w-full justify-start" variant="outline">
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Start New Chat
+                </Button>
+                <Button className="w-full justify-start" variant="outline">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Book Session
+                </Button>
+                <Button className="w-full justify-start" variant="outline">
+                  <Users className="w-4 h-4 mr-2" />
+                  Join Support Group
+                </Button>
+                <Button className="w-full justify-start" variant="outline">
+                  <FileText className="w-4 h-4 mr-2" />
+                  View Resources
+                </Button>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Messages */}
+        <div className="col-span-12 xl:col-span-7">
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Messages</CardTitle>
+              <CardDescription>Latest conversations with your counselors</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {recentMessages.map((message) => (
+                  <div key={message.id} className="flex items-start gap-4 p-4 border border-border rounded-lg">
+                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                      <MessageCircle className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <h4 className="font-medium text-foreground">{message.counselor}</h4>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">{message.time}</span>
+                          {message.unread && (
+                            <div className="w-2 h-2 bg-primary rounded-full"></div>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{message.message}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 
   const renderCounselors = () => (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-foreground">Your Counselors</h2>
+        <h2 className="text-2xl font-bold text-foreground">My Counselors</h2>
         <Button>
           <Plus className="w-4 h-4 mr-2" />
           Find New Counselor
@@ -233,55 +283,50 @@ export default function PatientDashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {[
           {
-            name: 'Dr. Marie Uwimana',
-            title: 'Licensed Clinical Psychologist',
-            specialties: ['Cancer Support', 'Grief Counseling'],
-            languages: ['Kinyarwanda', 'English'],
-            availability: 'Available now',
-            lastSession: '2 days ago'
+            name: 'Dr. Grace Mukamana',
+            specialty: 'Oncology Counseling',
+            experience: '8 years',
+            rating: 4.9,
+            nextSession: 'Tomorrow at 10:00 AM',
+            status: 'active',
+            image: 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=400&h=400&fit=crop&auto=format&q=80'
           },
           {
-            name: 'Jean-Baptiste Nkurunziza',
-            title: 'Mental Health Counselor',
-            specialties: ['Anxiety Management', 'Coping Strategies'],
-            languages: ['Kinyarwanda', 'English'],
-            availability: 'Available in 2 hours',
-            lastSession: '1 week ago'
+            name: 'Dr. Jean-Baptiste Nkurunziza',
+            specialty: 'Family Counseling',
+            experience: '12 years',
+            rating: 4.8,
+            nextSession: 'Friday at 2:00 PM',
+            status: 'active',
+            image: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&auto=format&q=80'
           }
         ].map((counselor, index) => (
           <Card key={index}>
             <CardContent className="p-6">
               <div className="text-center mb-4">
-                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Users className="w-8 h-8 text-primary" />
+                <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Users className="w-10 h-10 text-primary" />
                 </div>
                 <h3 className="font-semibold text-foreground">{counselor.name}</h3>
-                <p className="text-sm text-muted-foreground">{counselor.title}</p>
+                <p className="text-sm text-muted-foreground">{counselor.specialty}</p>
+                <div className="flex items-center justify-center gap-1 mt-1">
+                  <Award className="w-4 h-4 text-yellow-500" />
+                  <span className="text-sm font-medium">{counselor.rating}</span>
+                  <span className="text-sm text-muted-foreground">({counselor.experience})</span>
+                </div>
               </div>
               
               <div className="space-y-3">
                 <div>
-                  <p className="text-sm font-medium text-foreground">Specialties:</p>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {counselor.specialties.map((specialty, i) => (
-                      <Badge key={i} variant="secondary" className="text-xs">{specialty}</Badge>
-                    ))}
-                  </div>
+                  <p className="text-sm font-medium text-foreground">Next Session:</p>
+                  <p className="text-sm text-muted-foreground">{counselor.nextSession}</p>
                 </div>
                 
                 <div>
-                  <p className="text-sm font-medium text-foreground">Languages:</p>
-                  <p className="text-sm text-muted-foreground">{counselor.languages.join(', ')}</p>
-                </div>
-                
-                <div>
-                  <p className="text-sm font-medium text-foreground">Availability:</p>
-                  <p className="text-sm text-muted-foreground">{counselor.availability}</p>
-                </div>
-                
-                <div>
-                  <p className="text-sm font-medium text-foreground">Last Session:</p>
-                  <p className="text-sm text-muted-foreground">{counselor.lastSession}</p>
+                  <p className="text-sm font-medium text-foreground">Status:</p>
+                  <Badge variant={counselor.status === 'active' ? 'default' : 'secondary'}>
+                    {counselor.status}
+                  </Badge>
                 </div>
               </div>
               
@@ -292,7 +337,7 @@ export default function PatientDashboardPage() {
                 </Button>
                 <Button size="sm" variant="outline" className="flex-1">
                   <Calendar className="w-4 h-4 mr-2" />
-                  Book
+                  Schedule
                 </Button>
               </div>
             </CardContent>
@@ -308,7 +353,7 @@ export default function PatientDashboardPage() {
         <h2 className="text-2xl font-bold text-foreground">Support Groups</h2>
         <Button>
           <Plus className="w-4 h-4 mr-2" />
-          Join Group
+          Join New Group
         </Button>
       </div>
 
@@ -318,23 +363,25 @@ export default function PatientDashboardPage() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h3 className="font-semibold text-foreground">{group.name}</h3>
-                  <p className="text-sm text-muted-foreground">{group.description}</p>
+                  <h3 className="font-semibold text-foreground mb-2">{group.name}</h3>
+                  <p className="text-sm text-muted-foreground mb-3">{group.description}</p>
                 </div>
-                <Badge variant="secondary">{group.members} members</Badge>
+                <Badge variant="outline">{group.members} members</Badge>
               </div>
               
-              <div className="space-y-2 mb-4">
+              <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Next meeting: {group.nextMeeting}</span>
+                  <span className="text-sm text-muted-foreground">
+                    Next meeting: {group.nextMeeting}
+                  </span>
                 </div>
               </div>
               
-              <div className="flex gap-2">
+              <div className="flex gap-2 mt-4">
                 <Button size="sm" className="flex-1">
                   <Users className="w-4 h-4 mr-2" />
-                  Join Meeting
+                  View Group
                 </Button>
                 <Button size="sm" variant="outline" className="flex-1">
                   <MessageCircle className="w-4 h-4 mr-2" />
@@ -369,45 +416,8 @@ export default function PatientDashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[
-          {
-            title: 'Understanding Your Diagnosis',
-            type: 'Guide',
-            description: 'A comprehensive guide to understanding your cancer diagnosis and treatment options.',
-            category: 'Medical Information'
-          },
-          {
-            title: 'Coping with Treatment Side Effects',
-            type: 'Article',
-            description: 'Practical tips for managing common side effects of cancer treatment.',
-            category: 'Treatment Support'
-          },
-          {
-            title: 'Family Communication Guide',
-            type: 'Resource',
-            description: 'How to talk to your family about your cancer journey.',
-            category: 'Family Support'
-          },
-          {
-            title: 'Financial Assistance Programs',
-            type: 'Guide',
-            description: 'Information about financial support available for cancer patients.',
-            category: 'Financial Support'
-          },
-          {
-            title: 'Nutrition During Treatment',
-            type: 'Article',
-            description: 'Dietary guidelines and nutrition tips for cancer patients.',
-            category: 'Lifestyle'
-          },
-          {
-            title: 'Mental Health and Wellness',
-            type: 'Resource',
-            description: 'Strategies for maintaining mental health during your cancer journey.',
-            category: 'Mental Health'
-          }
-        ].map((resource, index) => (
-          <Card key={index}>
+        {resources.map((resource) => (
+          <Card key={resource.id}>
             <CardContent className="p-6">
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
@@ -446,8 +456,8 @@ export default function PatientDashboardPage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Patient Dashboard</h1>
-              <p className="text-muted-foreground">Welcome back! Here's your support overview.</p>
+              <h1 className="text-2xl font-bold text-foreground">Patient Dashboard - DASH STYLE</h1>
+              <p className="text-muted-foreground">Welcome back! Here's your support overview - Updated with Dash Style</p>
             </div>
             <div className="flex items-center gap-4">
               <Button variant="outline" size="sm">
@@ -466,9 +476,9 @@ export default function PatientDashboardPage() {
         <div className="container mx-auto px-4">
           <nav className="flex space-x-8">
             {[
-              { id: 'overview', label: 'Overview', icon: Heart },
+              { id: 'overview', label: 'Overview', icon: BarChart3 },
               { id: 'counselors', label: 'Counselors', icon: Users },
-              { id: 'support-groups', label: 'Support Groups', icon: Users },
+              { id: 'support-groups', label: 'Support Groups', icon: Heart },
               { id: 'resources', label: 'Resources', icon: FileText }
             ].map((tab) => (
               <button

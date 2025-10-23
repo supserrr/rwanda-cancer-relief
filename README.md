@@ -6,19 +6,16 @@ A monorepo for Rwanda Cancer Relief project containing multiple applications and
 
 ### Frontend
 
-- **frontend/web** - Main public-facing website with cancer services information
-- **frontend/dash** - Admin dashboard for managing the platform (Port 3001)
-- **frontend/dashy** - Alternative admin dashboard with advanced analytics (Port 3002)
+- **frontend/apps/web** - Main public-facing website with cancer services information
+- **frontend/apps/dash** - Admin dashboard for managing the platform (Port 3001)
+- **frontend/apps/demos** - Component demonstration hub (Port 4000)
+- **frontend/packages/ui** - Shared UI component library built with shadcn/ui
+- **frontend/packages/eslint-config** - Shared ESLint configurations
+- **frontend/packages/typescript-config** - Shared TypeScript configurations
 
 ### Backend
 
 - **backend/** - Backend services and API (coming soon)
-
-### Shared
-
-- **shared/ui** - Shared UI component library built with shadcn/ui
-- **shared/eslint-config** - Shared ESLint configurations
-- **shared/typescript-config** - Shared TypeScript configurations
 
 ## Documentation
 

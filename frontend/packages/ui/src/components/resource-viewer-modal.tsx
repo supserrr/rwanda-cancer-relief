@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Resource } from '@workspace/ui/lib/types';
+import { PDFViewer } from './pdf-viewer';
 
 interface ResourceViewerModalProps {
   resource: Resource;
@@ -243,23 +244,21 @@ export function ResourceViewerModal({
       case 'audio':
         return (
           <div className="space-y-4">
-            <div className="aspect-video bg-gradient-to-br from-purple-100 to-purple-200 rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-20 h-20 bg-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Play className="h-10 w-10 text-white" />
+            <div className="relative">
+              <img 
+                src={resource.thumbnail || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop'} 
+                alt={resource.title}
+                className="w-full h-64 object-cover rounded-xl"
+              />
+              <div className="absolute inset-0 bg-black/20 rounded-xl flex items-center justify-center">
+                <div className="text-center text-white">
+                  <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Play className="h-8 w-8" />
+                  </div>
+                  <p className="text-sm font-medium">Audio Resource</p>
                 </div>
-                <h3 className="text-lg font-semibold text-purple-800">{resource.title}</h3>
-                <p className="text-sm text-purple-600">Audio Resource</p>
               </div>
             </div>
-            
-            <audio
-              ref={audioRef}
-              src={resource.url}
-              onTimeUpdate={handleTimeUpdate}
-              onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-              className="hidden"
-            />
             
             <div className="space-y-3">
               <div className="flex items-center space-x-4">
@@ -355,64 +354,57 @@ export function ResourceViewerModal({
       case 'pdf':
         return (
           <div className="space-y-4">
-            <div className="aspect-video bg-gradient-to-br from-red-100 to-red-200 rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-20 h-20 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <FileText className="h-10 w-10 text-white" />
-                </div>
-                <h3 className="text-lg font-semibold text-red-800">{resource.title}</h3>
-                <p className="text-sm text-red-600">PDF Document</p>
-              </div>
-            </div>
-            
-            <div className="bg-white border rounded-lg p-6">
-              <div className="text-center space-y-4">
-                <p className="text-muted-foreground">
-                  This PDF document is ready for viewing. Click the download button to access the full content.
-                </p>
-                <Button onClick={handleDownload} className="w-full">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download PDF
-                </Button>
-              </div>
-            </div>
+            <PDFViewer url={resource.url} title={resource.title} thumbnail={resource.thumbnail} />
           </div>
         );
 
       case 'article':
         return (
           <div className="space-y-4">
-            <div className="aspect-video bg-gradient-to-br from-green-100 to-green-200 rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <BookOpen className="h-10 w-10 text-white" />
+            <div className="relative">
+              <img 
+                src={resource.thumbnail || 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=300&fit=crop'} 
+                alt={resource.title}
+                className="w-full h-64 object-cover rounded-xl"
+              />
+              <div className="absolute inset-0 bg-black/20 rounded-xl flex items-center justify-center">
+                <div className="text-center text-white">
+                  <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-3">
+                    <BookOpen className="h-8 w-8" />
+                  </div>
+                  <p className="text-sm font-medium">Article</p>
                 </div>
-                <h3 className="text-lg font-semibold text-green-800">{resource.title}</h3>
-                <p className="text-sm text-green-600">Article</p>
               </div>
             </div>
-            
-            <div className="bg-white border rounded-lg p-6">
-              <div className="prose max-w-none">
-                <h2 className="text-xl font-semibold mb-4">{resource.title}</h2>
-                <p className="text-muted-foreground mb-4">{resource.description}</p>
-                
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Key Points</h3>
-                  <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-                    <li>Understanding your diagnosis and treatment options</li>
-                    <li>Managing side effects and maintaining quality of life</li>
-                    <li>Building a support network and accessing resources</li>
-                    <li>Communicating effectively with your healthcare team</li>
-                  </ul>
-                  
-                  <h3 className="text-lg font-medium">Additional Resources</h3>
-                  <p className="text-muted-foreground">
-                    For more information and support, please consult with your healthcare provider 
-                    or contact our support team.
-                  </p>
-                </div>
-              </div>
+
+            {/* Article Controls */}
+            <div className="flex items-center justify-center space-x-4 p-4 bg-muted/30 rounded-lg">
+              <Button
+                onClick={() => window.open(resource.url, '_blank')}
+                className="flex items-center space-x-2"
+              >
+                <ExternalLink className="h-4 w-4" />
+                <span>Read Article</span>
+              </Button>
+              
+              <Button
+                variant="outline"
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className="flex items-center space-x-2"
+              >
+                {isDownloading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                    <span>Downloading...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4" />
+                    <span>Download Article</span>
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         );

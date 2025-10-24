@@ -5,6 +5,7 @@ import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-heade
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { ResourceCard } from '../../../../components/dashboard/shared/ResourceCard';
 import { ResourceViewerModal } from '@workspace/ui/components/resource-viewer-modal';
+import { ResourceEditModal } from '@workspace/ui/components/resource-edit-modal';
 import { Input } from '@workspace/ui/components/input';
 import { Button } from '@workspace/ui/components/button';
 import { Badge } from '@workspace/ui/components/badge';
@@ -38,12 +39,15 @@ export default function CounselorResourcesPage() {
   const [selectedType, setSelectedType] = useState('all');
   const [selectedResource, setSelectedResource] = useState<any>(null);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingResource, setEditingResource] = useState<Resource | null>(null);
   const [activeTab, setActiveTab] = useState('view');
   const [savedResources, setSavedResources] = useState<string[]>([]); // Track saved resource IDs
+  const [resources, setResources] = useState<Resource[]>(dummyResources); // Local state for resources
 
   const resourceTypes = ['all', 'audio', 'pdf', 'video', 'article'];
 
-  const filteredResources = dummyResources.filter(resource => {
+  const filteredResources = resources.filter(resource => {
     const matchesSearch = resource.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          resource.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          resource.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -53,7 +57,7 @@ export default function CounselorResourcesPage() {
   });
 
   const getSavedResources = () => {
-    return dummyResources.filter(resource => savedResources.includes(resource.id));
+    return resources.filter(resource => savedResources.includes(resource.id));
   };
 
   const handleViewResource = (resource: Resource) => {
@@ -87,11 +91,23 @@ export default function CounselorResourcesPage() {
   };
 
   const handleEditResource = (resource: Resource) => {
-    console.log('Edit resource:', resource.title);
+    setEditingResource(resource);
+    setIsEditOpen(true);
   };
 
-  const handleDeleteResource = (resource: Resource) => {
-    console.log('Delete resource:', resource.title);
+  const handleSaveResource = (updatedResource: Resource) => {
+    setResources(prev => prev.map(r => r.id === updatedResource.id ? updatedResource : r));
+    console.log('Resource updated:', updatedResource.title);
+  };
+
+  const handleDeleteResource = (resourceId: string) => {
+    setResources(prev => prev.filter(r => r.id !== resourceId));
+    console.log('Resource deleted:', resourceId);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditOpen(false);
+    setEditingResource(null);
   };
 
   const handleUploadResource = () => {
@@ -157,6 +173,9 @@ export default function CounselorResourcesPage() {
                   resource={resource}
                   onView={handleViewResource}
                   onDownload={handleDownloadResource}
+                  onEdit={handleEditResource}
+                  onDelete={(resource) => handleDeleteResource(resource.id)}
+                  showEditActions={true}
                   delay={index * 0.1}
                 />
               ))}
@@ -196,6 +215,9 @@ export default function CounselorResourcesPage() {
                     resource={resource}
                     onView={handleViewResource}
                     onDownload={handleDownloadResource}
+                    onEdit={handleEditResource}
+                    onDelete={(resource) => handleDeleteResource(resource.id)}
+                    showEditActions={true}
                     delay={index * 0.1}
                   />
                 ))}
@@ -239,7 +261,7 @@ export default function CounselorResourcesPage() {
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">All Resources</h3>
               <div className="grid gap-4">
-                {dummyResources.map((resource) => (
+                {resources.map((resource) => (
                   <div key={resource.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center space-x-4">
                       <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center">
@@ -263,7 +285,7 @@ export default function CounselorResourcesPage() {
                     </div>
                     <div className="flex items-center space-x-2">
                       <Button size="sm" variant="outline" onClick={() => handleViewResource(resource)}>
-                        <FileText className="h-4 w-4" />
+                        <Eye className="h-4 w-4" />
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => handleEditResource(resource)}>
                         <Edit className="h-4 w-4" />
@@ -271,7 +293,7 @@ export default function CounselorResourcesPage() {
                       <Button size="sm" variant="outline" onClick={() => handleDownloadResource(resource)}>
                         <Download className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleDeleteResource(resource)}>
+                      <Button size="sm" variant="destructive" onClick={() => handleDeleteResource(resource.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -294,6 +316,15 @@ export default function CounselorResourcesPage() {
           onBookmark={handleBookmarkResource}
         />
       )}
+
+      {/* Resource Edit Modal */}
+      <ResourceEditModal
+        resource={editingResource}
+        isOpen={isEditOpen}
+        onClose={handleCloseEditModal}
+        onSave={handleSaveResource}
+        onDelete={handleDeleteResource}
+      />
     </div>
   );
 }

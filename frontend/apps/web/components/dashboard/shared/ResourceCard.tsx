@@ -9,7 +9,9 @@ import {
   BookOpen, 
   Clock, 
   Download,
-  Eye
+  Eye,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import { Resource } from '../../../lib/types';
 
@@ -17,7 +19,10 @@ interface ResourceCardProps {
   resource: Resource;
   onView?: (resource: Resource) => void;
   onDownload?: (resource: Resource) => void;
+  onEdit?: (resource: Resource) => void;
+  onDelete?: (resource: Resource) => void;
   showActions?: boolean;
+  showEditActions?: boolean;
   delay?: number;
 }
 
@@ -25,7 +30,10 @@ export function ResourceCard({
   resource, 
   onView, 
   onDownload, 
+  onEdit,
+  onDelete,
   showActions = true,
+  showEditActions = false,
   delay = 0
 }: ResourceCardProps) {
   const getTypeIcon = (type: string) => {
@@ -135,6 +143,48 @@ export function ResourceCard({
                 onClick={() => onDownload(resource)}
               >
                 <Download className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )}
+
+        {showEditActions && (
+          <div className="flex space-x-2 pt-2">
+            {onView && (
+              <Button 
+                size="sm" 
+                className="flex-1"
+                onClick={() => onView(resource)}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                View
+              </Button>
+            )}
+            {onEdit && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => onEdit(resource)}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            )}
+            {onDownload && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => onDownload(resource)}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            )}
+            {onDelete && (
+              <Button 
+                size="sm" 
+                variant="destructive"
+                onClick={() => onDelete(resource)}
+              >
+                <Trash2 className="h-4 w-4" />
               </Button>
             )}
           </div>

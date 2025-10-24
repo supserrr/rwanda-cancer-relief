@@ -32,7 +32,7 @@ export default function CounselorPatientsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const currentCounselor = dummyCounselors[0]; // Dr. Marie Claire
   const assignedPatients = dummyPatients.filter(patient => 
-    currentCounselor.patients.includes(patient.id)
+    currentCounselor?.patients?.includes(patient.id)
   );
 
   const filteredPatients = assignedPatients.filter(patient =>
@@ -82,7 +82,10 @@ export default function CounselorPatientsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {Math.round(assignedPatients.reduce((acc, p) => acc + p.moduleProgress, 0) / assignedPatients.length)}%
+              {Math.round(assignedPatients.reduce((acc, p) => {
+                const avgProgress = Object.values(p.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(p.moduleProgress || {}).length || 0;
+                return acc + avgProgress;
+              }, 0) / assignedPatients.length)}%
             </div>
             <p className="text-xs text-muted-foreground">
               Average progress
@@ -97,7 +100,10 @@ export default function CounselorPatientsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {assignedPatients.filter(p => p.moduleProgress >= 100).length}
+              {assignedPatients.filter(p => {
+                const avgProgress = Object.values(p.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(p.moduleProgress || {}).length || 0;
+                return avgProgress >= 100;
+              }).length}
             </div>
             <p className="text-xs text-muted-foreground">
               Patients completed
@@ -168,9 +174,14 @@ export default function CounselorPatientsPage() {
                   <TableCell>
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm">{patient.moduleProgress}%</span>
+                        <span className="text-sm">
+                          {Math.round(Object.values(patient.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(patient.moduleProgress || {}).length || 0)}%
+                        </span>
                       </div>
-                      <Progress value={patient.moduleProgress} className="h-2" />
+                      <Progress 
+                        value={Object.values(patient.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(patient.moduleProgress || {}).length || 0} 
+                        className="h-2" 
+                      />
                     </div>
                   </TableCell>
                   <TableCell>
@@ -180,8 +191,14 @@ export default function CounselorPatientsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={patient.moduleProgress >= 80 ? "default" : "secondary"}>
-                      {patient.moduleProgress >= 80 ? "Active" : "In Progress"}
+                    <Badge variant={
+                      (Object.values(patient.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(patient.moduleProgress || {}).length || 0) >= 80 
+                        ? "default" 
+                        : "secondary"
+                    }>
+                      {(Object.values(patient.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(patient.moduleProgress || {}).length || 0) >= 80 
+                        ? "Active" 
+                        : "In Progress"}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
@@ -235,9 +252,14 @@ export default function CounselorPatientsPage() {
                     </Avatar>
                     <span className="text-sm font-medium">{patient.name}</span>
                   </div>
-                  <Badge variant="outline">{patient.moduleProgress}%</Badge>
+                  <Badge variant="outline">
+                    {Math.round(Object.values(patient.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(patient.moduleProgress || {}).length || 0)}%
+                  </Badge>
                 </div>
-                <Progress value={patient.moduleProgress} className="h-2" />
+                <Progress 
+                  value={Object.values(patient.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(patient.moduleProgress || {}).length || 0} 
+                  className="h-2" 
+                />
                 <p className="text-xs text-muted-foreground">
                   {patient.currentModule}
                 </p>

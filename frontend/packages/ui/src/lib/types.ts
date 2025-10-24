@@ -42,6 +42,9 @@ export interface Resource {
   createdAt: Date;
   isPublic: boolean;
   publisher: string; // Added publisher field
+  content?: string; // Added content field for articles
+  isYouTube?: boolean; // Added YouTube flag
+  youtubeUrl?: string; // Added YouTube URL field
 }
 
 export interface Session {

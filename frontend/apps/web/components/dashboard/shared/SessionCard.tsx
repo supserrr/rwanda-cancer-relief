@@ -72,7 +72,7 @@ export function SessionCard({
   };
 
   const isUpcoming = session.status === 'scheduled' && 
-    new Date(session.scheduledAt) > new Date();
+    new Date(session.date) > new Date();
 
   return (
     <Card className={`relative overflow-hidden h-full bg-gradient-to-br from-primary/5 via-background to-primary/10 rounded-3xl border-primary/20 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 ${isUpcoming ? 'border-blue-200 bg-blue-50/30' : ''}`}>
@@ -89,7 +89,7 @@ export function SessionCard({
             </Badge>
           </div>
           <div className="text-sm text-muted-foreground">
-            {session.type === 'individual' ? '1-on-1' : 'Group'}
+            {session.type === 'video' ? 'Video Call' : session.type === 'audio' ? 'Audio Call' : 'Chat Session'}
           </div>
         </div>
       </CardHeader>
@@ -125,11 +125,11 @@ export function SessionCard({
         <div className="space-y-2 text-sm">
           <div className="flex items-center space-x-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span>{format(new Date(session.scheduledAt), 'MMM dd, yyyy')}</span>
+            <span>{format(new Date(session.date), 'MMM dd, yyyy')}</span>
           </div>
           <div className="flex items-center space-x-2">
             <Clock className="h-4 w-4 text-muted-foreground" />
-            <span>{format(new Date(session.scheduledAt), 'h:mm a')}</span>
+            <span>{format(new Date(session.date), 'h:mm a')}</span>
           </div>
           <div className="flex items-center space-x-2">
             <Clock className="h-4 w-4 text-muted-foreground" />

@@ -5,6 +5,7 @@ import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-heade
 import { AnimatedGrid } from '@workspace/ui/components/animated-grid';
 import { ResourceCard } from '../../../../components/dashboard/shared/ResourceCard';
 import { ResourceViewerModal } from '@workspace/ui/components/resource-viewer-modal';
+import { ArticleViewer } from '@workspace/ui/components/article-viewer';
 import { Input } from '@workspace/ui/components/input';
 import { Button } from '@workspace/ui/components/button';
 import { Badge } from '@workspace/ui/components/badge';
@@ -25,6 +26,8 @@ export default function PatientResourcesPage() {
   const [selectedType, setSelectedType] = useState('all');
   const [selectedResource, setSelectedResource] = useState<any>(null);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
+  const [isArticleViewerOpen, setIsArticleViewerOpen] = useState(false);
+  const [viewingArticle, setViewingArticle] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('all');
   const [savedResources, setSavedResources] = useState<string[]>([]); // Track saved resource IDs
 
@@ -49,8 +52,18 @@ export default function PatientResourcesPage() {
   };
 
   const handleViewResource = (resource: Resource) => {
-    setSelectedResource(resource);
-    setIsViewerOpen(true);
+    if (resource.type === 'article') {
+      setViewingArticle(resource);
+      setIsArticleViewerOpen(true);
+    } else {
+      setSelectedResource(resource);
+      setIsViewerOpen(true);
+    }
+  };
+
+  const handleCloseArticleViewer = () => {
+    setIsArticleViewerOpen(false);
+    setViewingArticle(null);
   };
 
   const handleCloseViewer = () => {
@@ -295,17 +308,27 @@ export default function PatientResourcesPage() {
         ))}
       </Tabs>
 
-      {/* Resource Viewer Modal */}
-      {selectedResource && (
-        <ResourceViewerModal
-          resource={selectedResource}
-          isOpen={isViewerOpen}
-          onClose={handleCloseViewer}
-          onDownload={handleDownloadResource}
-          onShare={handleShareResource}
-          onBookmark={handleBookmarkResource}
-        />
-      )}
-    </div>
-  );
-}
+          {/* Resource Viewer Modal */}
+          {selectedResource && (
+            <ResourceViewerModal
+              resource={selectedResource}
+              isOpen={isViewerOpen}
+              onClose={handleCloseViewer}
+              onDownload={handleDownloadResource}
+              onShare={handleShareResource}
+              onBookmark={handleBookmarkResource}
+            />
+          )}
+
+          {/* Article Viewer */}
+          <ArticleViewer
+            article={viewingArticle}
+            isOpen={isArticleViewerOpen}
+            onClose={handleCloseArticleViewer}
+            onShare={handleShareResource}
+            onBookmark={handleBookmarkResource}
+            onDownload={handleDownloadResource}
+          />
+        </div>
+      );
+    }

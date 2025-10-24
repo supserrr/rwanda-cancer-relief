@@ -154,43 +154,51 @@ export default function AdminUsersPage() {
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            placeholder="Search users by name or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+        <AnimatedCard className="flex-1 p-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Search users by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </AnimatedCard>
         
-        <Select value={selectedRole} onValueChange={(value) => setSelectedRole(value as UserRole | 'all')}>
-          <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Role" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Roles</SelectItem>
-            <SelectItem value="patient">Patients</SelectItem>
-            <SelectItem value="counselor">Counselors</SelectItem>
-            <SelectItem value="admin">Admins</SelectItem>
-          </SelectContent>
-        </Select>
+        <AnimatedCard className="p-6">
+          <Select value={selectedRole} onValueChange={(value) => setSelectedRole(value as UserRole | 'all')}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Roles</SelectItem>
+              <SelectItem value="patient">Patients</SelectItem>
+              <SelectItem value="counselor">Counselors</SelectItem>
+              <SelectItem value="admin">Admins</SelectItem>
+            </SelectContent>
+          </Select>
+        </AnimatedCard>
 
-        <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as 'all' | 'active' | 'inactive')}>
-          <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="inactive">Inactive</SelectItem>
-          </SelectContent>
-        </Select>
+        <AnimatedCard className="p-6">
+          <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as 'all' | 'active' | 'inactive')}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+        </AnimatedCard>
 
-        <Button variant="outline">
-          <Filter className="h-4 w-4 mr-2" />
-          Filter
-        </Button>
+        <AnimatedCard className="p-6">
+          <Button variant="outline">
+            <Filter className="h-4 w-4 mr-2" />
+            Filter
+          </Button>
+        </AnimatedCard>
       </div>
 
       {/* Users Table */}
@@ -220,8 +228,8 @@ export default function AdminUsersPage() {
                     <div>
                       <p className="font-medium">{user.name}</p>
                       <p className="text-sm text-muted-foreground">{user.email}</p>
-                    </AnimatedCard>
-                  </AnimatedCard>
+                    </div>
+                  </div>
                 </TableCell>
                 <TableCell>
                   <Badge className={getRoleColor(user.role)}>
@@ -240,7 +248,7 @@ export default function AdminUsersPage() {
                       <p className="text-xs text-muted-foreground">
                         {user.lastLogin.toLocaleTimeString()}
                       </p>
-                    </AnimatedCard>
+                    </div>
                   ) : (
                     <span className="text-sm text-muted-foreground">Never</span>
                   )}
@@ -251,7 +259,7 @@ export default function AdminUsersPage() {
                     <p className="text-xs text-muted-foreground">
                       {Math.floor((Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24))} days ago
                     </p>
-                  </AnimatedCard>
+                  </div>
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end space-x-2">
@@ -276,7 +284,7 @@ export default function AdminUsersPage() {
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
-                  </AnimatedCard>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -296,7 +304,7 @@ export default function AdminUsersPage() {
           <Button variant="outline" size="sm">
             Bulk Actions
           </Button>
-        </AnimatedCard>
+        </div>
       </div>
     </div>
   );

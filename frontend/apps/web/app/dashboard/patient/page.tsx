@@ -30,12 +30,12 @@ export default function PatientDashboard() {
   const [isQuickBookingOpen, setIsQuickBookingOpen] = useState(false);
   const currentPatient = dummyPatients[0]; // Jean Baptiste
   const upcomingSessions = dummySessions.filter(session => 
-    session.patientId === currentPatient.id && 
+    session.patientId === currentPatient?.id && 
     session.status === 'scheduled' &&
-    new Date(session.scheduledAt) > new Date()
+    new Date(session.date) > new Date()
   );
   const recentMessages = dummyMessages.filter(msg => 
-    msg.senderId === currentPatient.id || msg.receiverId === currentPatient.id
+    msg.senderId === currentPatient?.id || msg.receiverId === currentPatient?.id
   ).slice(0, 3);
   const recommendedResources = dummyResources.slice(0, 3);
 
@@ -63,7 +63,7 @@ export default function PatientDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <AnimatedStatCard
           title="Module Progress"
-          value={currentPatient.moduleProgress}
+          value={Math.round(Object.values(currentPatient?.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(currentPatient?.moduleProgress || {}).length || 0)}
           description="Coping with Anxiety"
           icon={TrendingUp}
           trend={{ value: 15, isPositive: true }}
@@ -108,13 +108,13 @@ export default function PatientDashboard() {
                 <span className="text-sm font-medium">Coping with Anxiety</span>
                 <span className="text-sm text-muted-foreground">
                   <SlidingNumber 
-                    number={currentPatient.moduleProgress}
+                    number={Math.round(Object.values(currentPatient?.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(currentPatient?.moduleProgress || {}).length || 0)}
                     fromNumber={0}
                     transition={{ stiffness: 200, damping: 20, mass: 0.4 }}
                   />%
                 </span>
               </div>
-              <Progress value={currentPatient.moduleProgress} className="h-2" />
+              <Progress value={Math.round(Object.values(currentPatient?.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(currentPatient?.moduleProgress || {}).length || 0)} className="h-2" />
             </div>
             
             <div className="space-y-3">
@@ -174,8 +174,8 @@ export default function PatientDashboard() {
                     <div>
                       <p className="font-medium">Session with Dr. Marie Claire</p>
                       <p className="text-sm text-muted-foreground">
-                        {new Date(session.scheduledAt).toLocaleDateString()} at{' '}
-                        {new Date(session.scheduledAt).toLocaleTimeString([], { 
+                        {new Date(session.date).toLocaleDateString()} at{' '}
+                        {new Date(session.date).toLocaleTimeString([], { 
                           hour: '2-digit', 
                           minute: '2-digit' 
                         })}

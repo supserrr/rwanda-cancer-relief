@@ -244,13 +244,13 @@ function SlidingNumber({
   const finalIntLength = padStart
     ? Math.max(
         Math.floor(Math.abs(number)).toString().length,
-        newIntStrRaw.length,
+        newIntStrRaw?.length || 0,
       )
-    : newIntStrRaw.length;
+    : newIntStrRaw?.length || 0;
 
   const newIntStr = padStart
-    ? newIntStrRaw.padStart(finalIntLength, '0')
-    : newIntStrRaw;
+    ? (newIntStrRaw || '').padStart(finalIntLength, '0')
+    : newIntStrRaw || '';
 
   const prevFormatted = formatNumber(prevNumberRef.current);
   const [prevIntStrRaw = '', prevDecStrRaw = ''] = prevFormatted.split('.');

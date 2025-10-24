@@ -9,23 +9,22 @@ import { useAuth } from '@/hooks/use-auth'
  */
 interface AuthContextType {
   // State
-  user: User | null
-  isAuthenticated: boolean
+  session: any
+  user: any
+  userRole: any
   isLoading: boolean
-  error: string | null
+  isAuthenticated: boolean
   
   // Actions
-  signIn: (credentials: SignInCredentials) => Promise<{ success: boolean; error?: string }>
-  signUp: (credentials: SignUpCredentials) => Promise<{ success: boolean; error?: string }>
-  signOut: () => Promise<void>
-  refreshToken: () => Promise<boolean>
-  clearError: () => void
+  checkRole: (requiredRole: any) => boolean
+  redirectToDashboard: () => void
+  redirectToSignIn: () => void
+  signOut: () => void
   
   // Role checks
-  hasRole: (role: string) => boolean
-  isPatient: () => boolean
-  isCounselor: () => boolean
-  isAdmin: () => boolean
+  isPatient: boolean
+  isCounselor: boolean
+  isAdmin: boolean
 }
 
 /**

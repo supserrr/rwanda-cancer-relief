@@ -271,14 +271,14 @@ export function Sidebar({
                 {!isCollapsed && (
                   <>
                     <span className="flex-1 text-left text-base font-medium">{item.label}</span>
-                    {item.badge && item.badge > 0 && (
+                    {item.badge && typeof item.badge === 'number' && item.badge > 0 && (
                       <Badge variant="destructive" className="ml-2 h-6 w-6 rounded-full p-0 text-xs">
                         {item.badge > 9 ? '9+' : item.badge}
                       </Badge>
                     )}
                   </>
                 )}
-                {isCollapsed && item.badge && item.badge > 0 && (
+                {isCollapsed && item.badge && typeof item.badge === 'number' && item.badge > 0 && (
                   <div className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full" />
                 )}
               </Button>

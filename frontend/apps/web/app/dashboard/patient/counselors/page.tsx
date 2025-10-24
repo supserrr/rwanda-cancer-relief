@@ -177,7 +177,7 @@ export default function PatientCounselorsPage() {
         
         <AnimatedGrid className="grid gap-6 md:grid-cols-2" staggerDelay={0.15}>
           {dummyCounselors
-            .filter(counselor => counselor.rating >= 4.8)
+            .filter(counselor => (counselor.rating || 0) >= 4.8)
             .map((counselor, index) => (
               <div key={counselor.id} className="relative">
                 <LandingStyleCounselorCard

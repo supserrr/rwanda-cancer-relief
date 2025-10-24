@@ -31,7 +31,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { Resource } from '@workspace/ui/lib/types';
+import { Resource } from '../lib/types';
 
 interface ResourceEditModalProps {
   resource: Resource | null;
@@ -39,6 +39,7 @@ interface ResourceEditModalProps {
   onClose: () => void;
   onSave: (updatedResource: Resource) => void;
   onDelete: (resourceId: string) => void;
+  onCreateArticle?: () => void; // Added for article creation
 }
 
 export function ResourceEditModal({ 
@@ -46,7 +47,8 @@ export function ResourceEditModal({
   isOpen, 
   onClose, 
   onSave,
-  onDelete
+  onDelete,
+  onCreateArticle
 }: ResourceEditModalProps) {
   const [formData, setFormData] = useState({
     title: '',
@@ -57,7 +59,11 @@ export function ResourceEditModal({
     duration: '',
     tags: '',
     publisher: '',
-    isPublic: true
+    isPublic: true,
+    isYouTube: false,
+    youtubeUrl: '',
+    content: '', // Added for article content
+    createdAt: new Date() // Added for creation date
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -73,7 +79,27 @@ export function ResourceEditModal({
         duration: resource.duration?.toString() || '',
         tags: resource.tags.join(', '),
         publisher: resource.publisher,
-        isPublic: resource.isPublic
+        isPublic: resource.isPublic,
+        isYouTube: resource.isYouTube || false,
+        youtubeUrl: resource.youtubeUrl || '',
+        content: resource.content || '', // Added for article content
+        createdAt: resource.createdAt // Added for creation date
+      });
+    } else {
+      setFormData({
+        title: '',
+        description: '',
+        type: 'article',
+        url: '',
+        thumbnail: '',
+        duration: '',
+        tags: '',
+        publisher: '',
+        isPublic: true,
+        isYouTube: false,
+        youtubeUrl: '',
+        content: '', // Added for article content
+        createdAt: new Date() // Added for creation date
       });
     }
   }, [resource]);
@@ -103,12 +129,16 @@ export function ResourceEditModal({
         title: formData.title,
         description: formData.description,
         type: formData.type,
-        url: formData.url,
+        url: formData.isYouTube ? formData.youtubeUrl : formData.url,
         thumbnail: formData.thumbnail,
         duration: formData.duration ? parseInt(formData.duration) : undefined,
         tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
         publisher: formData.publisher,
-        isPublic: formData.isPublic
+        isPublic: formData.isPublic,
+        isYouTube: formData.isYouTube,
+        youtubeUrl: formData.youtubeUrl,
+        content: formData.content, // Added for article content
+        createdAt: formData.createdAt // Added for creation date
       };
       
       await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
@@ -230,6 +260,7 @@ export function ResourceEditModal({
                 value={formData.url}
                 onChange={(e) => setFormData(prev => ({ ...prev, url: e.target.value }))}
                 placeholder="https://example.com/resource"
+                disabled={formData.isYouTube}
               />
             </div>
             {(formData.type === 'audio' || formData.type === 'video') && (
@@ -245,6 +276,42 @@ export function ResourceEditModal({
               </div>
             )}
           </div>
+
+          {/* YouTube URL Option for Videos */}
+          {formData.type === 'video' && (
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="isYouTube"
+                  checked={formData.isYouTube}
+                  onChange={(e) => setFormData(prev => ({ 
+                    ...prev, 
+                    isYouTube: e.target.checked,
+                    url: e.target.checked ? '' : prev.url,
+                    youtubeUrl: e.target.checked ? prev.youtubeUrl : ''
+                  }))}
+                  className="rounded"
+                />
+                <Label htmlFor="isYouTube">This is a YouTube video</Label>
+              </div>
+              
+              {formData.isYouTube && (
+                <div>
+                  <Label htmlFor="youtubeUrl">YouTube URL</Label>
+                  <Input
+                    id="youtubeUrl"
+                    value={formData.youtubeUrl}
+                    onChange={(e) => setFormData(prev => ({ ...prev, youtubeUrl: e.target.value }))}
+                    placeholder="https://www.youtube.com/watch?v=VIDEO_ID"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Paste the YouTube video URL here. The video will be embedded and displayed directly.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Thumbnail */}
           <div>
@@ -303,23 +370,87 @@ export function ResourceEditModal({
           </div>
 
           {/* File Upload */}
-          <div>
-            <Label>Upload Resource File</Label>
-            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center">
-              <input
-                type="file"
-                accept={formData.type === 'audio' ? 'audio/*' : formData.type === 'video' ? 'video/*' : formData.type === 'pdf' ? '.pdf' : '*'}
-                onChange={handleFileUpload}
-                className="hidden"
-                id="file-upload"
-              />
-              <label htmlFor="file-upload" className="cursor-pointer">
-                <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  Click to upload {formData.type} file
-                </p>
-              </label>
+          {formData.type !== 'article' && !formData.isYouTube && (
+            <div>
+              <Label>Upload Resource File</Label>
+              <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center">
+                <input
+                  type="file"
+                  accept={formData.type === 'audio' ? 'audio/*' : formData.type === 'video' ? 'video/*' : formData.type === 'pdf' ? '.pdf' : '*'}
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="file-upload"
+                />
+                <label htmlFor="file-upload" className="cursor-pointer">
+                  <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    Click to upload {formData.type} file
+                  </p>
+                </label>
+              </div>
             </div>
+          )}
+
+          {/* YouTube Notice */}
+          {formData.type === 'video' && formData.isYouTube && (
+            <div className="border-2 border-dashed border-red-500/25 rounded-lg p-4 text-center bg-red-500/5">
+              <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Play className="h-6 w-6 text-white" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">YouTube Video</h3>
+              <p className="text-muted-foreground text-sm">
+                This video will be embedded directly from YouTube and displayed like an uploaded video.
+              </p>
+            </div>
+          )}
+
+          {/* Article Creation Notice */}
+          {formData.type === 'article' && (
+            <div className="border-2 border-dashed border-primary/25 rounded-lg p-6 text-center bg-primary/5">
+              <BookOpen className="h-12 w-12 text-primary mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Create Article Content</h3>
+              <p className="text-muted-foreground mb-4">
+                Articles are created directly on the platform with rich text editing capabilities.
+              </p>
+              {onCreateArticle && (
+                <Button onClick={onCreateArticle}>
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  Open Article Editor
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Article Content */}
+          {formData.type === 'article' && (
+            <div>
+              <Label htmlFor="content">Article Content</Label>
+              <Textarea
+                id="content"
+                value={formData.content}
+                onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+                placeholder="Enter article content here..."
+                rows={8}
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                You can use HTML tags for formatting. For rich text editing, use the Article Editor.
+              </p>
+            </div>
+          )}
+
+          {/* Creation Date */}
+          <div>
+            <Label htmlFor="createdAt">Creation Date</Label>
+            <Input
+              id="createdAt"
+              type="date"
+              value={formData.createdAt.toISOString().split('T')[0]}
+              onChange={(e) => setFormData(prev => ({ 
+                ...prev, 
+                createdAt: new Date(e.target.value) 
+              }))}
+            />
           </div>
 
           {/* Visibility */}

@@ -47,10 +47,10 @@ export default function PatientSettingsPage() {
   });
 
   const [profile, setProfile] = useState({
-    name: currentPatient.name,
-    email: currentPatient.email,
-    phoneNumber: currentPatient.phoneNumber,
-    emergencyContact: currentPatient.emergencyContact,
+    name: currentPatient?.name || '',
+    email: currentPatient?.email || '',
+    phoneNumber: currentPatient?.phoneNumber || '',
+    emergencyContact: currentPatient?.emergencyContact || '',
     language: 'en',
     timezone: 'Africa/Kigali'
   });
@@ -94,9 +94,9 @@ export default function PatientSettingsPage() {
               <div className="flex items-center space-x-4">
                 <div className="relative">
                   <Avatar className="h-20 w-20">
-                    <AvatarImage src={currentPatient.avatar} alt={currentPatient.name} />
+                    <AvatarImage src={currentPatient?.avatar} alt={currentPatient?.name} />
                     <AvatarFallback>
-                      {currentPatient.name.split(' ').map(n => n[0]).join('')}
+                      {currentPatient?.name?.split(' ').map(n => n[0]).join('')}
                     </AvatarFallback>
                   </Avatar>
                   <Button
@@ -108,10 +108,10 @@ export default function PatientSettingsPage() {
                   </Button>
                 </div>
                 <div>
-                  <h3 className="font-semibold">{currentPatient.name}</h3>
-                  <p className="text-sm text-muted-foreground">Patient since {currentPatient.createdAt.toLocaleDateString()}</p>
+                  <h3 className="font-semibold">{currentPatient?.name}</h3>
+                  <p className="text-sm text-muted-foreground">Patient since {currentPatient?.createdAt?.toLocaleDateString()}</p>
                   <Badge variant="secondary" className="mt-1">
-                    {currentPatient.role.charAt(0).toUpperCase() + currentPatient.role.slice(1)}
+                    {currentPatient?.role ? currentPatient.role.charAt(0).toUpperCase() + currentPatient.role.slice(1) : 'Patient'}
                   </Badge>
                 </div>
               </div>
@@ -203,14 +203,18 @@ export default function PatientSettingsPage() {
                   <Label>Date of Birth</Label>
                   <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/50">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">{currentPatient.dateOfBirth.toLocaleDateString()}</span>
+                    <span className="text-sm">{currentPatient?.dateOfBirth?.toLocaleDateString() || 'Not provided'}</span>
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Current Module</Label>
                   <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/50">
-                    <span className="text-sm">{currentPatient.currentModule}</span>
-                    <Badge variant="outline">{currentPatient.moduleProgress}%</Badge>
+                    <span className="text-sm">{currentPatient?.currentModule || 'Not assigned'}</span>
+                    <Badge variant="outline">
+                      {currentPatient?.moduleProgress ? 
+                        Object.values(currentPatient.moduleProgress).reduce((a, b) => a + b, 0) / Object.keys(currentPatient.moduleProgress).length : 0
+                      }%
+                    </Badge>
                   </div>
                 </div>
               </div>
@@ -218,7 +222,7 @@ export default function PatientSettingsPage() {
               <div className="space-y-2">
                 <Label>Medical History</Label>
                 <div className="p-3 border rounded-md bg-muted/50">
-                  <p className="text-sm">{currentPatient.medicalHistory}</p>
+                  <p className="text-sm">{currentPatient?.medicalHistory || 'No medical history provided'}</p>
                 </div>
               </div>
             </CardContent>

@@ -58,7 +58,11 @@ export const dummyPatients: Patient[] = [
     emergencyContact: '+250 788 654 321',
     medicalHistory: 'Breast cancer survivor, currently in remission',
     currentModule: 'Coping with Anxiety',
-    moduleProgress: 65
+    moduleProgress: {
+      'coping-anxiety': 65,
+      'stress-management': 40,
+      'mindfulness': 20
+    }
   },
   {
     id: '4',
@@ -73,7 +77,11 @@ export const dummyPatients: Patient[] = [
     emergencyContact: '+250 788 765 432',
     medicalHistory: 'Recently diagnosed with cervical cancer',
     currentModule: 'Understanding Your Diagnosis',
-    moduleProgress: 30
+    moduleProgress: {
+      'understanding-diagnosis': 30,
+      'treatment-options': 10,
+      'emotional-support': 5
+    }
   },
   {
     id: '5',
@@ -88,7 +96,11 @@ export const dummyPatients: Patient[] = [
     emergencyContact: '+250 788 876 543',
     medicalHistory: 'Prostate cancer, undergoing treatment',
     currentModule: 'Managing Treatment Side Effects',
-    moduleProgress: 80
+    moduleProgress: {
+      'managing-side-effects': 80,
+      'nutrition-guidance': 60,
+      'exercise-therapy': 40
+    }
   }
 ];
 
@@ -150,30 +162,33 @@ export const dummySessions: Session[] = [
     id: '1',
     patientId: '1',
     counselorId: '2',
-    scheduledAt: new Date('2024-01-22T10:00:00'),
+    date: new Date('2024-01-22T10:00:00'),
+    time: '10:00 AM',
     duration: 60,
     status: 'scheduled',
-    type: 'individual',
+    type: 'video',
     notes: 'Follow-up session to discuss anxiety management techniques'
   },
   {
     id: '2',
     patientId: '4',
     counselorId: '2',
-    scheduledAt: new Date('2024-01-23T14:00:00'),
+    date: new Date('2024-01-23T14:00:00'),
+    time: '2:00 PM',
     duration: 45,
     status: 'scheduled',
-    type: 'individual',
+    type: 'video',
     notes: 'Initial consultation for newly diagnosed patient'
   },
   {
     id: '3',
     patientId: '5',
     counselorId: '6',
-    scheduledAt: new Date('2024-01-21T09:00:00'),
+    date: new Date('2024-01-21T09:00:00'),
+    time: '9:00 AM',
     duration: 60,
     status: 'completed',
-    type: 'individual',
+    type: 'video',
     notes: 'Discussed treatment side effects and coping strategies'
   }
 ];
@@ -195,15 +210,15 @@ export const dummyResources: Resource[] = [
   },
   {
     id: '2',
-    title: 'Understanding Your Cancer Diagnosis',
-    description: 'A comprehensive guide to understanding different types of cancer and treatment options.',
+    title: 'Cancer Treatment Options Guide',
+    description: 'Detailed information about various cancer treatment options including surgery, chemotherapy, radiation therapy, and immunotherapy.',
     type: 'pdf',
-    url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    url: 'https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf',
     thumbnail: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop',
-    tags: ['education', 'diagnosis', 'treatment'],
-    createdAt: new Date('2024-01-10'),
+    tags: ['treatment', 'options', 'medical-guide'],
+    createdAt: new Date('2024-01-16'),
     isPublic: true,
-    publisher: 'Dr. Michael Chen'
+    publisher: 'Dr. Lisa Thompson'
   },
   {
     id: '3',
@@ -220,6 +235,21 @@ export const dummyResources: Resource[] = [
   },
   {
     id: '4',
+    title: 'Exercise and Cancer Recovery',
+    description: 'A comprehensive YouTube video about safe exercises during cancer treatment and recovery.',
+    type: 'video',
+    url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    thumbnail: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+    duration: 30,
+    tags: ['exercise', 'recovery', 'wellness'],
+    createdAt: new Date('2024-01-14'),
+    isPublic: true,
+    publisher: 'Dr. Sarah Johnson',
+    isYouTube: true,
+    youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+  },
+  {
+    id: '5',
     title: 'Coping with Chemotherapy Side Effects',
     description: 'Article covering common side effects and practical coping strategies.',
     type: 'article',
@@ -228,7 +258,81 @@ export const dummyResources: Resource[] = [
     tags: ['chemotherapy', 'side-effects', 'coping'],
     createdAt: new Date('2024-01-08'),
     isPublic: true,
-    publisher: 'Dr. James Wilson'
+    publisher: 'Dr. James Wilson',
+    content: `
+      <h2>Understanding Chemotherapy Side Effects</h2>
+      <p>Chemotherapy is a powerful treatment that can effectively target cancer cells, but it may also affect healthy cells in your body. Understanding the potential side effects and how to manage them can help you feel more prepared and in control during your treatment journey.</p>
+      
+      <h3>Common Side Effects</h3>
+      <p>While everyone's experience with chemotherapy is unique, there are several common side effects that many patients experience:</p>
+      
+      <h4>Fatigue</h4>
+      <p>Feeling tired or exhausted is one of the most common side effects of chemotherapy. This fatigue can be different from normal tiredness and may persist even after rest.</p>
+      <ul>
+        <li>Plan your day around your energy levels</li>
+        <li>Take short naps when needed</li>
+        <li>Ask for help with daily tasks</li>
+        <li>Engage in light exercise when possible</li>
+      </ul>
+      
+      <h4>Nausea and Vomiting</h4>
+      <p>Many chemotherapy drugs can cause nausea and vomiting. Your healthcare team will provide medications to help prevent and manage these symptoms.</p>
+      <ul>
+        <li>Take anti-nausea medications as prescribed</li>
+        <li>Eat small, frequent meals</li>
+        <li>Avoid strong smells and spicy foods</li>
+        <li>Stay hydrated with clear liquids</li>
+      </ul>
+      
+      <h4>Hair Loss</h4>
+      <p>Some chemotherapy drugs can cause hair loss, which may affect your scalp, eyebrows, eyelashes, and body hair.</p>
+      <ul>
+        <li>Consider cutting your hair short before treatment begins</li>
+        <li>Use gentle hair care products</li>
+        <li>Protect your scalp from sun exposure</li>
+        <li>Consider wigs, scarves, or hats for comfort</li>
+      </ul>
+      
+      <h3>Coping Strategies</h3>
+      <p>Managing chemotherapy side effects requires a combination of medical support and self-care strategies:</p>
+      
+      <h4>Communication</h4>
+      <p>Keep open communication with your healthcare team about any side effects you experience. They can adjust your treatment plan or provide additional support.</p>
+      
+      <h4>Nutrition</h4>
+      <p>Maintaining good nutrition during chemotherapy is crucial for your recovery and overall well-being:</p>
+      <ul>
+        <li>Work with a dietitian to create a meal plan</li>
+        <li>Focus on nutrient-dense foods</li>
+        <li>Stay hydrated throughout the day</li>
+        <li>Consider nutritional supplements if recommended</li>
+      </ul>
+      
+      <h4>Emotional Support</h4>
+      <p>Chemotherapy can be emotionally challenging. Don't hesitate to seek support:</p>
+      <ul>
+        <li>Join support groups for cancer patients</li>
+        <li>Consider counseling or therapy</li>
+        <li>Stay connected with family and friends</li>
+        <li>Practice relaxation techniques like meditation or deep breathing</li>
+      </ul>
+      
+      <h3>When to Contact Your Healthcare Team</h3>
+      <p>Contact your healthcare team immediately if you experience:</p>
+      <ul>
+        <li>Fever above 100.4°F (38°C)</li>
+        <li>Severe nausea or vomiting that prevents eating or drinking</li>
+        <li>Signs of infection (redness, swelling, warmth)</li>
+        <li>Difficulty breathing or chest pain</li>
+        <li>Unusual bleeding or bruising</li>
+        <li>Severe fatigue that doesn't improve with rest</li>
+      </ul>
+      
+      <h3>Remember</h3>
+      <p>Every person's experience with chemotherapy is different. While side effects can be challenging, they are often temporary and manageable with the right support and care. Focus on taking things one day at a time and remember that you're not alone in this journey.</p>
+      
+      <p><strong>Disclaimer:</strong> This information is for educational purposes only and should not replace professional medical advice. Always consult with your healthcare team about your specific situation and treatment plan.</p>
+    `
   }
 ];
 
@@ -269,15 +373,17 @@ export const dummyChats: Chat[] = [
     id: '1',
     participants: ['1', '2'],
     lastMessage: dummyMessages[1],
-    unreadCount: 0,
-    isActive: true
+    createdAt: new Date('2024-01-20'),
+    updatedAt: new Date('2024-01-21'),
+    unreadCount: 0
   },
   {
     id: '2',
     participants: ['4', '2'],
     lastMessage: dummyMessages[2],
-    unreadCount: 1,
-    isActive: false
+    createdAt: new Date('2024-01-19'),
+    updatedAt: new Date('2024-01-22'),
+    unreadCount: 1
   }
 ];
 
@@ -286,6 +392,7 @@ export const dummySupportTickets: SupportTicket[] = [
   {
     id: '1',
     userId: '1',
+    title: 'Video Resource Access Issue',
     subject: 'Unable to access video resources',
     description: 'I\'m having trouble playing the meditation videos on my phone.',
     status: 'open',
@@ -296,6 +403,7 @@ export const dummySupportTickets: SupportTicket[] = [
   {
     id: '2',
     userId: '4',
+    title: 'Calendar Scheduling Problem',
     subject: 'Session scheduling issue',
     description: 'The calendar is not showing available time slots for next week.',
     status: 'in-progress',
@@ -312,75 +420,28 @@ export const dummyModules: Module[] = [
     id: '1',
     title: 'Understanding Your Diagnosis',
     description: 'Learn about your cancer diagnosis and what it means for your treatment journey.',
-    progress: 30,
-    isCompleted: false,
-    lessons: [
-      {
-        id: '1-1',
-        title: 'What is Cancer?',
-        content: 'Introduction to cancer and how it develops in the body.',
-        type: 'reading',
-        duration: 10,
-        isCompleted: true
-      },
-      {
-        id: '1-2',
-        title: 'Types of Cancer',
-        content: 'Overview of different cancer types and their characteristics.',
-        type: 'video',
-        duration: 15,
-        isCompleted: true
-      },
-      {
-        id: '1-3',
-        title: 'Understanding Your Specific Diagnosis',
-        content: 'Personalized information about your specific cancer type.',
-        type: 'reading',
-        duration: 20,
-        isCompleted: false
-      }
-    ]
+    content: 'This module covers the basics of cancer diagnosis, including what your diagnosis means, treatment options, and how to cope with the news.',
+    duration: 45,
+    order: 1,
+    isCompleted: false
   },
   {
     id: '2',
     title: 'Coping with Anxiety',
-    description: 'Techniques and strategies to manage anxiety during your cancer journey.',
-    progress: 65,
-    isCompleted: false,
-    lessons: [
-      {
-        id: '2-1',
-        title: 'Recognizing Anxiety Symptoms',
-        content: 'Learn to identify when you\'re experiencing anxiety.',
-        type: 'reading',
-        duration: 10,
-        isCompleted: true
-      },
-      {
-        id: '2-2',
-        title: 'Breathing Exercises',
-        content: 'Simple breathing techniques to calm your mind and body.',
-        type: 'video',
-        duration: 12,
-        isCompleted: true
-      },
-      {
-        id: '2-3',
-        title: 'Mindfulness Practice',
-        content: 'Introduction to mindfulness meditation for cancer patients.',
-        type: 'exercise',
-        duration: 20,
-        isCompleted: true
-      },
-      {
-        id: '2-4',
-        title: 'Building a Support Network',
-        content: 'How to identify and strengthen your support system.',
-        type: 'reading',
-        duration: 15,
-        isCompleted: false
-      }
-    ]
+    description: 'Practical techniques for managing anxiety and stress during your cancer journey.',
+    content: 'Learn breathing exercises, mindfulness techniques, and other strategies to help manage anxiety and stress.',
+    duration: 30,
+    order: 2,
+    isCompleted: true
+  },
+  {
+    id: '3',
+    title: 'Managing Treatment Side Effects',
+    description: 'Understanding and managing common side effects of cancer treatment.',
+    content: 'Comprehensive guide to managing nausea, fatigue, pain, and other treatment-related side effects.',
+    duration: 60,
+    order: 3,
+    isCompleted: false
   }
 ];
 
@@ -389,9 +450,9 @@ export const dummyDashboardStats: DashboardStats = {
   totalUsers: 156,
   activeSessions: 12,
   moduleCompletions: 89,
+  totalResources: 45,
   supportTickets: 5,
   patientCount: 142,
   counselorCount: 8,
-  upcomingSessions: 15,
-  recentMessages: 23
+  upcomingSessions: 15
 };

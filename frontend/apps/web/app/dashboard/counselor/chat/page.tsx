@@ -81,7 +81,7 @@ export default function CounselorChatPage() {
               <ScrollArea className="h-[480px]">
                 <div className="space-y-1">
                   {dummyChats.map((chat) => {
-                    const patientId = chat.participants.find(id => id !== '2'); // Exclude counselor ID
+                     const patientId = chat.participants.find((id: string) => id !== '2'); // Exclude counselor ID
                     const patient = getPatientInfo(patientId || '');
                     
                     return (
@@ -143,22 +143,22 @@ export default function CounselorChatPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={getPatientInfo(activeChat.participants[0])?.avatar} />
+                        <AvatarImage src={getPatientInfo(activeChat.participants[0] || '')?.avatar || ''} />
                         <AvatarFallback>
-                          {getPatientInfo(activeChat.participants[0])?.name?.split(' ').map(n => n[0]).join('') || 'P'}
+                          {getPatientInfo(activeChat.participants[0] || '')?.name?.split(' ').map(n => n[0]).join('') || 'P'}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <h3 className="font-semibold">
-                          {getPatientInfo(activeChat.participants[0])?.name || 'Patient'}
+                          {getPatientInfo(activeChat.participants[0] || '')?.name || 'Patient'}
                         </h3>
                         <div className="flex items-center gap-2">
                           <p className="text-sm text-muted-foreground">
-                            Patient • {getPatientInfo(activeChat.participants[0])?.currentModule}
+                            Patient • {getPatientInfo(activeChat.participants[0] || '')?.currentModule}
                           </p>
-                          <Badge variant="outline" className="text-xs">
-                            {getPatientInfo(activeChat.participants[0])?.moduleProgress}% progress
-                          </Badge>
+                           <Badge variant="outline" className="text-xs">
+                             {Object.values(getPatientInfo(activeChat.participants[0] || '')?.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(getPatientInfo(activeChat.participants[0] || '')?.moduleProgress || {}).length || 0}% progress
+                           </Badge>
                         </div>
                       </div>
                     </div>

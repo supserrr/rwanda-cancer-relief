@@ -17,13 +17,28 @@ export function PDFViewer({ url, title, thumbnail }: PDFViewerProps) {
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
   useEffect(() => {
-    // Simulate loading time
-    const timer = setTimeout(() => {
+    // Set up error handling for the PDF
+    const handleError = () => {
+      setError('Failed to load PDF. The file may be corrupted or inaccessible.');
       setLoading(false);
-    }, 1000);
+    };
 
-    return () => clearTimeout(timer);
-  }, []);
+    // Check if the URL is accessible
+    if (url) {
+      fetch(url, { method: 'HEAD' })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('PDF not accessible');
+          }
+          setLoading(false);
+        })
+        .catch(() => {
+          handleError();
+        });
+    } else {
+      handleError();
+    }
+  }, [url]);
 
   const handleDownload = async () => {
     setIsDownloading(true);
@@ -83,33 +98,43 @@ export function PDFViewer({ url, title, thumbnail }: PDFViewerProps) {
 
   return (
     <div className="space-y-4">
-      {/* PDF Preview */}
-      <div className="relative">
-        <img 
-          src={thumbnail || 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop'} 
-          alt={title}
-          className="w-full h-64 object-cover rounded-xl"
+      {/* PDF Embed */}
+      <div className="relative w-full">
+        <iframe
+          src={`${url}#toolbar=1&navpanes=1&scrollbar=1`}
+          title={title}
+          className="w-full h-[600px] rounded-xl border"
+          frameBorder="0"
+          onLoad={() => {
+            setLoading(false);
+            setError(null);
+          }}
+          onError={() => {
+            setError('Failed to load PDF in viewer');
+            setLoading(false);
+          }}
         />
-        <div className="absolute inset-0 bg-black/20 rounded-xl flex items-center justify-center">
-          <div className="text-center text-white">
-            <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-3">
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+        
+        {/* Loading overlay */}
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-xl">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading PDF...</p>
             </div>
-            <p className="text-sm font-medium">PDF Document</p>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* PDF Controls */}
+      {/* PDF Actions */}
       <div className="flex items-center justify-center space-x-4 p-4 bg-muted/30 rounded-lg">
         <Button
           onClick={handleOpenInNewTab}
+          variant="outline"
           className="flex items-center space-x-2"
         >
           <ExternalLink className="h-4 w-4" />
-          <span>View PDF</span>
+          <span>Open in New Tab</span>
         </Button>
         
         <Button

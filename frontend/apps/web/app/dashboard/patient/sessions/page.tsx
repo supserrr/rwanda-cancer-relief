@@ -30,7 +30,7 @@ export default function PatientSessionsPage() {
   const upcomingSessions = dummySessions.filter(session => 
     session.patientId === currentPatientId && 
     session.status === 'scheduled' &&
-    new Date(session.scheduledAt) > new Date()
+    new Date(session.date) > new Date()
   );
 
   const pastSessions = dummySessions.filter(session => 

@@ -28,15 +28,15 @@ import { dummyCounselors, dummySessions, dummyPatients, dummyMessages } from '..
 export default function CounselorDashboard() {
   const currentCounselor = dummyCounselors[0]; // Dr. Marie Claire
   const assignedPatients = dummyPatients.filter(patient => 
-    currentCounselor.patients.includes(patient.id)
+    currentCounselor?.patients?.includes(patient.id)
   );
   const upcomingSessions = dummySessions.filter(session => 
-    session.counselorId === currentCounselor.id && 
+    session.counselorId === currentCounselor?.id && 
     session.status === 'scheduled' &&
-    new Date(session.scheduledAt) > new Date()
+    new Date(session.date) > new Date()
   );
   const recentMessages = dummyMessages.filter(msg => 
-    msg.senderId === currentCounselor.id || msg.receiverId === currentCounselor.id
+    msg.senderId === currentCounselor?.id || msg.receiverId === currentCounselor?.id
   ).slice(0, 3);
 
   const getPatientName = (patientId: string) => {
@@ -82,7 +82,7 @@ export default function CounselorDashboard() {
         />
         <AnimatedStatCard
           title="Rating"
-          value={currentCounselor.rating}
+          value={currentCounselor?.rating || 0}
           description="Based on patient feedback"
           icon={Star}
           trend={{ value: 5, isPositive: true }}
@@ -114,8 +114,8 @@ export default function CounselorDashboard() {
                       <div>
                         <p className="font-medium">{getPatientName(session.patientId)}</p>
                         <p className="text-sm text-muted-foreground">
-                          {new Date(session.scheduledAt).toLocaleDateString()} at{' '}
-                          {new Date(session.scheduledAt).toLocaleTimeString([], { 
+                          {new Date(session.date).toLocaleDateString()} at{' '}
+                          {new Date(session.date).toLocaleTimeString([], { 
                             hour: '2-digit', 
                             minute: '2-digit' 
                           })}
@@ -162,9 +162,14 @@ export default function CounselorDashboard() {
                       </Avatar>
                       <span className="text-sm font-medium">{patient.name}</span>
                     </div>
-                    <Badge variant="outline">{patient.moduleProgress}%</Badge>
+                    <Badge variant="outline">
+                      {Object.values(patient.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(patient.moduleProgress || {}).length || 0}%
+                    </Badge>
                   </div>
-                  <Progress value={patient.moduleProgress} className="h-2" />
+                  <Progress 
+                    value={Object.values(patient.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(patient.moduleProgress || {}).length || 0} 
+                    className="h-2" 
+                  />
                   <p className="text-xs text-muted-foreground">
                     Current module: {patient.currentModule}
                   </p>
@@ -188,7 +193,7 @@ export default function CounselorDashboard() {
             {recentMessages.length > 0 ? (
               <div className="space-y-3">
                 {recentMessages.map((message) => {
-                  const isFromCounselor = message.senderId === currentCounselor.id;
+                  const isFromCounselor = message.senderId === currentCounselor?.id;
                   const patientName = isFromCounselor ? 
                     getPatientName(message.receiverId) : 
                     getPatientName(message.senderId);

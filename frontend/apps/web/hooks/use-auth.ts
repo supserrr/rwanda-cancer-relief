@@ -1,7 +1,6 @@
-import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
-import { getDashboardPath, hasRole, USER_ROLES } from '@/lib/auth'
+import { useEffect, useState } from 'react'
+import { AuthSession, AuthService, UserRole, ROLES } from '@/lib/auth'
 
 /**
  * Custom hook for authentication and role-based access control
@@ -13,19 +12,19 @@ import { getDashboardPath, hasRole, USER_ROLES } from '@/lib/auth'
  * - Loading states
  */
 export function useAuth() {
-  const { data: session, status } = useSession()
   const router = useRouter()
+  const [user, setUser] = useState(AuthSession.getUser())
+  const [isLoading, setIsLoading] = useState(false)
 
-  const isLoading = status === 'loading'
-  const isAuthenticated = !!session?.user
-  const userRole = session?.user?.role
+  const isAuthenticated = AuthSession.isAuthenticated()
+  const userRole = AuthSession.getUserRole()
 
   /**
    * Check if user has required role
    */
-  const checkRole = (requiredRole: keyof typeof USER_ROLES) => {
+  const checkRole = (requiredRole: keyof typeof ROLES) => {
     if (!userRole) return false
-    return hasRole(userRole, USER_ROLES[requiredRole])
+    return userRole === ROLES[requiredRole]
   }
 
   /**
@@ -48,13 +47,22 @@ export function useAuth() {
   /**
    * Sign out user
    */
-  const signOut = () => {
-    router.push('/signin')
+  const signOut = async () => {
+    setIsLoading(true)
+    try {
+      await AuthService.signOut()
+      setUser(null)
+      router.push('/signin')
+    } catch (error) {
+      console.error('Sign out error:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return {
-    session,
-    user: session?.user,
+    session: { user },
+    user,
     userRole,
     isLoading,
     isAuthenticated,
@@ -66,6 +74,22 @@ export function useAuth() {
     isPatient: checkRole('PATIENT'),
     isCounselor: checkRole('COUNSELOR'),
     isAdmin: checkRole('ADMIN')
+  }
+}
+
+/**
+ * Get the appropriate dashboard path for a user role
+ */
+function getDashboardPath(userRole: UserRole): string {
+  switch (userRole) {
+    case ROLES.PATIENT:
+      return '/dashboard/patient'
+    case ROLES.COUNSELOR:
+      return '/dashboard/counselor'
+    case ROLES.ADMIN:
+      return '/dashboard/admin'
+    default:
+      return '/'
   }
 }
 
@@ -87,7 +111,7 @@ export function useRequireAuth() {
 /**
  * Hook for protecting routes based on role
  */
-export function useRequireRole(requiredRole: keyof typeof USER_ROLES) {
+export function useRequireRole(requiredRole: keyof typeof ROLES) {
   const { isAuthenticated, isLoading, checkRole, redirectToSignIn } = useAuth()
 
   useEffect(() => {

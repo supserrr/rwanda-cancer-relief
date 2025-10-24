@@ -17,7 +17,8 @@ import {
   Video,
   MoreVertical,
   Search,
-  Filter
+  Filter,
+  MessageCircle
 } from 'lucide-react';
 import { dummyChats, dummyMessages, dummyCounselors } from '../../../../lib/dummy-data';
 
@@ -79,7 +80,7 @@ export default function PatientChatPage() {
               <ScrollArea className="h-[480px]">
                 <div className="space-y-1">
                   {dummyChats.map((chat) => {
-                    const counselorId = chat.participants.find(id => id !== '1');
+                    const counselorId = chat.participants.find((id: string) => id !== '1');
                     const counselor = getCounselorInfo(counselorId || '');
                     
                     return (
@@ -141,17 +142,17 @@ export default function PatientChatPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={getCounselorInfo(activeChat.participants[1])?.avatar} />
+                        <AvatarImage src={getCounselorInfo(activeChat.participants[1] || '')?.avatar || ''} />
                         <AvatarFallback>
-                          {getCounselorInfo(activeChat.participants[1])?.name?.split(' ').map(n => n[0]).join('') || 'C'}
+                          {getCounselorInfo(activeChat.participants[1] || '')?.name?.split(' ').map(n => n[0]).join('') || 'C'}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <h3 className="font-semibold">
-                          {getCounselorInfo(activeChat.participants[1])?.name || 'Counselor'}
+                          {getCounselorInfo(activeChat.participants[1] || '')?.name || 'Counselor'}
                         </h3>
                         <p className="text-sm text-muted-foreground">
-                          {getCounselorInfo(activeChat.participants[1])?.specialty}
+                          {getCounselorInfo(activeChat.participants[1] || '')?.specialty}
                         </p>
                       </div>
                     </div>

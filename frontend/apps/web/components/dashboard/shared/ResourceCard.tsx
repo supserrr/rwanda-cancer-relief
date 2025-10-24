@@ -11,7 +11,8 @@ import {
   Download,
   Eye,
   Edit,
-  Trash2
+  Trash2,
+  StarOff
 } from 'lucide-react';
 import { Resource } from '../../../lib/types';
 
@@ -21,6 +22,7 @@ interface ResourceCardProps {
   onDownload?: (resource: Resource) => void;
   onEdit?: (resource: Resource) => void;
   onDelete?: (resource: Resource) => void;
+  onUnsave?: (resource: Resource) => void;
   showActions?: boolean;
   showEditActions?: boolean;
   delay?: number;
@@ -30,11 +32,12 @@ export function ResourceCard({
   resource, 
   onView, 
   onDownload, 
-  onEdit,
-  onDelete,
-  showActions = true,
+  onEdit, 
+  onDelete, 
+  onUnsave,
+  showActions = true, 
   showEditActions = false,
-  delay = 0
+  delay = 0 
 }: ResourceCardProps) {
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -124,31 +127,7 @@ export function ResourceCard({
           </div>
         )}
 
-        {showActions && (
-          <div className="flex space-x-2 pt-2">
-            {onView && (
-              <Button 
-                size="sm" 
-                className="flex-1"
-                onClick={() => onView(resource)}
-              >
-                <Eye className="h-4 w-4 mr-2" />
-                View
-              </Button>
-            )}
-            {onDownload && (
-              <Button 
-                size="sm" 
-                variant="outline"
-                onClick={() => onDownload(resource)}
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        )}
-
-        {showEditActions && (
+        {showEditActions ? (
           <div className="flex space-x-2 pt-2">
             {onView && (
               <Button 
@@ -169,13 +148,22 @@ export function ResourceCard({
                 <Edit className="h-4 w-4" />
               </Button>
             )}
-            {onDownload && (
+            {onDownload && !resource.isYouTube && (
               <Button 
                 size="sm" 
                 variant="outline"
                 onClick={() => onDownload(resource)}
               >
                 <Download className="h-4 w-4" />
+              </Button>
+            )}
+            {onUnsave && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => onUnsave(resource)}
+              >
+                <StarOff className="h-4 w-4" />
               </Button>
             )}
             {onDelete && (
@@ -185,6 +173,28 @@ export function ResourceCard({
                 onClick={() => onDelete(resource)}
               >
                 <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        ) : showActions && (
+          <div className="flex space-x-2 pt-2">
+            {onView && (
+              <Button 
+                size="sm" 
+                className="flex-1"
+                onClick={() => onView(resource)}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                View
+              </Button>
+            )}
+            {onDownload && !resource.isYouTube && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => onDownload(resource)}
+              >
+                <Download className="h-4 w-4" />
               </Button>
             )}
           </div>

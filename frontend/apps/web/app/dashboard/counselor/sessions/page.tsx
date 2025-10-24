@@ -27,18 +27,18 @@ export default function CounselorSessionsPage() {
   const currentCounselor = dummyCounselors[0]; // Dr. Marie Claire
 
   const upcomingSessions = dummySessions.filter(session => 
-    session.counselorId === currentCounselor.id && 
+    session.counselorId === currentCounselor?.id && 
     session.status === 'scheduled' &&
-    new Date(session.scheduledAt) > new Date()
+    new Date(session.date) > new Date()
   );
 
   const pastSessions = dummySessions.filter(session => 
-    session.counselorId === currentCounselor.id && 
+    session.counselorId === currentCounselor?.id && 
     (session.status === 'completed' || session.status === 'cancelled')
   );
 
   const allSessions = dummySessions.filter(session => 
-    session.counselorId === currentCounselor.id
+    session.counselorId === currentCounselor?.id
   );
 
   const getPatientName = (patientId: string) => {

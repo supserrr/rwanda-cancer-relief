@@ -38,7 +38,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { Resource } from '@workspace/ui/lib/types';
+import { Resource } from '../lib/types';
 import { PDFViewer } from './pdf-viewer';
 
 interface ResourceViewerModalProps {
@@ -48,6 +48,7 @@ interface ResourceViewerModalProps {
   onDownload?: (resource: Resource) => void;
   onShare?: (resource: Resource) => void;
   onBookmark?: (resource: Resource) => void;
+  onViewArticle?: (resource: Resource) => void; // Added for article viewing
 }
 
 export function ResourceViewerModal({ 
@@ -56,7 +57,8 @@ export function ResourceViewerModal({
   onClose, 
   onDownload,
   onShare,
-  onBookmark
+  onBookmark,
+  onViewArticle
 }: ResourceViewerModalProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -170,6 +172,18 @@ export function ResourceViewerModal({
     setToastType(type);
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
+  };
+
+  const getYouTubeEmbedUrl = (url: string) => {
+    // Extract video ID from various YouTube URL formats
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    const videoId = (match && match[2] && match[2].length === 11) ? match[2] : null;
+    
+    if (videoId) {
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+    return url;
   };
 
   const handleDownload = async () => {
@@ -300,54 +314,79 @@ export function ResourceViewerModal({
       case 'video':
         return (
           <div className="space-y-4">
-            <div className="relative">
-              <video
-                ref={videoRef}
-                src={resource.url}
-                poster={resource.thumbnail}
-                onTimeUpdate={handleTimeUpdate}
-                onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-                className="w-full aspect-video bg-black rounded-lg"
-                controls={false}
-              />
-              
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Button
-                  size="lg"
-                  onClick={handlePlayPause}
-                  className="w-16 h-16 rounded-full bg-black/50 hover:bg-black/70"
-                >
-                  {isPlaying ? <Pause className="h-8 w-8" /> : <Play className="h-8 w-8" />}
-                </Button>
-              </div>
-              
-              <div className="absolute bottom-4 left-4 right-4">
-                <div className="flex items-center space-x-2 text-white text-sm mb-2">
-                  <span>{formatTime(currentTime)}</span>
-                  <span>/</span>
-                  <span>{formatTime(duration)}</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max={duration}
-                  value={currentTime}
-                  onChange={handleSeek}
-                  className="w-full h-1 bg-white/30 rounded-lg appearance-none cursor-pointer"
+            {resource.isYouTube ? (
+              // YouTube Embed
+              <div className="relative">
+                <iframe
+                  src={getYouTubeEmbedUrl(resource.youtubeUrl || resource.url)}
+                  title={resource.title}
+                  className="w-full aspect-video rounded-xl"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
                 />
+                <div className="absolute top-4 right-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleFullscreen}
+                    className="bg-black/50 hover:bg-black/70 text-white"
+                  >
+                    {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
-              
-              <div className="absolute top-4 right-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleFullscreen}
-                  className="bg-black/50 hover:bg-black/70 text-white"
-                >
-                  {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                </Button>
+            ) : (
+              // Regular Video Player
+              <div className="relative">
+                <video
+                  ref={videoRef}
+                  src={resource.url}
+                  poster={resource.thumbnail}
+                  onTimeUpdate={handleTimeUpdate}
+                  onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+                  className="w-full aspect-video bg-black rounded-lg"
+                  controls={false}
+                />
+                
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Button
+                    size="lg"
+                    onClick={handlePlayPause}
+                    className="w-16 h-16 rounded-full bg-black/50 hover:bg-black/70"
+                  >
+                    {isPlaying ? <Pause className="h-8 w-8" /> : <Play className="h-8 w-8" />}
+                  </Button>
+                </div>
+                
+                <div className="absolute bottom-4 left-4 right-4">
+                  <div className="flex items-center space-x-2 text-white text-sm mb-2">
+                    <span>{formatTime(currentTime)}</span>
+                    <span>/</span>
+                    <span>{formatTime(duration)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max={duration}
+                    value={currentTime}
+                    onChange={handleSeek}
+                    className="w-full h-1 bg-white/30 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+                
+                <div className="absolute top-4 right-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleFullscreen}
+                    className="bg-black/50 hover:bg-black/70 text-white"
+                  >
+                    {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         );
 
@@ -380,10 +419,16 @@ export function ResourceViewerModal({
             {/* Article Controls */}
             <div className="flex items-center justify-center space-x-4 p-4 bg-muted/30 rounded-lg">
               <Button
-                onClick={() => window.open(resource.url, '_blank')}
+                onClick={() => {
+                  if (onViewArticle) {
+                    onViewArticle(resource);
+                  } else {
+                    window.open(resource.url, '_blank');
+                  }
+                }}
                 className="flex items-center space-x-2"
               >
-                <ExternalLink className="h-4 w-4" />
+                <BookOpen className="h-4 w-4" />
                 <span>Read Article</span>
               </Button>
               
@@ -490,19 +535,21 @@ export function ResourceViewerModal({
                   )}
                 </Button>
                 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleDownload}
-                  disabled={isDownloading}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  {isDownloading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="h-4 w-4" />
-                  )}
-                </Button>
+                {!resource.isYouTube && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleDownload}
+                    disabled={isDownloading}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    {isDownloading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -534,9 +581,17 @@ export function ResourceViewerModal({
                 </div>
               )}
 
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>Added {resource.createdAt.toLocaleDateString()}</span>
-                <span>Published by {resource.publisher}</span>
+              <div className="bg-muted/30 rounded-lg p-3 border">
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <div className="flex items-center space-x-2">
+                    <Calendar className="h-4 w-4" />
+                    <span>Added {resource.createdAt.toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <User className="h-4 w-4" />
+                    <span>Published by {resource.publisher}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

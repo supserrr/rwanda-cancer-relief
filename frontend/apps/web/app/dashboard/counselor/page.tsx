@@ -80,14 +80,6 @@ export default function CounselorDashboard() {
           icon={MessageCircle}
           delay={0.3}
         />
-        <AnimatedStatCard
-          title="Rating"
-          value={currentCounselor?.rating || 0}
-          description="Based on patient feedback"
-          icon={Star}
-          trend={{ value: 5, isPositive: true }}
-          delay={0.4}
-        />
       </div>
 
       <AnimatedGrid className="grid gap-6 lg:grid-cols-2" staggerDelay={0.2}>

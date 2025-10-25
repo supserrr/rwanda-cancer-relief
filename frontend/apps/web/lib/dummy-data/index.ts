@@ -118,8 +118,10 @@ export const dummyCounselors: Counselor[] = [
     experience: 8,
     languages: ['English', 'French', 'Kinyarwanda'],
     availability: 'available',
-    rating: 4.8,
     bio: 'Specialized in helping cancer patients and their families cope with diagnosis and treatment.',
+    credentials: 'PhD in Clinical Psychology, Licensed Clinical Psychologist',
+    location: 'Kigali, Rwanda',
+    phoneNumber: '+250 788 111 222',
     patients: ['1', '4']
   },
   {
@@ -134,8 +136,10 @@ export const dummyCounselors: Counselor[] = [
     experience: 12,
     languages: ['English', 'Kinyarwanda'],
     availability: 'busy',
-    rating: 4.9,
     bio: 'Experienced in grief counseling and end-of-life support for cancer patients.',
+    credentials: 'MSW in Social Work, Licensed Clinical Social Worker',
+    location: 'Butare, Rwanda',
+    phoneNumber: '+250 788 333 444',
     patients: ['5']
   },
   {
@@ -150,8 +154,10 @@ export const dummyCounselors: Counselor[] = [
     experience: 6,
     languages: ['English', 'French', 'Kinyarwanda'],
     availability: 'available',
-    rating: 4.7,
     bio: 'Focuses on family dynamics and support systems during cancer treatment.',
+    credentials: 'MA in Marriage and Family Therapy, Licensed Marriage and Family Therapist',
+    location: 'Gisenyi, Rwanda',
+    phoneNumber: '+250 788 555 666',
     patients: []
   }
 ];

@@ -1,0 +1,803 @@
+'use client';
+
+import React, { useState } from 'react';
+import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
+import { AnimatedCard } from '@workspace/ui/components/animated-card';
+import { Button } from '@workspace/ui/components/button';
+import { Input } from '@workspace/ui/components/input';
+import { Label } from '@workspace/ui/components/label';
+import { Switch } from '@workspace/ui/components/switch';
+import { Card, CardContent, CardHeader, CardTitle } from '@workspace/ui/components/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@workspace/ui/components/avatar';
+import { Badge } from '@workspace/ui/components/badge';
+import { Separator } from '@workspace/ui/components/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@workspace/ui/components/dialog';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@workspace/ui/components/select';
+import { 
+  User, 
+  Mail, 
+  Phone, 
+  Calendar, 
+  Globe, 
+  Bell, 
+  Shield, 
+  LogOut,
+  Camera,
+  Save,
+  Eye,
+  CheckCircle,
+  AlertCircle,
+  Info,
+  Settings2,
+  UserCheck,
+  Clock,
+  MapPin,
+  Award,
+  Languages,
+  Trash2,
+  X,
+  Plus
+} from 'lucide-react';
+import { dummyCounselors } from '../../../../lib/dummy-data';
+
+export default function CounselorSettingsPage() {
+  const currentCounselor = dummyCounselors[0]; // Dr. Marie Uwimana
+  const [activeTab, setActiveTab] = useState('profile');
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [newLanguage, setNewLanguage] = useState('');
+  
+  const [notifications, setNotifications] = useState({
+    email: true,
+    push: true,
+    sms: false,
+    sessionReminders: true,
+    patientMessages: true,
+    resourceUpdates: true,
+    systemAlerts: true
+  });
+
+  const [profile, setProfile] = useState({
+    name: currentCounselor?.name || '',
+    email: currentCounselor?.email || '',
+    phoneNumber: currentCounselor?.phoneNumber || '',
+    specialty: currentCounselor?.specialty || '',
+    bio: currentCounselor?.bio || '',
+    credentials: currentCounselor?.credentials || '',
+    experience: currentCounselor?.experience || 0,
+    location: currentCounselor?.location || '',
+    language: 'en',
+    timezone: 'Africa/Kigali',
+    languages: currentCounselor?.languages || []
+  });
+
+  const handleSaveProfile = async () => {
+    setIsSaving(true);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Saving profile:', profile);
+      setHasUnsavedChanges(false);
+      // Show success message
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      // Show error message
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLogout = () => {
+    console.log('Logging out...');
+    // Implement logout logic
+  };
+
+  const handleNotificationChange = (key: string, value: boolean) => {
+    setNotifications(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  const handleProfileChange = (field: string, value: string | number) => {
+    setProfile(prev => ({ ...prev, [field]: value }));
+    setHasUnsavedChanges(true);
+  };
+
+  const handleAddLanguage = (language: string) => {
+    if (language && !profile.languages.includes(language)) {
+      setProfile(prev => ({ 
+        ...prev, 
+        languages: [...prev.languages, language] 
+      }));
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  const handleRemoveLanguage = (languageToRemove: string) => {
+    setProfile(prev => ({ 
+      ...prev, 
+      languages: prev.languages.filter(lang => lang !== languageToRemove) 
+    }));
+    setHasUnsavedChanges(true);
+  };
+
+  const handleDeleteAccount = () => {
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deleteConfirmation !== 'DELETE') {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('Account deleted successfully');
+      // Redirect to login or home page
+      // window.location.href = '/';
+    } catch (error) {
+      console.error('Error deleting account:', error);
+    } finally {
+      setIsDeleting(false);
+      setIsDeleteModalOpen(false);
+      setDeleteConfirmation('');
+    }
+  };
+
+  const tabs = [
+    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'security', label: 'Security', icon: Shield },
+    { id: 'preferences', label: 'Preferences', icon: Settings2 }
+  ];
+
+  return (
+    <div className="space-y-6">
+      <AnimatedPageHeader
+        title="Settings"
+        description="Manage your account and preferences"
+      >
+        {hasUnsavedChanges && (
+          <div className="flex items-center gap-2 text-amber-600">
+            <AlertCircle className="h-4 w-4" />
+            <span className="text-sm font-medium">Unsaved changes</span>
+          </div>
+        )}
+      </AnimatedPageHeader>
+        <div className="grid gap-8 lg:grid-cols-12">
+          {/* Sidebar Navigation */}
+          <div className="lg:col-span-3">
+            <AnimatedCard delay={0.1} className="sticky top-8">
+              <div className="p-0">
+                <nav className="space-y-1">
+                  {tabs.map((tab) => {
+                    const Icon = tab.icon;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-200 rounded-xl ${
+                          activeTab === tab.id
+                            ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                            : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground hover:shadow-md'
+                        }`}
+                      >
+                        <Icon className="h-5 w-5" />
+                        <span className="font-medium">{tab.label}</span>
+                      </button>
+                    );
+                  })}
+                </nav>
+              </div>
+            </AnimatedCard>
+          </div>
+
+          {/* Main Content */}
+          <div className="lg:col-span-9">
+            {activeTab === 'profile' && (
+              <div className="space-y-6">
+                {/* Profile Header */}
+                <AnimatedCard delay={0.2}>
+                  <div className="flex items-center gap-6">
+                    <div className="relative">
+                      <Avatar className="h-24 w-24 ring-4 ring-primary/20 shadow-lg">
+                        <AvatarImage src={currentCounselor?.avatar} alt={currentCounselor?.name} />
+                        <AvatarFallback className="text-xl bg-primary/10 text-primary">
+                          {currentCounselor?.name?.split(' ').map(n => n[0]).join('')}
+                        </AvatarFallback>
+                      </Avatar>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full shadow-lg border-primary/20 hover:bg-primary/10"
+                      >
+                        <Camera className="h-4 w-4 text-primary" />
+                      </Button>
+                    </div>
+                    <div className="flex-1">
+                      <h2 className="text-2xl font-bold text-foreground">{currentCounselor?.name}</h2>
+                      <p className="text-primary font-medium">{currentCounselor?.specialty}</p>
+                      <div className="flex items-center gap-4 mt-2">
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          <span>{currentCounselor?.experience} years experience</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <MapPin className="h-4 w-4" />
+                          <span>{currentCounselor?.location}</span>
+                        </div>
+                      </div>
+                      <Badge variant="secondary" className="mt-2 bg-primary/10 text-primary border-primary/20">
+                        <UserCheck className="h-3 w-3 mr-1" />
+                        Verified Counselor
+                      </Badge>
+                    </div>
+                  </div>
+                </AnimatedCard>
+
+                {/* Personal Information */}
+                <AnimatedCard delay={0.3}>
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 pb-4 border-b border-primary/10">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <User className="h-5 w-5 text-primary" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-foreground">Personal Information</h3>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Full Name</Label>
+                        <Input
+                          id="name"
+                          value={profile.name}
+                          onChange={(e) => handleProfileChange('name', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email Address</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={profile.email}
+                          onChange={(e) => handleProfileChange('email', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">Phone Number</Label>
+                        <Input
+                          id="phone"
+                          value={profile.phoneNumber}
+                          onChange={(e) => handleProfileChange('phoneNumber', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="specialty">Specialty</Label>
+                        <Input
+                          id="specialty"
+                          value={profile.specialty}
+                          onChange={(e) => handleProfileChange('specialty', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="bio">Professional Bio</Label>
+                      <textarea
+                        id="bio"
+                        className="w-full min-h-[120px] p-3 border rounded-md resize-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                        value={profile.bio}
+                        onChange={(e) => handleProfileChange('bio', e.target.value)}
+                        placeholder="Tell patients about your background, approach, and expertise..."
+                      />
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="credentials">Credentials</Label>
+                        <Input
+                          id="credentials"
+                          value={profile.credentials}
+                          onChange={(e) => handleProfileChange('credentials', e.target.value)}
+                          placeholder="e.g., PhD in Clinical Psychology"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="experience">Years of Experience</Label>
+                        <Input
+                          id="experience"
+                          type="number"
+                          value={profile.experience}
+                          onChange={(e) => handleProfileChange('experience', parseInt(e.target.value) || 0)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="location">Location</Label>
+                      <Input
+                        id="location"
+                        value={profile.location}
+                        onChange={(e) => handleProfileChange('location', e.target.value)}
+                        placeholder="City, Country"
+                      />
+                    </div>
+
+                    {/* Professional Languages */}
+                    <div className="space-y-2">
+                      <Label>Professional Languages</Label>
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap gap-2">
+                          {profile.languages.map((language, index) => (
+                            <Badge 
+                              key={index} 
+                              variant="outline" 
+                              className="px-3 py-1 border-primary/20 text-primary bg-primary/5 flex items-center gap-1"
+                            >
+                              {language}
+                              <button
+                                onClick={() => handleRemoveLanguage(language)}
+                                className="ml-1 hover:bg-primary/20 rounded-full p-0.5"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            value={newLanguage}
+                            onChange={(e) => setNewLanguage(e.target.value)}
+                            placeholder="Add a language..."
+                            className="flex-1"
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddLanguage(newLanguage);
+                                setNewLanguage('');
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              handleAddLanguage(newLanguage);
+                              setNewLanguage('');
+                            }}
+                            disabled={!newLanguage.trim()}
+                            className="border-primary/20 hover:bg-primary/10"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Languages you can provide counseling in
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="language">Primary Language</Label>
+                        <Select value={profile.language} onValueChange={(value) => handleProfileChange('language', value)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="en">English</SelectItem>
+                            <SelectItem value="fr">Français</SelectItem>
+                            <SelectItem value="rw">Kinyarwanda</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="timezone">Timezone</Label>
+                        <Select value={profile.timezone} onValueChange={(value) => handleProfileChange('timezone', value)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Africa/Kigali">Africa/Kigali</SelectItem>
+                            <SelectItem value="UTC">UTC</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-4 border-t border-primary/10">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Info className="h-4 w-4" />
+                        <span>Changes are saved automatically</span>
+                      </div>
+                      <Button 
+                        onClick={handleSaveProfile} 
+                        disabled={!hasUnsavedChanges || isSaving}
+                        className="min-w-[120px] bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
+                      >
+                        {isSaving ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4 mr-2" />
+                            Save Changes
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </AnimatedCard>
+              </div>
+            )}
+
+            {activeTab === 'notifications' && (
+              <AnimatedCard delay={0.2}>
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 pb-4 border-b border-primary/10">
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <Bell className="h-5 w-5 text-primary" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground">Notification Preferences</h3>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 border border-primary/20 rounded-xl bg-gradient-to-r from-primary/5 to-transparent">
+                      <div className="space-y-1">
+                        <Label className="text-base font-medium text-foreground">Email Notifications</Label>
+                        <p className="text-sm text-muted-foreground">Receive updates and reminders via email</p>
+                      </div>
+                      <Switch
+                        checked={notifications.email}
+                        onCheckedChange={(checked) => handleNotificationChange('email', checked)}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-4 border border-primary/20 rounded-xl bg-gradient-to-r from-primary/5 to-transparent">
+                      <div className="space-y-1">
+                        <Label className="text-base font-medium text-foreground">Push Notifications</Label>
+                        <p className="text-sm text-muted-foreground">Browser notifications for important updates</p>
+                      </div>
+                      <Switch
+                        checked={notifications.push}
+                        onCheckedChange={(checked) => handleNotificationChange('push', checked)}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-4 border border-primary/20 rounded-xl bg-gradient-to-r from-primary/5 to-transparent">
+                      <div className="space-y-1">
+                        <Label className="text-base font-medium text-foreground">SMS Notifications</Label>
+                        <p className="text-sm text-muted-foreground">Text message alerts for urgent matters</p>
+                      </div>
+                      <Switch
+                        checked={notifications.sms}
+                        onCheckedChange={(checked) => handleNotificationChange('sms', checked)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-primary/10 pt-6">
+                    <h3 className="text-lg font-semibold text-foreground mb-4">Session & Patient Notifications</h3>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 border border-primary/20 rounded-xl bg-gradient-to-r from-primary/5 to-transparent">
+                        <div className="space-y-1">
+                          <Label className="text-base font-medium text-foreground">Session Reminders</Label>
+                          <p className="text-sm text-muted-foreground">Remind me before scheduled sessions</p>
+                        </div>
+                        <Switch
+                          checked={notifications.sessionReminders}
+                          onCheckedChange={(checked) => handleNotificationChange('sessionReminders', checked)}
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-4 border border-primary/20 rounded-xl bg-gradient-to-r from-primary/5 to-transparent">
+                        <div className="space-y-1">
+                          <Label className="text-base font-medium text-foreground">Patient Messages</Label>
+                          <p className="text-sm text-muted-foreground">Messages from patients and families</p>
+                        </div>
+                        <Switch
+                          checked={notifications.patientMessages}
+                          onCheckedChange={(checked) => handleNotificationChange('patientMessages', checked)}
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-4 border border-primary/20 rounded-xl bg-gradient-to-r from-primary/5 to-transparent">
+                        <div className="space-y-1">
+                          <Label className="text-base font-medium text-foreground">Resource Updates</Label>
+                          <p className="text-sm text-muted-foreground">New resources and materials available</p>
+                        </div>
+                        <Switch
+                          checked={notifications.resourceUpdates}
+                          onCheckedChange={(checked) => handleNotificationChange('resourceUpdates', checked)}
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-4 border border-primary/20 rounded-xl bg-gradient-to-r from-primary/5 to-transparent">
+                        <div className="space-y-1">
+                          <Label className="text-base font-medium text-foreground">System Alerts</Label>
+                          <p className="text-sm text-muted-foreground">Platform updates and maintenance notices</p>
+                        </div>
+                        <Switch
+                          checked={notifications.systemAlerts}
+                          onCheckedChange={(checked) => handleNotificationChange('systemAlerts', checked)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </AnimatedCard>
+            )}
+
+            {activeTab === 'security' && (
+              <div className="space-y-6">
+                <AnimatedCard delay={0.2}>
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 pb-4 border-b border-primary/10">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <Shield className="h-5 w-5 text-primary" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-foreground">Security Settings</h3>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 border border-primary/20 rounded-xl bg-gradient-to-r from-primary/5 to-transparent">
+                        <div className="space-y-1">
+                          <Label className="text-base font-medium text-foreground">Change Password</Label>
+                          <p className="text-sm text-muted-foreground">Update your account password</p>
+                        </div>
+                        <Button variant="outline" className="border-primary/20 hover:bg-primary/10">
+                          <Eye className="h-4 w-4 mr-2" />
+                          Change
+                        </Button>
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-4 border border-primary/20 rounded-xl bg-gradient-to-r from-primary/5 to-transparent">
+                        <div className="space-y-1">
+                          <Label className="text-base font-medium text-foreground">Two-Factor Authentication</Label>
+                          <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
+                        </div>
+                        <Button variant="outline" className="border-primary/20 hover:bg-primary/10">
+                          <Shield className="h-4 w-4 mr-2" />
+                          Enable
+                        </Button>
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-4 border border-primary/20 rounded-xl bg-gradient-to-r from-primary/5 to-transparent">
+                        <div className="space-y-1">
+                          <Label className="text-base font-medium text-foreground">Login Activity</Label>
+                          <p className="text-sm text-muted-foreground">View recent login attempts</p>
+                        </div>
+                        <Button variant="outline" className="border-primary/20 hover:bg-primary/10">
+                          <Eye className="h-4 w-4 mr-2" />
+                          View
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </AnimatedCard>
+
+                <AnimatedCard delay={0.3}>
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 pb-4 border-b border-primary/10">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <Mail className="h-5 w-5 text-primary" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-foreground">Data & Privacy</h3>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 border border-primary/20 rounded-xl bg-gradient-to-r from-primary/5 to-transparent">
+                        <div className="space-y-1">
+                          <Label className="text-base font-medium text-foreground">Export Data</Label>
+                          <p className="text-sm text-muted-foreground">Download your account data</p>
+                        </div>
+                        <Button variant="outline" className="border-primary/20 hover:bg-primary/10">
+                          <Mail className="h-4 w-4 mr-2" />
+                          Export
+                        </Button>
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-4 border border-primary/20 rounded-xl bg-gradient-to-r from-primary/5 to-transparent">
+                        <div className="space-y-1">
+                          <Label className="text-base font-medium text-foreground">Privacy Settings</Label>
+                          <p className="text-sm text-muted-foreground">Manage your privacy preferences</p>
+                        </div>
+                        <Button variant="outline" className="border-primary/20 hover:bg-primary/10">
+                          <Shield className="h-4 w-4 mr-2" />
+                          Manage
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </AnimatedCard>
+
+                {/* Delete Account Section */}
+                <AnimatedCard delay={0.4}>
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 pb-4 border-b border-destructive/20">
+                      <div className="p-2 rounded-lg bg-destructive/10">
+                        <AlertCircle className="h-5 w-5 text-destructive" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-foreground">Danger Zone</h3>
+                    </div>
+                    
+                    <div className="p-6 border border-destructive/20 rounded-xl bg-gradient-to-r from-destructive/5 to-transparent">
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="text-base font-semibold text-foreground mb-2">Delete Account</h4>
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Permanently delete your account and all associated data. This action cannot be undone.
+                          </p>
+                          <div className="space-y-2 text-sm text-muted-foreground">
+                            <p>• All your profile information will be deleted</p>
+                            <p>• Your patient assignments will be reassigned</p>
+                            <p>• All session history will be permanently removed</p>
+                            <p>• You will lose access to all platform features</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-3 pt-4">
+                          <Button 
+                            variant="destructive" 
+                            className="bg-destructive hover:bg-destructive/90 shadow-lg shadow-destructive/20"
+                            onClick={handleDeleteAccount}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Account
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </AnimatedCard>
+              </div>
+            )}
+
+            {activeTab === 'preferences' && (
+              <AnimatedCard delay={0.2}>
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 pb-4 border-b border-primary/10">
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <Settings2 className="h-5 w-5 text-primary" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground">Preferences</h3>
+                  </div>
+                  
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <Label className="text-base font-medium text-foreground">Default Session Duration</Label>
+                      <Select defaultValue="60">
+                        <SelectTrigger className="w-48 border-primary/20 focus:ring-primary/20">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="30">30 minutes</SelectItem>
+                          <SelectItem value="45">45 minutes</SelectItem>
+                          <SelectItem value="60">60 minutes</SelectItem>
+                          <SelectItem value="90">90 minutes</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-base font-medium text-foreground">Working Hours</Label>
+                      <div className="grid gap-2 md:grid-cols-2">
+                        <div>
+                          <Label className="text-sm text-muted-foreground">Start Time</Label>
+                          <Input type="time" defaultValue="09:00" className="border-primary/20 focus:ring-primary/20" />
+                        </div>
+                        <div>
+                          <Label className="text-sm text-muted-foreground">End Time</Label>
+                          <Input type="time" defaultValue="17:00" className="border-primary/20 focus:ring-primary/20" />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-base font-medium text-foreground">Time Zone</Label>
+                      <Select defaultValue="Africa/Kigali">
+                        <SelectTrigger className="w-64 border-primary/20 focus:ring-primary/20">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Africa/Kigali">Africa/Kigali (GMT+2)</SelectItem>
+                          <SelectItem value="UTC">UTC (GMT+0)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              </AnimatedCard>
+            )}
+          </div>
+        </div>
+
+      {/* Delete Account Confirmation Modal */}
+      <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              Delete Account
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              This action cannot be undone. This will permanently delete your account and remove all data from our servers.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="p-4 border border-destructive/20 rounded-lg bg-destructive/5">
+              <h4 className="font-semibold text-foreground mb-2">What will be deleted:</h4>
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                <li>• Your profile and personal information</li>
+                <li>• All session history and notes</li>
+                <li>• Patient assignments (will be reassigned)</li>
+                <li>• All messages and communications</li>
+                <li>• Your account credentials</li>
+              </ul>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="delete-confirmation" className="text-sm font-medium">
+                Type <span className="font-mono bg-muted px-1 rounded">DELETE</span> to confirm:
+              </Label>
+              <Input
+                id="delete-confirmation"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder="Type DELETE to confirm"
+                className="border-destructive/20 focus:ring-destructive/20"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsDeleteModalOpen(false);
+                setDeleteConfirmation('');
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleConfirmDelete}
+              disabled={deleteConfirmation !== 'DELETE' || isDeleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Account
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

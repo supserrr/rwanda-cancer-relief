@@ -66,7 +66,7 @@ const navigationItems: NavigationItem[] = [
   },
   {
     id: 'chat',
-    label: 'Chat',
+    label: 'Messages',
     icon: 'MessageCircle',
     path: '/dashboard/patient/chat',
     roles: ['patient'],
@@ -118,7 +118,7 @@ const navigationItems: NavigationItem[] = [
   },
   {
     id: 'counselor-chat',
-    label: 'Chat',
+    label: 'Messages',
     icon: 'MessageCircle',
     path: '/dashboard/counselor/chat',
     roles: ['counselor'],
@@ -129,6 +129,13 @@ const navigationItems: NavigationItem[] = [
     label: 'AI Chat',
     icon: 'Bot',
     path: '/dashboard/counselor/ai-chat',
+    roles: ['counselor']
+  },
+  {
+    id: 'counselor-settings',
+    label: 'Settings',
+    icon: 'Settings',
+    path: '/dashboard/counselor/settings',
     roles: ['counselor']
   },
 

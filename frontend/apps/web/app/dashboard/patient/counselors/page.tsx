@@ -17,6 +17,7 @@ import {
 } from '@workspace/ui/components/select';
 import { Search, Filter, Star } from 'lucide-react';
 import { dummyCounselors } from '../../../../lib/dummy-data';
+import { ProfileViewModal } from '@workspace/ui/components/profile-view-modal';
 
 export default function PatientCounselorsPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,6 +25,8 @@ export default function PatientCounselorsPage() {
   const [selectedAvailability, setSelectedAvailability] = useState('all');
   const [selectedCounselor, setSelectedCounselor] = useState<any>(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [selectedProfileCounselor, setSelectedProfileCounselor] = useState<any>(null);
 
   const specialties = ['all', 'Oncology Psychology', 'Grief Counseling', 'Family Therapy'];
   const availabilityOptions = ['all', 'available', 'busy', 'offline'];
@@ -57,8 +60,11 @@ export default function PatientCounselorsPage() {
   };
 
   const handleViewProfile = (counselorId: string) => {
-    console.log('View profile for counselor:', counselorId);
-    // Implement profile view logic
+    const counselor = dummyCounselors.find(c => c.id === counselorId);
+    if (counselor) {
+      setSelectedProfileCounselor(counselor);
+      setIsProfileOpen(true);
+    }
   };
 
   const handleSendMessage = (counselorId: string) => {
@@ -131,14 +137,9 @@ export default function PatientCounselorsPage() {
               key={counselor.id}
               id={counselor.id}
               name={counselor.name}
-              title={`${counselor.experience} years experience`}
               avatar={counselor.avatar}
-              rating={counselor.rating}
               specialty={counselor.specialty}
-              location="Kigali, Rwanda"
               availability={counselor.availability}
-              bio={counselor.bio}
-              languages={counselor.languages}
               experience={counselor.experience}
               onBookSession={handleBookSession}
               onViewProfile={handleViewProfile}
@@ -177,20 +178,15 @@ export default function PatientCounselorsPage() {
         
         <AnimatedGrid className="grid gap-6 md:grid-cols-2" staggerDelay={0.15}>
           {dummyCounselors
-            .filter(counselor => (counselor.rating || 0) >= 4.8)
+            .filter(counselor => counselor.experience >= 8)
             .map((counselor, index) => (
               <div key={counselor.id} className="relative">
                 <LandingStyleCounselorCard
                   id={counselor.id}
                   name={counselor.name}
-                  title={`${counselor.experience} years experience`}
                   avatar={counselor.avatar}
-                  rating={counselor.rating}
                   specialty={counselor.specialty}
-                  location="Kigali, Rwanda"
                   availability={counselor.availability}
-                  bio={counselor.bio}
-                  languages={counselor.languages}
                   experience={counselor.experience}
                   onBookSession={handleBookSession}
                   onViewProfile={handleViewProfile}
@@ -211,6 +207,20 @@ export default function PatientCounselorsPage() {
           isOpen={isBookingModalOpen}
           onClose={handleCloseBookingModal}
           onBookingConfirmed={handleConfirmBooking}
+        />
+      )}
+
+      {/* Profile View Modal */}
+      {selectedProfileCounselor && (
+        <ProfileViewModal
+          isOpen={isProfileOpen}
+          onClose={() => {
+            setIsProfileOpen(false);
+            setSelectedProfileCounselor(null);
+          }}
+          user={selectedProfileCounselor}
+          userType="counselor"
+          currentUserRole="patient"
         />
       )}
     </div>

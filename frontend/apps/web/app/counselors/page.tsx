@@ -19,7 +19,6 @@ interface Counselor {
   specialties: string[];
   languages: string[];
   experience: string;
-  rating: number;
   reviews: number;
   availability: string;
   photo: string;
@@ -40,7 +39,6 @@ const counselors: Counselor[] = [
     specialties: ['Cancer Support', 'Grief Counseling', 'Family Therapy'],
     languages: ['Kinyarwanda', 'English', 'French'],
     experience: '8 years',
-    rating: 4.9,
     reviews: 127,
     availability: 'Available now',
     photo: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&h=400&fit=crop&auto=format&q=80',
@@ -56,7 +54,6 @@ const counselors: Counselor[] = [
     specialties: ['Anxiety Management', 'Depression Support', 'Coping Strategies'],
     languages: ['Kinyarwanda', 'English'],
     experience: '6 years',
-    rating: 4.8,
     reviews: 89,
     availability: 'Available in 2 hours',
     photo: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&auto=format&q=80',
@@ -72,7 +69,6 @@ const counselors: Counselor[] = [
     specialties: ['Family Support', 'Resource Navigation', 'End-of-Life Care'],
     languages: ['Kinyarwanda', 'English', 'Swahili'],
     experience: '10 years',
-    rating: 4.9,
     reviews: 156,
     availability: 'Available tomorrow',
     photo: 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=400&h=400&fit=crop&auto=format&q=80',
@@ -88,7 +84,6 @@ const counselors: Counselor[] = [
     specialties: ['Peer Support', 'Survivor Stories', 'Community Building'],
     languages: ['Kinyarwanda', 'English'],
     experience: '4 years',
-    rating: 4.7,
     reviews: 73,
     availability: 'Available now',
     photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&auto=format&q=80',

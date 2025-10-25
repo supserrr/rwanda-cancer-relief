@@ -3,14 +3,13 @@ import { Card, CardContent, CardHeader } from '@workspace/ui/components/card';
 import { Button } from '@workspace/ui/components/button';
 import { Badge } from '@workspace/ui/components/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@workspace/ui/components/avatar';
-import { Star, MapPin, Clock, MessageCircle } from 'lucide-react';
+import { MapPin, Clock, MessageCircle } from 'lucide-react';
 
 interface ProfileCardProps {
   id: string;
   name: string;
   title?: string;
   avatar?: string;
-  rating?: number;
   specialty?: string;
   location?: string;
   availability?: 'available' | 'busy' | 'offline';
@@ -28,7 +27,6 @@ export function ProfileCard({
   name,
   title,
   avatar,
-  rating,
   specialty,
   location,
   availability,
@@ -89,12 +87,6 @@ export function ProfileCard({
               {title && <p className="text-sm text-muted-foreground">{title}</p>}
             </div>
           </div>
-          {rating && (
-            <div className="flex items-center space-x-1">
-              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-              <span className="text-sm font-medium">{rating}</span>
-            </div>
-          )}
         </div>
       </CardHeader>
       <CardContent className="relative z-10 space-y-3">

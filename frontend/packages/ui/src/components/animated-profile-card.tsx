@@ -13,7 +13,6 @@ interface AnimatedProfileCardProps {
   specialty?: string;
   avatar?: string;
   availability?: 'available' | 'busy' | 'offline';
-  rating?: number;
   experience?: string;
   onBookSession?: () => void;
   delay?: number;
@@ -25,7 +24,6 @@ export function AnimatedProfileCard({
   specialty,
   avatar,
   availability = 'available',
-  rating,
   experience,
   onBookSession,
   delay = 0,
@@ -101,12 +99,6 @@ export function AnimatedProfileCard({
               <Badge variant="secondary" className="text-xs">
                 {availabilityLabels[availability]}
               </Badge>
-              {rating && (
-                <div className="flex items-center space-x-1">
-                  <span className="text-sm font-medium">{rating}</span>
-                  <span className="text-yellow-500">★</span>
-                </div>
-              )}
             </motion.div>
 
             {onBookSession && (

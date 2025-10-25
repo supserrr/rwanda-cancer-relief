@@ -9,23 +9,39 @@ import { Badge } from '@workspace/ui/components/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@workspace/ui/components/avatar';
 import { Card, CardContent, CardHeader } from '@workspace/ui/components/card';
 import { ScrollArea } from '@workspace/ui/components/scroll-area';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@workspace/ui/components/ui/dropdown-menu';
 import { 
   Send, 
   Paperclip, 
   Smile, 
-  Phone, 
-  Video,
   MoreVertical,
   Search,
   MessageCircle,
   Clock,
-  CheckCircle
+  CheckCircle,
+  Archive,
+  Trash2,
+  Bell,
+  BellOff,
+  User,
+  Calendar,
+  FileText,
+  Flag
 } from 'lucide-react';
 import { dummyChats, dummyMessages, dummyPatients } from '../../../../lib/dummy-data';
+import { ProfileViewModal } from '@workspace/ui/components/profile-view-modal';
 
 export default function CounselorChatPage() {
   const [selectedChat, setSelectedChat] = useState(dummyChats[0]?.id || '');
   const [newMessage, setNewMessage] = useState('');
+  const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(true);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const activeChat = dummyChats.find(chat => chat.id === selectedChat);
   const activeMessages = dummyMessages.filter(msg => 
@@ -51,6 +67,35 @@ export default function CounselorChatPage() {
     }
   };
 
+  const handleViewPatientProfile = () => {
+    setIsProfileOpen(true);
+  };
+
+  const handleScheduleSession = () => {
+    console.log('Schedule session with patient');
+  };
+
+  const handleAddSessionNotes = () => {
+    console.log('Add session notes');
+  };
+
+  const handleFlagPatient = () => {
+    console.log('Flag patient for follow-up');
+  };
+
+  const handleArchiveChat = () => {
+    console.log('Archive chat');
+  };
+
+  const handleDeleteChat = () => {
+    console.log('Delete chat');
+  };
+
+  const handleToggleNotifications = () => {
+    setIsNotificationsEnabled(!isNotificationsEnabled);
+    console.log('Toggle notifications:', !isNotificationsEnabled);
+  };
+
   return (
     <div className="space-y-6">
       <AnimatedPageHeader
@@ -65,8 +110,8 @@ export default function CounselorChatPage() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold">Patient Conversations</h3>
-                <Button size="sm" variant="ghost">
-                  <MoreVertical className="h-4 w-4" />
+                <Button size="sm" variant="ghost" className="hover:bg-primary/10">
+                  <MoreVertical className="h-4 w-4 text-primary" />
                 </Button>
               </div>
               <div className="relative">
@@ -154,24 +199,81 @@ export default function CounselorChatPage() {
                         </h3>
                         <div className="flex items-center gap-2">
                           <p className="text-sm text-muted-foreground">
-                            Patient • {getPatientInfo(activeChat.participants[0] || '')?.currentModule}
+                            Patient
                           </p>
-                           <Badge variant="outline" className="text-xs">
-                             {Object.values(getPatientInfo(activeChat.participants[0] || '')?.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(getPatientInfo(activeChat.participants[0] || '')?.moduleProgress || {}).length || 0}% progress
-                           </Badge>
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Button size="sm" variant="ghost">
-                        <Phone className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" variant="ghost">
-                        <Video className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" variant="ghost">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="sm" variant="ghost" className="hover:bg-primary/10">
+                            <MoreVertical className="h-4 w-4 text-primary" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56 bg-background border-border shadow-lg">
+                          <DropdownMenuItem 
+                            onClick={handleViewPatientProfile}
+                            className="hover:bg-primary/10 focus:bg-primary/10 cursor-pointer"
+                          >
+                            <User className="mr-2 h-4 w-4 text-primary" />
+                            <span className="text-foreground">View Patient Profile</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={handleScheduleSession}
+                            className="hover:bg-primary/10 focus:bg-primary/10 cursor-pointer"
+                          >
+                            <Calendar className="mr-2 h-4 w-4 text-primary" />
+                            <span className="text-foreground">Schedule Session</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={handleAddSessionNotes}
+                            className="hover:bg-primary/10 focus:bg-primary/10 cursor-pointer"
+                          >
+                            <FileText className="mr-2 h-4 w-4 text-primary" />
+                            <span className="text-foreground">Add Session Notes</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={handleFlagPatient}
+                            className="hover:bg-primary/10 focus:bg-primary/10 cursor-pointer"
+                          >
+                            <Flag className="mr-2 h-4 w-4 text-primary" />
+                            <span className="text-foreground">Flag for Follow-up</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={handleToggleNotifications}
+                            className="hover:bg-primary/10 focus:bg-primary/10 cursor-pointer"
+                          >
+                            {isNotificationsEnabled ? (
+                              <>
+                                <BellOff className="mr-2 h-4 w-4 text-primary" />
+                                <span className="text-foreground">Mute Notifications</span>
+                              </>
+                            ) : (
+                              <>
+                                <Bell className="mr-2 h-4 w-4 text-primary" />
+                                <span className="text-foreground">Enable Notifications</span>
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={handleArchiveChat}
+                            className="hover:bg-primary/10 focus:bg-primary/10 cursor-pointer"
+                          >
+                            <Archive className="mr-2 h-4 w-4 text-primary" />
+                            <span className="text-foreground">Archive Chat</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={handleDeleteChat}
+                            className="hover:bg-destructive/10 focus:bg-destructive/10 cursor-pointer text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4 text-destructive" />
+                            <span className="text-destructive">Delete Chat</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 </CardHeader>
@@ -263,6 +365,17 @@ export default function CounselorChatPage() {
           </AnimatedCard>
         </div>
       </div>
+
+      {/* Profile View Modal */}
+      {activeChat && (
+        <ProfileViewModal
+          isOpen={isProfileOpen}
+          onClose={() => setIsProfileOpen(false)}
+          user={getPatientInfo(activeChat.participants[0] || '') || null}
+          userType="patient"
+          currentUserRole="counselor"
+        />
+      )}
     </div>
   );
 }

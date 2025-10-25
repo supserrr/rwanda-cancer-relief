@@ -6,20 +6,15 @@ import { Card, CardContent } from './card';
 import { Button } from './button';
 import { Badge } from './badge';
 import { Avatar, AvatarFallback, AvatarImage } from './avatar';
-import { MapPin, Clock, User } from 'lucide-react';
+import { Clock, User } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface LandingStyleCounselorCardProps {
   id: string;
   name: string;
-  title?: string;
   avatar?: string;
-  rating?: number;
   specialty?: string;
-  location?: string;
   availability?: 'available' | 'busy' | 'offline';
-  bio?: string;
-  languages?: string[];
   experience?: number;
   onBookSession?: (id: string) => void;
   onViewProfile?: (id: string) => void;
@@ -30,14 +25,9 @@ interface LandingStyleCounselorCardProps {
 export function LandingStyleCounselorCard({
   id,
   name,
-  title,
   avatar,
-  rating,
   specialty,
-  location,
   availability,
-  bio,
-  languages,
   experience,
   onBookSession,
   onViewProfile,
@@ -78,92 +68,50 @@ export function LandingStyleCounselorCard({
       whileHover={{ scale: 1.02, y: -2 }}
       className={cn('h-full', className)}
     >
-      <Card className="relative overflow-hidden h-full bg-gradient-to-br from-primary/5 via-background to-primary/10 rounded-3xl border-primary/20 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10">
-        {/* Decorative gradient blobs */}
-        <div className="absolute top-0 right-0 w-48 h-48 bg-primary/10 rounded-full blur-3xl -z-0"></div>
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/10 rounded-full blur-3xl -z-0"></div>
-        
-        <CardContent className="relative z-10 p-6">
-          {/* Header with Avatar */}
-          <div className="flex items-start mb-6">
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Avatar className="h-16 w-16">
-                  <AvatarImage src={avatar} alt={name} />
-                  <AvatarFallback className="text-lg">
-                    {name.split(' ').map(n => n[0]).join('')}
-                  </AvatarFallback>
-                </Avatar>
-                <div className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-2 border-white ${getAvailabilityColor(availability)}`} />
-              </div>
-              <div>
-                <h3 className="font-semibold text-xl text-foreground">{name}</h3>
-                {title && <p className="text-sm text-muted-foreground">{title}</p>}
-                {specialty && (
-                  <Badge variant="secondary" className="mt-1 text-xs">
-                    {specialty}
-                  </Badge>
-                )}
-              </div>
+      <Card className="relative overflow-hidden h-full bg-background border border-border/50 rounded-xl transition-all duration-300 hover:shadow-md hover:border-primary/20">
+        <CardContent className="p-6">
+          {/* Header with Avatar and Basic Info */}
+          <div className="flex items-center space-x-4 mb-4">
+            <div className="relative">
+              <Avatar className="h-12 w-12">
+                <AvatarImage src={avatar} alt={name} />
+                <AvatarFallback className="text-sm">
+                  {name.split(' ').map(n => n[0]).join('')}
+                </AvatarFallback>
+              </Avatar>
+              <div className={`absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-background ${getAvailabilityColor(availability)}`} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-lg text-foreground truncate">{name}</h3>
+              {specialty && (
+                <p className="text-sm text-muted-foreground truncate">{specialty}</p>
+              )}
             </div>
           </div>
 
-          {/* Bio */}
-          {bio && (
-            <p className="text-sm text-muted-foreground leading-relaxed mb-4 line-clamp-3">
-              {bio}
-            </p>
-          )}
-
-          {/* Details */}
-          <div className="space-y-2 mb-6">
-            {location && (
+          {/* Essential Info Only */}
+          <div className="space-y-2 mb-4">
+            {experience && (
               <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                <MapPin className="h-4 w-4" />
-                <span>{location}</span>
+                <User className="h-3 w-3" />
+                <span>{experience} years experience</span>
               </div>
             )}
             
             {availability && (
               <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                <Clock className="h-4 w-4" />
+                <Clock className="h-3 w-3" />
                 <span>{getAvailabilityText(availability)}</span>
-              </div>
-            )}
-            
-            {experience && (
-              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                <User className="h-4 w-4" />
-                <span>{experience} years experience</span>
               </div>
             )}
           </div>
 
-          {/* Languages */}
-          {languages && languages.length > 0 && (
-            <div className="mb-6">
-              <p className="text-xs font-medium text-muted-foreground mb-2">Languages:</p>
-              <div className="flex flex-wrap gap-1">
-                {languages.slice(0, 3).map((language, index) => (
-                  <Badge key={index} variant="outline" className="text-xs">
-                    {language}
-                  </Badge>
-                ))}
-                {languages.length > 3 && (
-                  <Badge variant="outline" className="text-xs">
-                    +{languages.length - 3} more
-                  </Badge>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Action Buttons */}
-          <div className="flex space-x-3">
+          <div className="flex space-x-2">
             {onBookSession && (
               <Button 
                 size="sm" 
-                className="flex-1"
+                className="flex-1 text-xs"
                 onClick={() => onBookSession(id)}
                 disabled={availability === 'offline'}
               >
@@ -174,7 +122,7 @@ export function LandingStyleCounselorCard({
               <Button 
                 size="sm" 
                 variant="outline"
-                className="flex-1"
+                className="flex-1 text-xs"
                 onClick={() => onViewProfile(id)}
               >
                 View Profile

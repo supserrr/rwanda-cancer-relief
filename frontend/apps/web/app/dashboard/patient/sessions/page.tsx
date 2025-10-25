@@ -1,11 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { AnimatedGrid } from '@workspace/ui/components/animated-grid';
 import { SessionCard } from '../../../../components/dashboard/shared/SessionCard';
-import { QuickBookingModal } from '@workspace/ui/components/quick-booking-modal';
+import { SessionBookingModal } from '../../../../components/session/SessionBookingModal';
+import { CounselorSelectionModal } from '../../../../components/session/CounselorSelectionModal';
+import { RescheduleModal } from '../../../../components/session/RescheduleModal';
+import { CancelSessionModal } from '../../../../components/session/CancelSessionModal';
 import { Button } from '@workspace/ui/components/button';
 import { Badge } from '@workspace/ui/components/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@workspace/ui/components/tabs';
@@ -23,8 +27,14 @@ import { dummySessions, dummyCounselors } from '../../../../lib/dummy-data';
 import { Session } from '../../../../lib/types';
 
 export default function PatientSessionsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('upcoming');
-  const [isQuickBookingOpen, setIsQuickBookingOpen] = useState(false);
+  const [isCounselorSelectionOpen, setIsCounselorSelectionOpen] = useState(false);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
+  const [selectedCounselor, setSelectedCounselor] = useState<any>(null);
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const currentPatientId = '1'; // Jean Baptiste
 
   const upcomingSessions = dummySessions.filter(session => 
@@ -53,18 +63,76 @@ export default function PatientSessionsPage() {
   };
 
   const handleJoinSession = (session: Session) => {
-    console.log('Join session:', session.id);
-    // Implement session joining logic
+    // Navigate to the session room
+    router.push(`/dashboard/patient/sessions/session/${session.id}`);
   };
 
   const handleRescheduleSession = (session: Session) => {
-    console.log('Reschedule session:', session.id);
-    // Implement rescheduling logic
+    setSelectedSession(session);
+    setIsRescheduleOpen(true);
+  };
+
+  const handleConfirmReschedule = async (sessionId: string, newDate: Date, newTime: string, newDuration: number) => {
+    try {
+      // In a real app, this would make an API call to update the session
+      console.log('Rescheduling session:', {
+        sessionId,
+        newDate,
+        newTime,
+        newDuration
+      });
+      
+      // Update the session in dummy data (for demo purposes)
+      const sessionIndex = dummySessions.findIndex(s => s.id === sessionId);
+      if (sessionIndex !== -1) {
+        dummySessions[sessionIndex] = {
+          ...dummySessions[sessionIndex],
+          date: newDate,
+          time: newTime,
+          duration: newDuration
+        };
+      }
+      
+      // Show success message (in a real app, you'd use a toast notification)
+      alert('Session rescheduled successfully!');
+      
+    } catch (error) {
+      console.error('Error rescheduling session:', error);
+      alert('Failed to reschedule session. Please try again.');
+    }
   };
 
   const handleCancelSession = (session: Session) => {
-    console.log('Cancel session:', session.id);
-    // Implement cancellation logic
+    setSelectedSession(session);
+    setIsCancelOpen(true);
+  };
+
+  const handleConfirmCancel = async (sessionId: string, reason: string, notes?: string) => {
+    try {
+      // In a real app, this would make an API call to cancel the session
+      console.log('Cancelling session:', {
+        sessionId,
+        reason,
+        notes
+      });
+      
+      // Update the session in dummy data (for demo purposes)
+      const sessionIndex = dummySessions.findIndex(s => s.id === sessionId);
+      if (sessionIndex !== -1) {
+        dummySessions[sessionIndex] = {
+          ...dummySessions[sessionIndex],
+          status: 'cancelled',
+          notes: `${dummySessions[sessionIndex].notes || ''}\n\nCancellation: ${reason}${notes ? ` - ${notes}` : ''}`
+        };
+      }
+      
+      // Show success message (in a real app, you'd use a toast notification)
+      alert('Session cancelled successfully! Your counselor has been notified.');
+      
+    } catch (error) {
+      console.error('Error cancelling session:', error);
+      alert('Failed to cancel session. Please try again.');
+    }
   };
 
   const handleViewNotes = (session: Session) => {
@@ -73,16 +141,21 @@ export default function PatientSessionsPage() {
   };
 
   const handleQuickBooking = () => {
-    setIsQuickBookingOpen(true);
+    // Open counselor selection modal
+    setIsCounselorSelectionOpen(true);
   };
 
-  const handleConfirmQuickBooking = (bookingData: any) => {
-    console.log('Quick booking confirmed:', bookingData);
+  const handleSelectCounselor = (counselor: any) => {
+    setSelectedCounselor(counselor);
+    setIsCounselorSelectionOpen(false);
+    setIsBookingOpen(true);
+  };
+
+  const handleConfirmBooking = (bookingData: any) => {
+    console.log('Booking confirmed:', bookingData);
     // Here you would typically send the booking data to your backend
-  };
-
-  const handleCloseQuickBooking = () => {
-    setIsQuickBookingOpen(false);
+    setIsBookingOpen(false);
+    setSelectedCounselor(null);
   };
 
   return (
@@ -252,12 +325,48 @@ export default function PatientSessionsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Quick Booking Modal */}
-      <QuickBookingModal
-        isOpen={isQuickBookingOpen}
-        onClose={handleCloseQuickBooking}
-        onConfirmBooking={handleConfirmQuickBooking}
+      {/* Counselor Selection Modal */}
+      <CounselorSelectionModal
+        isOpen={isCounselorSelectionOpen}
+        onClose={() => setIsCounselorSelectionOpen(false)}
         counselors={dummyCounselors}
+        onSelectCounselor={handleSelectCounselor}
+      />
+
+      {/* Session Booking Modal */}
+      {selectedCounselor && (
+        <SessionBookingModal
+          counselor={selectedCounselor}
+          isOpen={isBookingOpen}
+          onClose={() => {
+            setIsBookingOpen(false);
+            setSelectedCounselor(null);
+          }}
+          onBookingConfirmed={handleConfirmBooking}
+        />
+      )}
+
+      {/* Reschedule Modal */}
+      <RescheduleModal
+        isOpen={isRescheduleOpen}
+        onClose={() => {
+          setIsRescheduleOpen(false);
+          setSelectedSession(null);
+        }}
+        session={selectedSession}
+        onReschedule={handleConfirmReschedule}
+      />
+
+      {/* Cancel Session Modal */}
+      <CancelSessionModal
+        isOpen={isCancelOpen}
+        onClose={() => {
+          setIsCancelOpen(false);
+          setSelectedSession(null);
+        }}
+        session={selectedSession}
+        userRole="patient"
+        onCancel={handleConfirmCancel}
       />
     </div>
   );

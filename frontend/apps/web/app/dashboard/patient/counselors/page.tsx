@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedGrid } from '@workspace/ui/components/animated-grid';
 import { LandingStyleCounselorCard } from '@workspace/ui/components/landing-style-counselor-card';
-import { BookingModal } from '@workspace/ui/components/booking-modal';
+import { SessionBookingModal } from '../../../../components/session/SessionBookingModal';
 import { Input } from '@workspace/ui/components/input';
 import { Button } from '@workspace/ui/components/button';
 import { Badge } from '@workspace/ui/components/badge';
@@ -206,11 +206,11 @@ export default function PatientCounselorsPage() {
 
       {/* Booking Modal */}
       {selectedCounselor && (
-        <BookingModal
+        <SessionBookingModal
           counselor={selectedCounselor}
           isOpen={isBookingModalOpen}
           onClose={handleCloseBookingModal}
-          onConfirmBooking={handleConfirmBooking}
+          onBookingConfirmed={handleConfirmBooking}
         />
       )}
     </div>

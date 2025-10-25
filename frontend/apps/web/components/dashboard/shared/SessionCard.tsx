@@ -8,6 +8,7 @@ import {
   Clock, 
   User, 
   Video, 
+  Mic,
   MessageCircle,
   CheckCircle,
   XCircle,
@@ -88,9 +89,13 @@ export function SessionCard({
               {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
             </Badge>
           </div>
-          <div className="text-sm text-muted-foreground">
-            {session.type === 'video' ? 'Video Call' : session.type === 'audio' ? 'Audio Call' : 'Chat Session'}
-          </div>
+          <Badge variant="outline" className="flex items-center gap-1">
+            {session.sessionType === 'audio' ? (
+              <><Mic className="h-3 w-3" /> Audio Only</>
+            ) : (
+              <><Video className="h-3 w-3" /> Video</>
+            )}
+          </Badge>
         </div>
       </CardHeader>
       <CardContent className="relative z-10 space-y-4">

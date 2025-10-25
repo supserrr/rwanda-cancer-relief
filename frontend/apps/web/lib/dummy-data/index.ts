@@ -162,11 +162,13 @@ export const dummySessions: Session[] = [
     id: '1',
     patientId: '1',
     counselorId: '2',
-    date: new Date('2024-01-22T10:00:00'),
+    date: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
     time: '10:00 AM',
     duration: 60,
     status: 'scheduled',
     type: 'video',
+    sessionType: 'video',
+    roomName: 'session-1-video',
     notes: 'Follow-up session to discuss anxiety management techniques'
   },
   {
@@ -177,6 +179,8 @@ export const dummySessions: Session[] = [
     time: '2:00 PM',
     duration: 45,
     status: 'scheduled',
+    sessionType: 'audio',
+    roomName: 'session-2-audio',
     type: 'video',
     notes: 'Initial consultation for newly diagnosed patient'
   },
@@ -189,6 +193,8 @@ export const dummySessions: Session[] = [
     duration: 60,
     status: 'completed',
     type: 'video',
+    sessionType: 'video',
+    roomName: 'session-3-video',
     notes: 'Discussed treatment side effects and coping strategies'
   }
 ];

@@ -1,9 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { SessionCard } from '../../../../components/dashboard/shared/SessionCard';
+import { CounselorRescheduleModal } from '../../../../components/session/CounselorRescheduleModal';
+import { CancelSessionModal } from '../../../../components/session/CancelSessionModal';
+import { ScheduleSessionModal } from '../../../../components/session/ScheduleSessionModal';
 import { Button } from '@workspace/ui/components/button';
 import { Badge } from '@workspace/ui/components/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@workspace/ui/components/tabs';
@@ -23,7 +27,12 @@ import { dummySessions, dummyCounselors, dummyPatients } from '../../../../lib/d
 import { Session } from '../../../../lib/types';
 
 export default function CounselorSessionsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('upcoming');
+  const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const currentCounselor = dummyCounselors[0]; // Dr. Marie Claire
 
   const upcomingSessions = dummySessions.filter(session => 
@@ -52,7 +61,8 @@ export default function CounselorSessionsPage() {
   };
 
   const handleJoinSession = (session: Session) => {
-    console.log('Join session:', session.id);
+    // Navigate to the session room
+    router.push(`/dashboard/counselor/sessions/session/${session.id}`);
   };
 
   const handleAcceptSession = (session: Session) => {
@@ -60,7 +70,40 @@ export default function CounselorSessionsPage() {
   };
 
   const handleRescheduleSession = (session: Session) => {
-    console.log('Reschedule session:', session.id);
+    setSelectedSession(session);
+    setIsRescheduleOpen(true);
+  };
+
+  const handleConfirmReschedule = async (sessionId: string, newDate: Date, newTime: string, newDuration: number, notes?: string) => {
+    try {
+      // In a real app, this would make an API call to update the session
+      console.log('Rescheduling session:', {
+        sessionId,
+        newDate,
+        newTime,
+        newDuration,
+        notes
+      });
+      
+      // Update the session in dummy data (for demo purposes)
+      const sessionIndex = dummySessions.findIndex(s => s.id === sessionId);
+      if (sessionIndex !== -1) {
+        dummySessions[sessionIndex] = {
+          ...dummySessions[sessionIndex],
+          date: newDate,
+          time: newTime,
+          duration: newDuration,
+          notes: notes ? `${dummySessions[sessionIndex].notes || ''}\n\nReschedule Note: ${notes}` : dummySessions[sessionIndex].notes
+        };
+      }
+      
+      // Show success message (in a real app, you'd use a toast notification)
+      alert('Session rescheduled successfully! Patient has been notified.');
+      
+    } catch (error) {
+      console.error('Error rescheduling session:', error);
+      alert('Failed to reschedule session. Please try again.');
+    }
   };
 
   const handleViewNotes = (session: Session) => {
@@ -69,6 +112,81 @@ export default function CounselorSessionsPage() {
 
   const handleAddNotes = (session: Session) => {
     console.log('Add notes to session:', session.id);
+  };
+
+  const handleScheduleSession = () => {
+    setIsScheduleOpen(true);
+  };
+
+  const handleConfirmSchedule = async (sessionData: {
+    patientId: string;
+    date: Date;
+    time: string;
+    duration: number;
+    sessionType: 'video' | 'audio';
+    notes?: string;
+  }) => {
+    try {
+      // In a real app, this would make an API call to create the session
+      console.log('Scheduling session:', sessionData);
+      
+      // Create new session in dummy data (for demo purposes)
+      const newSession: Session = {
+        id: (dummySessions.length + 1).toString(),
+        patientId: sessionData.patientId,
+        counselorId: currentCounselor?.id || '2',
+        date: sessionData.date,
+        time: sessionData.time,
+        duration: sessionData.duration,
+        status: 'scheduled',
+        type: sessionData.sessionType,
+        sessionType: sessionData.sessionType,
+        roomName: `session-${dummySessions.length + 1}-${sessionData.sessionType}`,
+        notes: sessionData.notes || ''
+      };
+      
+      dummySessions.push(newSession);
+      
+      // Show success message (in a real app, you'd use a toast notification)
+      alert('Session scheduled successfully! Patient has been notified.');
+      
+    } catch (error) {
+      console.error('Error scheduling session:', error);
+      alert('Failed to schedule session. Please try again.');
+    }
+  };
+
+  const handleCancelSession = (session: Session) => {
+    setSelectedSession(session);
+    setIsCancelOpen(true);
+  };
+
+  const handleConfirmCancel = async (sessionId: string, reason: string, notes?: string) => {
+    try {
+      // In a real app, this would make an API call to cancel the session
+      console.log('Cancelling session:', {
+        sessionId,
+        reason,
+        notes
+      });
+      
+      // Update the session in dummy data (for demo purposes)
+      const sessionIndex = dummySessions.findIndex(s => s.id === sessionId);
+      if (sessionIndex !== -1) {
+        dummySessions[sessionIndex] = {
+          ...dummySessions[sessionIndex],
+          status: 'cancelled',
+          notes: `${dummySessions[sessionIndex].notes || ''}\n\nCancellation: ${reason}${notes ? ` - ${notes}` : ''}`
+        };
+      }
+      
+      // Show success message (in a real app, you'd use a toast notification)
+      alert('Session cancelled successfully! Patient has been notified.');
+      
+    } catch (error) {
+      console.error('Error cancelling session:', error);
+      alert('Failed to cancel session. Please try again.');
+    }
   };
 
   return (
@@ -175,7 +293,7 @@ export default function CounselorSessionsPage() {
                 <p className="text-muted-foreground mb-4">
                   You don't have any scheduled sessions at the moment
                 </p>
-                <Button>
+                <Button onClick={handleScheduleSession}>
                   <Plus className="h-4 w-4 mr-2" />
                   Schedule Session
                 </Button>
@@ -239,7 +357,7 @@ export default function CounselorSessionsPage() {
                 <p className="text-muted-foreground mb-4">
                   Start by scheduling your first session
                 </p>
-                <Button>
+                <Button onClick={handleScheduleSession}>
                   <Plus className="h-4 w-4 mr-2" />
                   Schedule Session
                 </Button>
@@ -248,6 +366,47 @@ export default function CounselorSessionsPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Reschedule Modal */}
+      <CounselorRescheduleModal
+        isOpen={isRescheduleOpen}
+        onClose={() => {
+          setIsRescheduleOpen(false);
+          setSelectedSession(null);
+        }}
+        session={selectedSession}
+        patientName={selectedSession ? getPatientName(selectedSession.patientId) : undefined}
+        patientAvatar={selectedSession ? getPatientAvatar(selectedSession.patientId) : undefined}
+        onReschedule={handleConfirmReschedule}
+      />
+
+      {/* Cancel Session Modal */}
+      <CancelSessionModal
+        isOpen={isCancelOpen}
+        onClose={() => {
+          setIsCancelOpen(false);
+          setSelectedSession(null);
+        }}
+        session={selectedSession}
+        patientName={selectedSession ? getPatientName(selectedSession.patientId) : undefined}
+        patientAvatar={selectedSession ? getPatientAvatar(selectedSession.patientId) : undefined}
+        userRole="counselor"
+        onCancel={handleConfirmCancel}
+      />
+
+      {/* Schedule Session Modal */}
+      <ScheduleSessionModal
+        isOpen={isScheduleOpen}
+        onClose={() => setIsScheduleOpen(false)}
+        counselorId={currentCounselor?.id || '2'}
+        counselorName={currentCounselor?.name || 'Dr. Marie Claire'}
+        patients={dummyPatients.map(patient => ({
+          id: patient.id,
+          name: patient.name,
+          avatar: patient.avatar
+        }))}
+        onSchedule={handleConfirmSchedule}
+      />
     </div>
   );
 }

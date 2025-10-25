@@ -19,7 +19,7 @@ importers:
         version: 3.6.2
       shadcn:
         specifier: ^3.5.0
-        version: 3.5.0(@types/node@20.19.9)(typescript@5.7.3)
+        version: 3.5.0(typescript@5.7.3)
       turbo:
         specifier: ^2.5.5
         version: 2.5.5
@@ -159,6 +159,9 @@ importers:
       '@fullcalendar/timegrid':
         specifier: ^6.1.19
         version: 6.1.19(@fullcalendar/core@6.1.19)
+      '@jitsi/react-sdk':
+        specifier: ^1.4.4
+        version: 1.4.4(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
       '@radix-ui/react-icons':
         specifier: ^1.3.2
         version: 1.3.2(react@19.1.1)
@@ -1015,6 +1018,12 @@ packages:
   '@isaacs/fs-minipass@4.0.1':
     resolution: {integrity: sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w==}
     engines: {node: '>=18.0.0'}
+
+  '@jitsi/react-sdk@1.4.4':
+    resolution: {integrity: sha512-VV5sy94zmGYByz8ebsOinwvzK/Srekbg+dECHBqGloeyPYpwlOLe6WiqmCCJ2l+wv2CT++xIznkZwcnh2YX2ug==}
+    peerDependencies:
+      react: 16 || 17 || 18 || 19
+      react-dom: 16 || 17 || 18 || 19
 
   '@jridgewell/gen-mapping@0.3.12':
     resolution: {integrity: sha512-OuLGC46TjB5BbN1dH8JULVVZY4WTdkF7tV9Ys6wLL1rubZnCMstOhNHueU5bLCrnRuDhKPDM4g6sw4Bel5Gzqg==}
@@ -6437,6 +6446,11 @@ snapshots:
     dependencies:
       minipass: 7.1.2
 
+  '@jitsi/react-sdk@1.4.4(react-dom@19.1.1(react@19.1.1))(react@19.1.1)':
+    dependencies:
+      react: 19.1.1
+      react-dom: 19.1.1(react@19.1.1)
+
   '@jridgewell/gen-mapping@0.3.12':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.4
@@ -10399,31 +10413,6 @@ snapshots:
 
   ms@2.1.3: {}
 
-  msw@2.11.6(@types/node@20.19.9)(typescript@5.7.3):
-    dependencies:
-      '@inquirer/confirm': 5.1.19(@types/node@20.19.9)
-      '@mswjs/interceptors': 0.40.0
-      '@open-draft/deferred-promise': 2.2.0
-      '@types/statuses': 2.0.6
-      cookie: 1.0.2
-      graphql: 16.11.0
-      headers-polyfill: 4.0.3
-      is-node-process: 1.2.0
-      outvariant: 1.4.3
-      path-to-regexp: 6.3.0
-      picocolors: 1.1.1
-      rettime: 0.7.0
-      statuses: 2.0.2
-      strict-event-emitter: 0.5.1
-      tough-cookie: 6.0.0
-      type-fest: 4.41.0
-      until-async: 3.0.2
-      yargs: 17.7.2
-    optionalDependencies:
-      typescript: 5.7.3
-    transitivePeerDependencies:
-      - '@types/node'
-
   msw@2.11.6(@types/node@20.19.9)(typescript@5.9.2):
     dependencies:
       '@inquirer/confirm': 5.1.19(@types/node@20.19.9)
@@ -10446,6 +10435,31 @@ snapshots:
       yargs: 17.7.2
     optionalDependencies:
       typescript: 5.9.2
+    transitivePeerDependencies:
+      - '@types/node'
+
+  msw@2.11.6(typescript@5.7.3):
+    dependencies:
+      '@inquirer/confirm': 5.1.19(@types/node@20.19.9)
+      '@mswjs/interceptors': 0.40.0
+      '@open-draft/deferred-promise': 2.2.0
+      '@types/statuses': 2.0.6
+      cookie: 1.0.2
+      graphql: 16.11.0
+      headers-polyfill: 4.0.3
+      is-node-process: 1.2.0
+      outvariant: 1.4.3
+      path-to-regexp: 6.3.0
+      picocolors: 1.1.1
+      rettime: 0.7.0
+      statuses: 2.0.2
+      strict-event-emitter: 0.5.1
+      tough-cookie: 6.0.0
+      type-fest: 4.41.0
+      until-async: 3.0.2
+      yargs: 17.7.2
+    optionalDependencies:
+      typescript: 5.7.3
     transitivePeerDependencies:
       - '@types/node'
 
@@ -11366,44 +11380,6 @@ snapshots:
 
   setprototypeof@1.2.0: {}
 
-  shadcn@3.5.0(@types/node@20.19.9)(typescript@5.7.3):
-    dependencies:
-      '@antfu/ni': 25.0.0
-      '@babel/core': 7.28.5
-      '@babel/parser': 7.28.5
-      '@babel/plugin-transform-typescript': 7.28.5(@babel/core@7.28.5)
-      '@babel/preset-typescript': 7.28.5(@babel/core@7.28.5)
-      '@dotenvx/dotenvx': 1.51.0
-      '@modelcontextprotocol/sdk': 1.20.1
-      browserslist: 4.26.3
-      commander: 14.0.1
-      cosmiconfig: 9.0.0(typescript@5.7.3)
-      dedent: 1.7.0
-      deepmerge: 4.3.1
-      diff: 8.0.2
-      execa: 9.6.0
-      fast-glob: 3.3.3
-      fs-extra: 11.3.2
-      fuzzysort: 3.1.0
-      https-proxy-agent: 7.0.6
-      kleur: 4.1.5
-      msw: 2.11.6(@types/node@20.19.9)(typescript@5.7.3)
-      node-fetch: 3.3.2
-      ora: 8.2.0
-      postcss: 8.5.6
-      prompts: 2.4.2
-      recast: 0.23.11
-      stringify-object: 5.0.0
-      ts-morph: 26.0.0
-      tsconfig-paths: 4.2.0
-      zod: 3.25.76
-      zod-to-json-schema: 3.24.6(zod@3.25.76)
-    transitivePeerDependencies:
-      - '@types/node'
-      - babel-plugin-macros
-      - supports-color
-      - typescript
-
   shadcn@3.5.0(@types/node@20.19.9)(typescript@5.9.2):
     dependencies:
       '@antfu/ni': 25.0.0
@@ -11426,6 +11402,44 @@ snapshots:
       https-proxy-agent: 7.0.6
       kleur: 4.1.5
       msw: 2.11.6(@types/node@20.19.9)(typescript@5.9.2)
+      node-fetch: 3.3.2
+      ora: 8.2.0
+      postcss: 8.5.6
+      prompts: 2.4.2
+      recast: 0.23.11
+      stringify-object: 5.0.0
+      ts-morph: 26.0.0
+      tsconfig-paths: 4.2.0
+      zod: 3.25.76
+      zod-to-json-schema: 3.24.6(zod@3.25.76)
+    transitivePeerDependencies:
+      - '@types/node'
+      - babel-plugin-macros
+      - supports-color
+      - typescript
+
+  shadcn@3.5.0(typescript@5.7.3):
+    dependencies:
+      '@antfu/ni': 25.0.0
+      '@babel/core': 7.28.5
+      '@babel/parser': 7.28.5
+      '@babel/plugin-transform-typescript': 7.28.5(@babel/core@7.28.5)
+      '@babel/preset-typescript': 7.28.5(@babel/core@7.28.5)
+      '@dotenvx/dotenvx': 1.51.0
+      '@modelcontextprotocol/sdk': 1.20.1
+      browserslist: 4.26.3
+      commander: 14.0.1
+      cosmiconfig: 9.0.0(typescript@5.7.3)
+      dedent: 1.7.0
+      deepmerge: 4.3.1
+      diff: 8.0.2
+      execa: 9.6.0
+      fast-glob: 3.3.3
+      fs-extra: 11.3.2
+      fuzzysort: 3.1.0
+      https-proxy-agent: 7.0.6
+      kleur: 4.1.5
+      msw: 2.11.6(typescript@5.7.3)
       node-fetch: 3.3.2
       ora: 8.2.0
       postcss: 8.5.6

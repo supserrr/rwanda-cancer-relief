@@ -121,7 +121,7 @@
   --chart-5: oklch(0.68 0.12 310);
 
   /* Sidebar - More visible dark purple */
-  --sidebar: oklch(0.22 0.08 300);
+  --sidebar: oklch(0.05 0.02 300);
   --sidebar-foreground: oklch(0.90 0.05 300);
   --sidebar-primary: oklch(0.70 0.20 300);
   --sidebar-primary-foreground: oklch(0.15 0.02 300);

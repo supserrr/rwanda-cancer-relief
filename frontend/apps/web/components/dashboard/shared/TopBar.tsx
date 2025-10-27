@@ -17,7 +17,6 @@ import {
 } from '@workspace/ui/components/animate-ui/components/buttons/theme-toggler';
 import { 
   LogOut, 
-  Settings, 
   User, 
   Menu
 } from 'lucide-react';
@@ -35,6 +34,7 @@ interface TopBarProps {
   isSidebarOpen?: boolean;
   notifications?: number;
   onNotificationClick?: () => void;
+  onNavigate?: (path: string) => void;
 }
 
 export function TopBar({ 
@@ -43,7 +43,8 @@ export function TopBar({
   onToggleSidebar,
   isSidebarOpen = true,
   notifications = 0,
-  onNotificationClick
+  onNotificationClick,
+  onNavigate
 }: TopBarProps) {
   const getRoleColor = (role: UserRole) => {
     switch (role) {
@@ -68,6 +69,14 @@ export function TopBar({
         return 'Administrator';
       default:
         return 'User';
+    }
+  };
+
+  const handleProfileClick = () => {
+    if (onNavigate) {
+      // For now, navigate to settings as profile functionality is typically in settings
+      const settingsPath = `/dashboard/${user.role}/settings`;
+      onNavigate(settingsPath);
     }
   };
 
@@ -96,7 +105,6 @@ export function TopBar({
           {/* Theme Toggle */}
           <ThemeTogglerButton
             variant="ghost"
-            size="icon"
             direction="ltr"
             modes={['light', 'dark']}
             className="h-12 w-12 rounded-full border-0"
@@ -108,10 +116,10 @@ export function TopBar({
           {/* User menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-12 w-12 rounded-full">
-                <Avatar className="h-10 w-10">
+              <Button variant="ghost" className="relative h-12 w-12 rounded-full hover:bg-primary/10 border-2 border-transparent hover:border-primary/20 transition-all">
+                <Avatar className="h-10 w-10 border-2 border-primary/20">
                   <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback>
+                  <AvatarFallback className="bg-primary/10 text-primary font-semibold">
                     {user.name.split(' ').map(n => n[0]).join('')}
                   </AvatarFallback>
                 </Avatar>
@@ -130,13 +138,9 @@ export function TopBar({
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={handleProfileClick} className="cursor-pointer">
                 <User className="mr-2 h-4 w-4" />
                 <span>Profile</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onLogout} className="text-red-600">

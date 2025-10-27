@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from '@workspace/ui/components/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@workspace/ui/components/tabs';
-import { Search, Filter, Play, FileText, Video, BookOpen, Download } from 'lucide-react';
+import { Search, Filter, Play, FileText, Video, BookOpen, Download, SortAsc, SortDesc, Grid3X3, List, RefreshCw } from 'lucide-react';
 import { dummyResources } from '../../../../lib/dummy-data';
 import { Resource } from '../../../../lib/types';
 
@@ -30,6 +30,10 @@ export default function PatientResourcesPage() {
   const [viewingArticle, setViewingArticle] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('all');
   const [savedResources, setSavedResources] = useState<string[]>([]); // Track saved resource IDs
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const resourceTypes = ['all', 'audio', 'pdf', 'video', 'article'];
 
@@ -114,29 +118,59 @@ export default function PatientResourcesPage() {
       />
 
       {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col lg:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
           <Input
             placeholder="Search resources..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
           />
         </div>
         
-        <Select value={selectedType} onValueChange={setSelectedType}>
-          <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Resource Type" />
-          </SelectTrigger>
-          <SelectContent>
-            {resourceTypes.map((type) => (
-              <SelectItem key={type} value={type}>
-                {type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2">
+          <Select value={selectedType} onValueChange={setSelectedType}>
+            <SelectTrigger className="w-32 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              {resourceTypes.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+          >
+            {sortOrder === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+            onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+          >
+            {viewMode === 'grid' ? <List className="h-4 w-4" /> : <Grid3X3 className="h-4 w-4" />}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+            onClick={() => setIsRefreshing(true)}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </div>
 
       {/* Resource Type Tabs */}
@@ -246,7 +280,6 @@ export default function PatientResourcesPage() {
                   Save resources by clicking the bookmark icon when viewing them
                 </p>
                 <Button 
-                  variant="outline" 
                   onClick={() => setActiveTab('all')}
                 >
                   Browse All Resources
@@ -296,7 +329,6 @@ export default function PatientResourcesPage() {
                     No {type} resources available at the moment
                   </p>
                   <Button 
-                    variant="outline" 
                     onClick={() => setActiveTab('all')}
                   >
                     View All Resources
@@ -317,6 +349,20 @@ export default function PatientResourcesPage() {
               onDownload={handleDownloadResource}
               onShare={handleShareResource}
               onBookmark={handleBookmarkResource}
+              onViewArticle={(resource) => {
+                setViewingArticle({
+                  id: resource.id,
+                  title: resource.title,
+                  content: resource.description || '',
+                  description: resource.description,
+                  publisher: resource.publisher,
+                  createdAt: resource.createdAt,
+                  thumbnail: resource.thumbnail,
+                  tags: resource.tags || []
+                });
+                setIsViewerOpen(false);
+                setIsArticleViewerOpen(true);
+              }}
             />
           )}
 

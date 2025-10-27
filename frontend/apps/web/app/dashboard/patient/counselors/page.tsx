@@ -82,17 +82,17 @@ export default function PatientCounselorsPage() {
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
           <Input
             placeholder="Search counselors by name or specialty..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
           />
         </div>
         
         <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
             <SelectValue placeholder="Specialty" />
           </SelectTrigger>
           <SelectContent>
@@ -105,7 +105,7 @@ export default function PatientCounselorsPage() {
         </Select>
 
         <Select value={selectedAvailability} onValueChange={setSelectedAvailability}>
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
             <SelectValue placeholder="Availability" />
           </SelectTrigger>
           <SelectContent>
@@ -172,7 +172,7 @@ export default function PatientCounselorsPage() {
       {/* Featured Counselors */}
       <div className="mt-12">
         <div className="flex items-center gap-2 mb-6">
-          <Star className="h-5 w-5 text-yellow-500" />
+          <Star className="h-5 w-5 text-foreground" />
           <h2 className="text-xl font-semibold">Featured Counselors</h2>
         </div>
         
@@ -192,7 +192,7 @@ export default function PatientCounselorsPage() {
                   onViewProfile={handleViewProfile}
                   delay={index * 0.15}
                 />
-                <Badge className="absolute top-4 right-4 bg-yellow-100 text-yellow-800 z-20">
+                <Badge className="absolute top-4 right-4 bg-foreground text-background z-20">
                   Featured
                 </Badge>
               </div>

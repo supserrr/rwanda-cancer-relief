@@ -143,24 +143,17 @@ export function ResourceCard({
               <Button 
                 size="sm" 
                 variant="outline"
+                className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
                 onClick={() => onEdit(resource)}
               >
                 <Edit className="h-4 w-4" />
-              </Button>
-            )}
-            {onDownload && !resource.isYouTube && (
-              <Button 
-                size="sm" 
-                variant="outline"
-                onClick={() => onDownload(resource)}
-              >
-                <Download className="h-4 w-4" />
               </Button>
             )}
             {onUnsave && (
               <Button 
                 size="sm" 
                 variant="outline"
+                className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
                 onClick={() => onUnsave(resource)}
               >
                 <StarOff className="h-4 w-4" />
@@ -186,15 +179,6 @@ export function ResourceCard({
               >
                 <Eye className="h-4 w-4 mr-2" />
                 View
-              </Button>
-            )}
-            {onDownload && !resource.isYouTube && (
-              <Button 
-                size="sm" 
-                variant="outline"
-                onClick={() => onDownload(resource)}
-              >
-                <Download className="h-4 w-4" />
               </Button>
             )}
           </div>

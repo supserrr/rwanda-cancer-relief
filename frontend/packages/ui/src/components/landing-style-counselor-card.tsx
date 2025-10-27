@@ -84,9 +84,9 @@ export function LandingStyleCounselorCard({
       />
 
       {/* Smooth Blur Overlay - Multiple layers for seamless fade */}
-      <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/40 via-background/20 via-background/10 to-transparent" />
-      <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-background/90 via-background/60 via-background/30 via-background/15 via-background/8 to-transparent backdrop-blur-[1px]" />
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background/85 via-background/40 to-transparent backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-gradient-to-t from-sidebar/95 via-sidebar/40 via-sidebar/20 via-sidebar/10 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-sidebar/90 via-sidebar/60 via-sidebar/30 via-sidebar/15 via-sidebar/8 to-transparent backdrop-blur-[1px]" />
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-sidebar/85 via-sidebar/40 to-transparent backdrop-blur-sm" />
 
       {/* Content */}
       <div className="absolute bottom-0 left-0 right-0 p-6 space-y-4">
@@ -105,19 +105,19 @@ export function LandingStyleCounselorCard({
         {/* Consultation Types */}
         <div className="flex gap-2 flex-wrap">
           {consultationTypes.includes('chat') && (
-            <Badge variant="outline" className="bg-background/80 backdrop-blur-sm text-xs">
+            <Badge variant="outline" className="bg-sidebar/80 backdrop-blur-sm text-xs">
               <MessageCircle className="w-3 h-3 mr-1" />
               Chat
             </Badge>
           )}
           {consultationTypes.includes('video') && (
-            <Badge variant="outline" className="bg-background/80 backdrop-blur-sm text-xs">
+            <Badge variant="outline" className="bg-sidebar/80 backdrop-blur-sm text-xs">
               <Video className="w-3 h-3 mr-1" />
               Video
             </Badge>
           )}
           {consultationTypes.includes('phone') && (
-            <Badge variant="outline" className="bg-background/80 backdrop-blur-sm text-xs">
+            <Badge variant="outline" className="bg-sidebar/80 backdrop-blur-sm text-xs">
               <Phone className="w-3 h-3 mr-1" />
               Phone
             </Badge>
@@ -139,7 +139,7 @@ export function LandingStyleCounselorCard({
           {onViewProfile && (
             <button
               onClick={() => onViewProfile(id)}
-              className="flex-1 cursor-pointer py-3 px-4 rounded-2xl font-semibold text-sm transition-all duration-200 border-2 border-border/60 shadow-sm transform-gpu bg-background/80 backdrop-blur-sm text-foreground hover:bg-background/90 hover:border-border/80"
+              className="flex-1 cursor-pointer py-3 px-4 rounded-2xl font-semibold text-sm transition-all duration-200 border-2 border-border/60 shadow-sm transform-gpu bg-sidebar/80 backdrop-blur-sm text-foreground hover:bg-sidebar/90 hover:border-border/80"
             >
               View Profile
             </button>

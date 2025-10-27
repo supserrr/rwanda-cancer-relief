@@ -202,13 +202,23 @@ export default function CounselorResourcesPage() {
   };
 
   const handleViewResource = (resource: Resource) => {
-    setSelectedResource(resource);
-    setIsViewerOpen(true);
+    if (resource.type === 'article') {
+      setViewingArticle(resource);
+      setIsArticleViewerOpen(true);
+    } else {
+      setSelectedResource(resource);
+      setIsViewerOpen(true);
+    }
   };
 
   const handleCloseViewer = () => {
     setIsViewerOpen(false);
     setSelectedResource(null);
+  };
+
+  const handleCloseArticleViewer = () => {
+    setIsArticleViewerOpen(false);
+    setViewingArticle(null);
   };
 
   const handleDownloadResource = (resource: Resource) => {
@@ -291,11 +301,6 @@ export default function CounselorResourcesPage() {
     setEditingArticle(null);
   };
 
-  const handleCloseArticleViewer = () => {
-    setIsArticleViewerOpen(false);
-    setViewingArticle(null);
-  };
-
   const handleUploadResource = () => {
     console.log('Upload new resource');
   };
@@ -329,19 +334,19 @@ export default function CounselorResourcesPage() {
             {/* Main Search Bar */}
             <div className="flex flex-col lg:flex-row gap-4">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
                 <Input
                   placeholder="Search resources by title, description, or tags..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
                 />
               </div>
               
               {/* Quick Filters */}
               <div className="flex gap-2">
                 <Select value={selectedType} onValueChange={setSelectedType}>
-                  <SelectTrigger className="w-32">
+                  <SelectTrigger className="w-32 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
                     <SelectValue placeholder="Type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -354,7 +359,7 @@ export default function CounselorResourcesPage() {
                 </Select>
 
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-32">
+                  <SelectTrigger className="w-32 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -367,7 +372,7 @@ export default function CounselorResourcesPage() {
                 </Select>
 
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-36">
+                  <SelectTrigger className="w-36 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
                   <SelectContent>
@@ -382,6 +387,7 @@ export default function CounselorResourcesPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
                   onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
                 >
                   {sortOrder === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
@@ -390,6 +396,7 @@ export default function CounselorResourcesPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
                   onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
                 >
                   {viewMode === 'grid' ? <List className="h-4 w-4" /> : <Grid3X3 className="h-4 w-4" />}
@@ -398,6 +405,7 @@ export default function CounselorResourcesPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
                   onClick={handleRefresh}
                   disabled={isRefreshing}
                 >
@@ -463,22 +471,51 @@ export default function CounselorResourcesPage() {
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Button size="sm" variant="outline" onClick={() => handleViewResource(resource)}>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                        onClick={() => handleViewResource(resource)}
+                      >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleEditResource(resource)}>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                        onClick={() => handleEditResource(resource)}
+                      >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleDuplicateResource(resource)}>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                        onClick={() => handleDuplicateResource(resource)}
+                      >
                         <Copy className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleDownloadResource(resource)}>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                        onClick={() => handleDownloadResource(resource)}
+                      >
                         <Download className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleArchiveResource(resource.id)}>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                        onClick={() => handleArchiveResource(resource.id)}
+                      >
                         <Archive className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleDeleteResource(resource.id)}>
+                      <Button 
+                        size="sm" 
+                        variant="destructive" 
+                        onClick={() => handleDeleteResource(resource.id)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -539,7 +576,6 @@ export default function CounselorResourcesPage() {
                   Save resources by clicking the bookmark icon when viewing them
                 </p>
                 <Button 
-                  variant="outline" 
                   onClick={() => setActiveTab('view')}
                 >
                   Browse All Resources
@@ -1578,6 +1614,7 @@ Remember to:
           onShare={handleShareResource}
           onBookmark={handleBookmarkResource}
           onDownload={handleDownloadResource}
+          onEdit={handleEditResource}
         />
       )}
     </div>

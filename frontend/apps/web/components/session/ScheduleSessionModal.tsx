@@ -61,21 +61,6 @@ export function ScheduleSessionModal({
     }
   }
 
-  // Generate date options (next 30 days)
-  const dateOptions: { value: string; label: string }[] = [];
-  for (let i = 1; i <= 30; i++) {
-    const date = new Date();
-    date.setDate(date.getDate() + i);
-    const dateString = date.toISOString().split('T')[0] || '';
-    const displayDate = date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-    dateOptions.push({ value: dateString, label: displayDate });
-  }
-
   const handleSubmit = async () => {
     if (!selectedPatient || !selectedDate || !selectedTime) {
       return;
@@ -125,12 +110,12 @@ export function ScheduleSessionModal({
 
         <div className="space-y-6">
           {/* Counselor Information */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
             <h4 className="font-medium mb-2 flex items-center gap-2">
-              <User className="h-4 w-4 text-blue-600" />
+              <User className="h-4 w-4 text-primary" />
               Counselor Information
             </h4>
-            <p className="text-sm text-blue-800">{counselorName}</p>
+            <p className="text-sm text-foreground">{counselorName}</p>
           </div>
 
           {/* Patient Selection */}
@@ -165,7 +150,7 @@ export function ScheduleSessionModal({
 
           {/* Selected Patient Info */}
           {selectedPatientData && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
               <div className="flex items-center gap-3">
                 {selectedPatientData.avatar ? (
                   <img 
@@ -174,13 +159,13 @@ export function ScheduleSessionModal({
                     className="w-8 h-8 rounded-full object-cover"
                   />
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                    <User className="h-4 w-4 text-green-600" />
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                    <User className="h-4 w-4 text-primary" />
                   </div>
                 )}
                 <div>
-                  <p className="font-medium text-green-800">{selectedPatientData.name}</p>
-                  <p className="text-xs text-green-600">Selected for session</p>
+                  <p className="font-medium text-foreground">{selectedPatientData.name}</p>
+                  <p className="text-xs text-primary">Selected for session</p>
                 </div>
               </div>
             </div>
@@ -193,30 +178,30 @@ export function ScheduleSessionModal({
             {/* Date Selection */}
             <div className="space-y-2">
               <Label htmlFor="date">Select Date *</Label>
-              <Select value={selectedDate} onValueChange={setSelectedDate}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a date" />
-                </SelectTrigger>
-                <SelectContent>
-                  {dateOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                id="date"
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                className="bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
+              />
             </div>
 
             {/* Time Selection */}
             <div className="space-y-2">
               <Label htmlFor="time">Select Time *</Label>
               <Select value={selectedTime} onValueChange={setSelectedTime}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary focus-visible:border-primary">
                   <SelectValue placeholder="Choose a time" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-background border-primary/20">
                   {timeSlots.map((slot) => (
-                    <SelectItem key={slot.value} value={slot.value}>
+                    <SelectItem 
+                      key={slot.value} 
+                      value={slot.value}
+                      className="focus:bg-primary focus:text-primary-foreground"
+                    >
                       {slot.label}
                     </SelectItem>
                   ))}
@@ -228,15 +213,15 @@ export function ScheduleSessionModal({
             <div className="space-y-2">
               <Label htmlFor="duration">Session Duration</Label>
               <Select value={selectedDuration} onValueChange={setSelectedDuration}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary focus-visible:border-primary">
                   <SelectValue placeholder="Choose duration" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="30">30 minutes</SelectItem>
-                  <SelectItem value="45">45 minutes</SelectItem>
-                  <SelectItem value="60">60 minutes</SelectItem>
-                  <SelectItem value="90">90 minutes</SelectItem>
-                  <SelectItem value="120">120 minutes</SelectItem>
+                <SelectContent className="bg-background border-primary/20">
+                  <SelectItem value="30" className="focus:bg-primary focus:text-primary-foreground">30 minutes</SelectItem>
+                  <SelectItem value="45" className="focus:bg-primary focus:text-primary-foreground">45 minutes</SelectItem>
+                  <SelectItem value="60" className="focus:bg-primary focus:text-primary-foreground">60 minutes</SelectItem>
+                  <SelectItem value="90" className="focus:bg-primary focus:text-primary-foreground">90 minutes</SelectItem>
+                  <SelectItem value="120" className="focus:bg-primary focus:text-primary-foreground">120 minutes</SelectItem>
                 </SelectContent>
               </Select>
             </div>

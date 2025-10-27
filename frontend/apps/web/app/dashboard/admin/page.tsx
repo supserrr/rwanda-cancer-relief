@@ -171,45 +171,45 @@ export default function AdminDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center space-x-3 p-3 border rounded-lg">
+            <div className="flex items-center space-x-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
               <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                 <Users className="h-4 w-4 text-blue-600" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium">New patient registered</p>
+                <p className="text-sm font-medium text-muted-foreground">New patient registered</p>
                 <p className="text-xs text-muted-foreground">Grace Mukamana joined the platform</p>
               </div>
               <span className="text-xs text-muted-foreground">2h ago</span>
             </div>
             
-            <div className="flex items-center space-x-3 p-3 border rounded-lg">
+            <div className="flex items-center space-x-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
               <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
                 <TrendingUp className="h-4 w-4 text-green-600" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium">Module completed</p>
+                <p className="text-sm font-medium text-muted-foreground">Module completed</p>
                 <p className="text-xs text-muted-foreground">Paul Nkurunziza finished "Managing Treatment Side Effects"</p>
               </div>
               <span className="text-xs text-muted-foreground">4h ago</span>
             </div>
             
-            <div className="flex items-center space-x-3 p-3 border rounded-lg">
+            <div className="flex items-center space-x-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
               <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
                 <Calendar className="h-4 w-4 text-purple-600" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium">Session completed</p>
+                <p className="text-sm font-medium text-muted-foreground">Session completed</p>
                 <p className="text-xs text-muted-foreground">Dr. Marie Claire finished session with Jean Baptiste</p>
               </div>
               <span className="text-xs text-muted-foreground">6h ago</span>
             </div>
             
-            <div className="flex items-center space-x-3 p-3 border rounded-lg">
+            <div className="flex items-center space-x-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
               <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
                 <AlertCircle className="h-4 w-4 text-orange-600" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium">Support ticket created</p>
+                <p className="text-sm font-medium text-muted-foreground">Support ticket created</p>
                 <p className="text-xs text-muted-foreground">New urgent ticket from patient</p>
               </div>
               <span className="text-xs text-muted-foreground">8h ago</span>

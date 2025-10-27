@@ -1,15 +1,12 @@
 'use client';
 
 import React from 'react';
-import { AIChatInterface } from '@workspace/ui/components/ai-chat-interface';
+import { AIChatSimpleDemo } from '@workspace/ui/components/ai-chat-simple-demo';
 
 export default function AIChatDemoPage() {
-  return (
-    <div className="h-screen overflow-hidden">
-      <AIChatInterface 
-        userName="Demo User"
-        className="h-full"
-      />
-    </div>
-  );
+  const [isOpen, setIsOpen] = React.useState(true);
+
+  if (!isOpen) return null;
+
+  return <AIChatSimpleDemo onClose={() => setIsOpen(false)} />;
 }

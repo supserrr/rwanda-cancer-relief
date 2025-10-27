@@ -156,19 +156,19 @@ export default function AdminUsersPage() {
       <div className="flex flex-col sm:flex-row gap-4">
         <AnimatedCard className="flex-1 p-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
             <Input
               placeholder="Search users by name or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
             />
           </div>
         </AnimatedCard>
         
         <AnimatedCard className="p-6">
           <Select value={selectedRole} onValueChange={(value) => setSelectedRole(value as UserRole | 'all')}>
-            <SelectTrigger className="w-full sm:w-48">
+            <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
               <SelectValue placeholder="Role" />
             </SelectTrigger>
             <SelectContent>
@@ -182,7 +182,7 @@ export default function AdminUsersPage() {
 
         <AnimatedCard className="p-6">
           <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as 'all' | 'active' | 'inactive')}>
-            <SelectTrigger className="w-full sm:w-48">
+            <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>

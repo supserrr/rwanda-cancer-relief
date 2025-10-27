@@ -37,7 +37,6 @@ export default function SessionRoomPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [isInMeeting, setIsInMeeting] = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
-  const [notes, setNotes] = useState('');
 
   useEffect(() => {
     // Find the session
@@ -78,8 +77,8 @@ export default function SessionRoomPage() {
   };
 
   const handleCompleteFeedback = () => {
-    // In production, save feedback and notes
-    router.push(`/dashboard/${user?.role}/sessions`);
+    // In production, save feedback
+    router.push(`/dashboard/counselor/sessions`);
   };
 
   // In-meeting view (full screen, exits dashboard layout)
@@ -146,36 +145,9 @@ export default function SessionRoomPage() {
             </div>
           </div>
 
-          {/* Notes Section (for counselors) */}
-          {user?.role === 'counselor' && (
-            <div className="mb-6">
-              <label className="text-sm font-medium mb-2 block">Session Notes</label>
-              <textarea
-                className="w-full min-h-[120px] p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Add any notes or observations from this session..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                These notes are private and only visible to you
-              </p>
-            </div>
-          )}
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 justify-center">
-            {user?.role === 'counselor' && (
-              <Button
-                variant="outline"
-                onClick={() => router.push(`/dashboard/counselor/patients`)}
-              >
-                View Patient Profile
-              </Button>
-            )}
-            <Button onClick={handleCompleteFeedback}>
-              {user?.role === 'counselor' ? 'Save & Close' : 'Close'}
-            </Button>
-          </div>
+
+
         </AnimatedCard>
         </div>
       </div>

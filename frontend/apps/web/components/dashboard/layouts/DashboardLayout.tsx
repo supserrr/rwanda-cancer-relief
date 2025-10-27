@@ -55,6 +55,7 @@ export function DashboardLayout({
           isSidebarOpen={isSidebarOpen}
           notifications={notifications}
           onNotificationClick={onNotificationClick}
+          onNavigate={onNavigate}
         />
         
         <main className="flex-1 overflow-auto p-6 bg-sidebar">

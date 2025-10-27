@@ -80,9 +80,9 @@ export function CancelSessionModal({
         <div className="space-y-6">
           {/* Patient Information (for counselors) */}
           {isCounselor && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
               <h4 className="font-medium mb-3 flex items-center gap-2">
-                <User className="h-4 w-4 text-blue-600" />
+                <User className="h-4 w-4 text-primary" />
                 Patient Information
               </h4>
               <div className="flex items-center gap-3">
@@ -93,12 +93,12 @@ export function CancelSessionModal({
                     className="w-10 h-10 rounded-full object-cover"
                   />
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                    <User className="h-5 w-5 text-blue-600" />
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <User className="h-5 w-5 text-primary" />
                   </div>
                 )}
                 <div>
-                  <p className="font-medium">{patientName || 'Unknown Patient'}</p>
+                  <p className="font-medium text-foreground">{patientName || 'Unknown Patient'}</p>
                   <p className="text-sm text-muted-foreground">Session ID: {session.id}</p>
                 </div>
               </div>
@@ -106,7 +106,7 @@ export function CancelSessionModal({
           )}
 
           {/* Session Information */}
-          <div className="bg-muted/30 rounded-lg p-4">
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
             <h4 className="font-medium mb-2">Session Details</h4>
             <div className="space-y-2 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
@@ -179,12 +179,12 @@ export function CancelSessionModal({
           </div>
 
           {/* Warning Notice */}
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
             <div className="flex gap-2 text-sm">
-              <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-              <div className="text-red-800">
+              <AlertTriangle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+              <div className="text-foreground">
                 <p className="font-medium">Important Notice</p>
-                <p>
+                <p className="text-muted-foreground">
                   {isCounselor 
                     ? "Cancelling this session will notify the patient immediately. Please ensure this is necessary and consider rescheduling instead."
                     : "Cancelling this session will notify your counselor immediately. You may be charged a cancellation fee depending on your agreement."

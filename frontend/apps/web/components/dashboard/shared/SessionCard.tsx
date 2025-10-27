@@ -166,6 +166,7 @@ export function SessionCard({
               <Button 
                 size="sm" 
                 variant="outline"
+                className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
                 onClick={() => onReschedule(session)}
               >
                 Reschedule

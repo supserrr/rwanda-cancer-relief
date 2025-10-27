@@ -36,21 +36,6 @@ export function RescheduleModal({ isOpen, onClose, session, onReschedule }: Resc
     }
   }
 
-  // Generate date options (next 30 days)
-  const dateOptions: { value: string; label: string }[] = [];
-  for (let i = 1; i <= 30; i++) {
-    const date = new Date();
-    date.setDate(date.getDate() + i);
-    const dateString = date.toISOString().split('T')[0] || '';
-    const displayDate = date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-    dateOptions.push({ value: dateString, label: displayDate });
-  }
-
   const handleSubmit = async () => {
     if (!session || !selectedDate || !selectedTime) {
       return;
@@ -89,7 +74,7 @@ export function RescheduleModal({ isOpen, onClose, session, onReschedule }: Resc
 
         <div className="space-y-6">
           {/* Current Session Info */}
-          <div className="bg-muted/30 rounded-lg p-4">
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
             <h4 className="font-medium mb-2">Current Session Details</h4>
             <div className="space-y-2 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
@@ -122,30 +107,30 @@ export function RescheduleModal({ isOpen, onClose, session, onReschedule }: Resc
             {/* Date Selection */}
             <div className="space-y-2">
               <Label htmlFor="date">Select Date</Label>
-              <Select value={selectedDate} onValueChange={setSelectedDate}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a date" />
-                </SelectTrigger>
-                <SelectContent>
-                  {dateOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                id="date"
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                className="bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
+              />
             </div>
 
             {/* Time Selection */}
             <div className="space-y-2">
               <Label htmlFor="time">Select Time</Label>
               <Select value={selectedTime} onValueChange={setSelectedTime}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary focus-visible:border-primary">
                   <SelectValue placeholder="Choose a time" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-background border-primary/20">
                   {timeSlots.map((slot) => (
-                    <SelectItem key={slot.value} value={slot.value}>
+                    <SelectItem 
+                      key={slot.value} 
+                      value={slot.value}
+                      className="focus:bg-primary focus:text-primary-foreground"
+                    >
                       {slot.label}
                     </SelectItem>
                   ))}
@@ -157,26 +142,26 @@ export function RescheduleModal({ isOpen, onClose, session, onReschedule }: Resc
             <div className="space-y-2">
               <Label htmlFor="duration">Session Duration</Label>
               <Select value={selectedDuration} onValueChange={setSelectedDuration}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary focus-visible:border-primary">
                   <SelectValue placeholder="Choose duration" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="30">30 minutes</SelectItem>
-                  <SelectItem value="45">45 minutes</SelectItem>
-                  <SelectItem value="60">60 minutes</SelectItem>
-                  <SelectItem value="90">90 minutes</SelectItem>
+                <SelectContent className="bg-background border-primary/20">
+                  <SelectItem value="30" className="focus:bg-primary focus:text-primary-foreground">30 minutes</SelectItem>
+                  <SelectItem value="45" className="focus:bg-primary focus:text-primary-foreground">45 minutes</SelectItem>
+                  <SelectItem value="60" className="focus:bg-primary focus:text-primary-foreground">60 minutes</SelectItem>
+                  <SelectItem value="90" className="focus:bg-primary focus:text-primary-foreground">90 minutes</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
           {/* Warning Notice */}
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
             <div className="flex gap-2 text-sm">
-              <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div className="text-amber-800">
+              <AlertCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+              <div className="text-foreground">
                 <p className="font-medium">Important Notice</p>
-                <p>Rescheduling will send a notification to your counselor. Please ensure the new time works for both parties.</p>
+                <p className="text-muted-foreground">Rescheduling will send a notification to your counselor. Please ensure the new time works for both parties.</p>
               </div>
             </div>
           </div>

@@ -2,58 +2,18 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { AIChatInterface } from '@workspace/ui/components/ai-chat-interface';
-import { DashboardSidebar } from '../../../../components/dashboard/shared/DashboardSidebar';
+import { AIChatSimpleDemo } from '@workspace/ui/components/ai-chat-simple-demo';
 import { useAuth } from '../../../../hooks/use-auth';
 
 export default function PatientAIChatPage() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
 
   const handleClose = () => {
     router.push('/dashboard/patient');
   };
 
-  const handleNavigate = (path: string) => {
-    router.push(path);
-  };
-
-  const handleLogout = async () => {
-    await signOut();
-  };
-
-  const handleNotificationClick = () => {
-    console.log('Notification clicked');
-  };
-
   if (!user) return null;
 
-  const userData = {
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    avatar: user.avatar || '/avatars/default.jpg'
-  };
-
-  return (
-    <AIChatInterface 
-      userName={user?.name || "Patient"}
-      onClose={handleClose}
-      userRole={user.role}
-      user={userData}
-      currentPath="/dashboard/patient/ai-chat"
-      onNavigate={handleNavigate}
-      onLogout={handleLogout}
-      notifications={3}
-      onNotificationClick={handleNotificationClick}
-      sidebarComponent={() => (
-        <DashboardSidebar
-          userRole={user.role}
-          currentPath="/dashboard/patient/ai-chat"
-          onNavigate={handleNavigate}
-          className="h-full"
-        />
-      )}
-    />
-  );
+  return <AIChatSimpleDemo onClose={handleClose} />;
 }

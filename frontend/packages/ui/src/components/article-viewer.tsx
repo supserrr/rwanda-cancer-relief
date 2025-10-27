@@ -20,7 +20,8 @@ import {
   User,
   Eye,
   Printer,
-  Clock
+  Clock,
+  Edit
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Resource } from '../lib/types';
@@ -32,6 +33,7 @@ interface ArticleViewerProps {
   onShare?: (article: Resource) => void;
   onBookmark?: (article: Resource) => void;
   onDownload?: (article: Resource) => void;
+  onEdit?: (article: Resource) => void;
 }
 
 export function ArticleViewer({ 
@@ -40,7 +42,8 @@ export function ArticleViewer({
   onClose, 
   onShare,
   onBookmark,
-  onDownload
+  onDownload,
+  onEdit
 }: ArticleViewerProps) {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
@@ -204,31 +207,28 @@ export function ArticleViewer({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-0" showCloseButton={false}>
         {/* Visually hidden title for accessibility */}
         <DialogTitle className="sr-only">
           {article.title}
         </DialogTitle>
         
-        {/* Header */}
-        <div className="sticky top-0 z-20 bg-sidebar border-b px-6 py-4">
-          <div className="flex items-center justify-end">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="rounded-full p-2 hover:bg-muted"
-            >
-              <X className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-
         {/* Article Content */}
         <div className="bg-background">
           {/* Hero Section */}
           <div className="px-6 py-6">
             <div className="max-w-3xl mx-auto">
+              {/* Close Button */}
+              <div className="flex justify-end mb-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onClose}
+                  className="rounded-full p-2 hover:bg-muted"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
               {/* Article Meta */}
               <div className="mb-6">
                 <div className="flex items-center space-x-4 text-sm text-muted-foreground mb-4">
@@ -324,6 +324,18 @@ export function ArticleViewer({
                   <Printer className="h-4 w-4" />
                   <span>Print</span>
                 </Button>
+
+                {onEdit && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onEdit(article!)}
+                    className="flex items-center space-x-2"
+                  >
+                    <Edit className="h-4 w-4" />
+                    <span>Edit</span>
+                  </Button>
+                )}
               </div>
             </div>
           </div>

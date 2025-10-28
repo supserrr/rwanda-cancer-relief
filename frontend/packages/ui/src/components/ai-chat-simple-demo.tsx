@@ -15,7 +15,7 @@ interface AIChatSimpleDemoProps {
  */
 export function AIChatSimpleDemo({ onClose }: AIChatSimpleDemoProps) {
   return (
-    <div className="fixed inset-0 z-50 flex h-screen bg-background">
+    <div className="flex h-full flex-col bg-background">
       <div className="flex flex-1 flex-col overflow-hidden relative">
         {/* Close button */}
         {onClose && (

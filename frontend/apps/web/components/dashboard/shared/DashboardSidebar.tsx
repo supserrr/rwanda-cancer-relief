@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Sidebar, SidebarBody, SidebarLink, useSidebar } from "@workspace/ui/components/ui/sidebar";
+import { Sidebar, SidebarBody, SidebarLink, useSidebar, SidebarProvider } from "@workspace/ui/components/ui/sidebar";
 import { RCRLogo } from "@workspace/ui/components/rcr-logo";
 import {
   LayoutDashboard,
@@ -15,9 +15,9 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { UserRole, NavigationItem } from '../../../lib/types';
-import { motion } from "framer-motion";
-import Link from "next/link";
 import { cn } from "@workspace/ui/lib/utils";
+import Link from "next/link";
+import { motion } from "framer-motion";
 
 interface DashboardSidebarProps {
   userRole: UserRole;
@@ -212,25 +212,27 @@ export function DashboardSidebar({
 
   return (
     <div className={cn("h-full", className)}>
-      <Sidebar open={open} setOpen={setOpen}>
-        <SidebarBody className="justify-between gap-10">
-          <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-            <RCRLogoComponent />
-            <div className="mt-8 flex flex-col gap-2">
-              {links.map((link, idx) => (
-                <SidebarLink 
-                  key={idx} 
-                  link={link}
-                  className={cn(
-                    "rounded-md px-3 py-2 transition-colors",
-                    currentPath === link.href && "bg-sidebar-accent text-sidebar-primary"
-                  )}
-                />
-              ))}
+      <SidebarProvider>
+        <Sidebar open={open} setOpen={setOpen}>
+          <SidebarBody className="justify-between gap-10">
+            <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+              <RCRLogoComponent />
+              <div className="mt-8 flex flex-col gap-2">
+                {links.map((link, idx) => (
+                  <SidebarLink 
+                    key={idx} 
+                    link={link}
+                    className={cn(
+                      "rounded-md px-3 py-2 transition-colors",
+                      currentPath === link.href && "bg-sidebar-accent text-sidebar-primary"
+                    )}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        </SidebarBody>
-      </Sidebar>
+          </SidebarBody>
+        </Sidebar>
+      </SidebarProvider>
     </div>
   );
 }

@@ -8,9 +8,5 @@ export default function PatientAIChatPage() {
 
   if (!user) return null;
 
-  return (
-    <div className="h-full">
-      {/* AI Chat content will go here */}
-    </div>
-  );
+  return null;
 }

@@ -82,23 +82,33 @@ export const PromptBox = React.forwardRef<HTMLTextAreaElement, React.TextareaHTM
     const hasValue = (props.value as string || "").trim().length > 0 || imagePreview;
 
     return (
-      <div className={cn("flex flex-col rounded-[28px] p-2 shadow-sm transition-colors bg-primary/5 border border-primary/20 dark:bg-primary/5 dark:border-primary/20 cursor-text", className)}>
+      <div className={cn("flex flex-col rounded-[28px] p-2 shadow-sm transition-colors bg-foreground border border-border text-white dark:bg-foreground dark:border-border cursor-text", className)}>
         <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*"/>
         
         {imagePreview && ( <Dialog open={isImageDialogOpen} onOpenChange={setIsImageDialogOpen}> <div className="relative mb-1 w-fit rounded-[1rem] px-1 pt-1"> <button type="button" className="transition-transform" onClick={() => setIsImageDialogOpen(true)}> <img src={imagePreview} alt="Image preview" className="h-14.5 w-14.5 rounded-[1rem]" /> </button> <button onClick={handleRemoveImage} className="absolute right-2 top-2 z-10 flex h-4 w-4 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors hover:bg-primary/20 hover:text-primary" aria-label="Remove image"> <XIcon className="h-4 w-4" /> </button> </div> <DialogContent> <img src={imagePreview} alt="Full size preview" className="w-full max-h-[95vh] object-contain rounded-[24px]" /> </DialogContent> </Dialog> )}
         
-        <textarea ref={internalTextareaRef} rows={1} value={props.value || ""} onChange={handleInputChange} onKeyDown={handleKeyDown} placeholder="Message..." className="custom-scrollbar w-full resize-none border-0 bg-transparent p-3 text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-gray-300 focus:ring-0 focus-visible:outline-none h-8" {...props} />
+        <textarea ref={internalTextareaRef} rows={1} value={props.value || ""} onChange={handleInputChange} onKeyDown={handleKeyDown} placeholder="Message..." className="w-full resize-none border-0 bg-transparent p-3 text-white placeholder:text-white/60 dark:text-[#45276f] placeholder:dark:text-gray-300 focus:ring-0 focus-visible:outline-none overflow-hidden" {...props} />
         
         <div className="mt-0.5 p-1 pt-0">
           <TooltipProvider delayDuration={100}>
             <div className="flex items-center gap-2">
-              <Tooltip> <TooltipTrigger asChild><button type="button" onClick={handlePlusClick} className="flex h-8 w-8 items-center justify-center rounded-full text-foreground hover:bg-primary/10 hover:text-primary transition-colors focus-visible:outline-none"><PlusIcon className="h-6 w-6" /><span className="sr-only">Attach image</span></button></TooltipTrigger> <TooltipContent side="top" showArrow={true}><p>Attach image</p></TooltipContent> </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" onClick={handlePlusClick} className="flex h-8 w-8 items-center justify-center rounded-full text-white hover:bg-[#45276f] transition-colors focus-visible:outline-none">
+                    <PlusIcon className="h-6 w-6" />
+                    <span className="sr-only">Attach image</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" showArrow={true}>
+                  <p>Attach image</p>
+                </TooltipContent>
+              </Tooltip>
 
               {/* MODIFIED: Right-aligned buttons container */}
               <div className="ml-auto flex items-center gap-2">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <button type="button" className="flex h-8 w-8 items-center justify-center rounded-full text-foreground hover:bg-primary/10 hover:text-primary transition-colors focus-visible:outline-none">
+                    <button type="button" className="flex h-8 w-8 items-center justify-center rounded-full text-white hover:bg-[#45276f] transition-colors focus-visible:outline-none">
                       <MicIcon className="h-5 w-5" />
                       <span className="sr-only">Record voice</span>
                     </button>
@@ -108,7 +118,7 @@ export const PromptBox = React.forwardRef<HTMLTextAreaElement, React.TextareaHTM
 
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <button type="submit" disabled={!hasValue} onClick={onSubmit} className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/40">
+                    <button type="submit" disabled={!hasValue} onClick={onSubmit} className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none bg-white text-black hover:bg-white/90 disabled:bg-white/40 dark:bg-[#45276f] dark:text-white dark:hover:bg-[#45276f]/90 dark:disabled:bg-[#45276f]/40">
                       <SendIcon className="h-6 w-6 text-bold" />
                       <span className="sr-only">Send message</span>
                     </button>

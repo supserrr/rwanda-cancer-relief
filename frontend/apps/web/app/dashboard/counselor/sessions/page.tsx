@@ -106,10 +106,6 @@ export default function CounselorSessionsPage() {
     }
   };
 
-  const handleViewNotes = (session: Session) => {
-    console.log('View session notes:', session.id);
-  };
-
   const handleAddNotes = (session: Session) => {
     console.log('Add notes to session:', session.id);
   };
@@ -360,7 +356,6 @@ export default function CounselorSessionsPage() {
                       patientAvatar={getPatientAvatar(session.patientId)}
                       onJoin={session.status === 'scheduled' ? handleJoinSession : undefined}
                       onReschedule={session.status === 'scheduled' ? handleRescheduleSession : undefined}
-                      onViewNotes={session.status === 'completed' ? handleViewNotes : undefined}
                     />
                   ))}
                 </div>

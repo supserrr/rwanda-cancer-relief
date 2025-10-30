@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 import { useRef } from 'react';
 import { Button } from "@workspace/ui/components/button";
 import { Navbar } from "@workspace/ui/components/ui/mini-navbar";
@@ -31,12 +31,21 @@ interface LinePathProps {
  * 
  * The path draws progressively as the user scrolls, creating
  * a smooth visual effect that follows scroll progress.
+ * Optimized with Framer Motion's useTransform for efficient animations.
  * 
  * @param props - Component props
  * @returns An animated SVG path element
  */
 const LinePath = ({ className, scrollYProgress }: LinePathProps) => {
-  const pathLength = useTransform(scrollYProgress, [0, 1], [0.5, 1]);
+  // Use lighter spring for better scroll performance
+  const smoothProgress = useSpring(scrollYProgress, {
+    stiffness: 150,
+    damping: 40,
+    mass: 0.3,
+  });
+  
+  const pathLength = useTransform(smoothProgress, [0, 1], [0.5, 1]);
+  const strokeDashoffset = useTransform(pathLength, (value) => 1 - value);
 
   return (
     <svg
@@ -47,6 +56,12 @@ const LinePath = ({ className, scrollYProgress }: LinePathProps) => {
       overflow="visible"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
+      style={{
+        willChange: 'transform',
+        transform: 'translateZ(0)',
+        backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden',
+      }}
     >
       <motion.path
         d="M876.605 394.131C788.982 335.917 696.198 358.139 691.836 416.303C685.453 501.424 853.722 498.43 941.95 409.714C1016.1 335.156 1008.64 186.907 906.167 142.846C807.014 100.212 712.699 198.494 789.049 245.127C889.053 306.207 986.062 116.979 840.548 43.3233C743.932 -5.58141 678.027 57.1682 672.279 112.188C666.53 167.208 712.538 172.943 736.353 163.088C760.167 153.234 764.14 120.924 746.651 93.3868C717.461 47.4252 638.894 77.8642 601.018 116.979C568.164 150.908 557 201.079 576.467 246.924C593.342 286.664 630.24 310.55 671.68 302.614C756.114 286.446 729.747 206.546 681.86 186.442C630.54 164.898 492 209.318 495.026 287.644C496.837 334.494 518.402 366.466 582.455 367.287C680.013 368.538 771.538 299.456 898.634 292.434C1007.02 286.446 1192.67 309.384 1242.36 382.258C1266.99 418.39 1273.65 443.108 1247.75 474.477C1217.32 511.33 1149.4 511.259 1096.84 466.093C1044.29 420.928 1029.14 380.576 1033.97 324.172C1038.31 273.428 1069.55 228.986 1117.2 216.384C1152.2 207.128 1188.29 213.629 1194.45 245.127C1201.49 281.062 1132.22 280.104 1100.44 272.673C1065.32 264.464 1044.22 234.837 1032.77 201.413C1019.29 162.061 1029.71 131.126 1056.44 100.965C1086.19 67.4032 1143.96 54.5526 1175.78 86.1513C1207.02 117.17 1186.81 143.379 1156.22 166.691C1112.57 199.959 1052.57 186.238 999.784 155.164C957.312 130.164 899.171 63.7054 931.284 26.3214C952.068 2.12513 996.288 3.87363 1007.22 43.58C1018.15 83.2749 1003.56 122.644 975.969 163.376C948.377 204.107 907.272 255.122 913.558 321.045C919.727 385.734 990.968 497.068 1063.84 503.35C1111.46 507.456 1166.79 511.984 1175.68 464.527C1191.52 379.956 1101.26 334.985 1030.29 377.017C971.109 412.064 956.297 483.647 953.797 561.655C947.587 755.413 1197.56 941.828 936.039 1140.66C745.771 1285.32 321.926 950.737 134.536 1202.19C-6.68295 1391.68 -53.4837 1655.38 131.935 1760.5C478.381 1956.91 1124.19 1515 1201.28 1997.83C1273.66 2451.23 100.805 1864.7 303.794 2668.89"
@@ -54,7 +69,8 @@ const LinePath = ({ className, scrollYProgress }: LinePathProps) => {
         strokeWidth="20"
         style={{
           pathLength,
-          strokeDashoffset: useTransform(pathLength, (value) => 1 - value),
+          strokeDashoffset,
+          willChange: 'stroke-dasharray, stroke-dashoffset',
         }}
       />
     </svg>
@@ -70,10 +86,19 @@ export default function LandingPage() {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
+    layoutEffect: false,
+    offset: ['start start', 'end end'],
   });
 
   return (
-    <main className="min-h-screen bg-background overflow-x-hidden">
+    <main 
+      className="min-h-screen bg-background overflow-x-hidden" 
+      style={{ 
+        scrollBehavior: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehavior: 'contain',
+      }}
+    >
       {/* Mini Navbar */}
       <Navbar />
 
@@ -81,13 +106,36 @@ export default function LandingPage() {
       {/* Wrapper for scroll tracking */}
       <div className="relative w-full">
         {/* Scroll Target - invisible element for tracking */}
-        <div ref={ref} className="absolute top-0 left-0 w-full h-[350vh] pointer-events-none"></div>
+        <div 
+          ref={ref} 
+          className="absolute top-0 left-0 w-full h-[350vh] pointer-events-none"
+          style={{
+            contain: 'strict',
+            willChange: 'transform',
+            transform: 'translateZ(0)',
+          }}
+        ></div>
 
         {/* Layer 1: Background - Bottom */}
-        <div className="fixed inset-0 bg-background -z-10"></div>
+        <div 
+          className="fixed inset-0 bg-background -z-10"
+          style={{
+            willChange: 'transform',
+            transform: 'translateZ(0)',
+            backfaceVisibility: 'hidden',
+          }}
+        ></div>
 
         {/* Layer 2: SVG Animation - Middle (sticky) */}
-        <div className="sticky top-0 h-screen w-full z-0 pointer-events-none overflow-visible">
+        <div 
+          className="sticky top-0 h-screen w-full z-0 pointer-events-none overflow-visible"
+          style={{
+            willChange: 'transform',
+            transform: 'translateZ(0)',
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+          }}
+        >
           <LinePath
             className="absolute left-1/2 top-52 transform -translate-x-1/2"
             scrollYProgress={scrollYProgress}
@@ -95,9 +143,24 @@ export default function LandingPage() {
         </div>
 
         {/* Layer 3: Content Sections - Top (normal flow) */}
-        <div className="relative z-10 bg-transparent" style={{ marginTop: '-100vh' }}>
+        <div 
+          className="relative z-10 bg-transparent" 
+          style={{ 
+            marginTop: '-100vh',
+            transform: 'translateZ(0)',
+            willChange: 'contents',
+            contain: 'layout style',
+          }}
+        >
             {/* Hero Section */}
-            <div className="min-h-screen flex items-center relative w-full px-6 lg:px-12 bg-transparent">
+            <div 
+              className="min-h-screen flex items-center relative w-full px-6 lg:px-12 bg-transparent"
+              style={{
+                transform: 'translateZ(0)',
+                willChange: 'contents',
+                contain: 'layout style paint',
+              }}
+            >
               <div className="relative max-w-7xl mx-auto w-full">
                 <div className="relative flex flex-col items-start justify-start gap-6 text-left max-w-3xl">
                   <h1 className="font-jakarta-sans relative z-10 text-5xl font-medium tracking-[-0.02em] lg:text-7xl text-foreground">
@@ -121,7 +184,13 @@ export default function LandingPage() {
             </div>
 
             {/* Why This Platform Matters Section */}
-            <div className="relative w-full pt-20 px-6 bg-transparent">
+            <div 
+              className="relative w-full pt-20 px-6 bg-transparent"
+              style={{
+                transform: 'translateZ(0)',
+                contain: 'layout style paint',
+              }}
+            >
               <div className="max-w-7xl mx-auto text-center">
                 <h2 className="font-jakarta-sans text-4xl lg:text-5xl font-semibold text-foreground mb-24">
                   Why This Platform Matters
@@ -130,14 +199,32 @@ export default function LandingPage() {
             </div>
 
             {/* Feature Spotlight */}
-            <div className="relative w-full pt-12 px-6 lg:px-12 bg-transparent">
+            <div 
+              className="relative w-full pt-12 px-6 lg:px-12 bg-transparent"
+              style={{
+                transform: 'translateZ(0)',
+                contain: 'layout style paint',
+              }}
+            >
               <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
                 {/* Image on the left */}
-                <div className="relative z-10 flex-1 w-full lg:w-auto">
+                <div 
+                  className="relative z-10 flex-1 w-full lg:w-auto"
+                  style={{
+                    transform: 'translateZ(0)',
+                    contain: 'layout style paint',
+                  }}
+                >
                   <img
                     src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800&h=600&fit=crop&auto=format&q=80"
                     alt="Compassionate counselor providing support"
                     className="w-full h-auto rounded-2xl shadow-2xl"
+                    loading="lazy"
+                    decoding="async"
+                    style={{
+                      transform: 'translateZ(0)',
+                      willChange: 'transform',
+                    }}
                   />
                 </div>
 
@@ -161,7 +248,13 @@ export default function LandingPage() {
             </div>
 
             {/* How It Works Section */}
-            <div className="relative w-full pt-32 px-6 bg-transparent">
+            <div 
+              className="relative w-full pt-32 px-6 bg-transparent"
+              style={{
+                transform: 'translateZ(0)',
+                contain: 'layout style paint',
+              }}
+            >
               <div className="max-w-7xl mx-auto text-center">
                 <h2 className="font-jakarta-sans text-4xl lg:text-5xl font-semibold text-foreground mb-20">
                   How It Works
@@ -170,7 +263,13 @@ export default function LandingPage() {
             </div>
 
             {/* How It Works Steps */}
-            <div className="relative w-full px-6 lg:px-12 pb-20 bg-transparent">
+            <div 
+              className="relative w-full px-6 lg:px-12 pb-20 bg-transparent"
+              style={{
+                transform: 'translateZ(0)',
+                contain: 'layout style paint',
+              }}
+            >
               <div className="max-w-7xl mx-auto space-y-12 lg:space-y-16">
                 {/* Step 1 */}
                 <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-center">
@@ -185,11 +284,23 @@ export default function LandingPage() {
                       Answer a few short questions to be matched with a trained Rwandan counselor who understands your unique needs and background. Our platform connects you with professionals experienced in supporting cancer patients and their families.
                     </p>
                   </div>
-                  <div className="flex-1 w-full lg:w-auto">
+                  <div 
+                    className="flex-1 w-full lg:w-auto"
+                    style={{
+                      transform: 'translateZ(0)',
+                      contain: 'layout style paint',
+                    }}
+                  >
                     <img
                       src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=800&h=600&fit=crop&auto=format&q=80"
                       alt="Counselor matching process"
                       className="w-full h-auto rounded-2xl shadow-xl"
+                      loading="lazy"
+                      decoding="async"
+                      style={{
+                        transform: 'translateZ(0)',
+                        willChange: 'transform',
+                      }}
                     />
                   </div>
                 </div>
@@ -214,11 +325,23 @@ export default function LandingPage() {
                       Speak with your counselor in the way that feels most comfortable, through secure chat, audio, or video sessions. Every interaction is confidential and guided by compassion and professionalism.
                     </p>
                   </div>
-                  <div className="flex-1 w-full lg:w-auto">
+                  <div 
+                    className="flex-1 w-full lg:w-auto"
+                    style={{
+                      transform: 'translateZ(0)',
+                      contain: 'layout style paint',
+                    }}
+                  >
                     <img
                       src="https://images.unsplash.com/photo-1516321497487-e288fb19713f?w=800&h=600&fit=crop&auto=format&q=80"
                       alt="Communication options - chat, audio, video"
                       className="w-full h-auto rounded-2xl shadow-xl"
+                      loading="lazy"
+                      decoding="async"
+                      style={{
+                        transform: 'translateZ(0)',
+                        willChange: 'transform',
+                      }}
                     />
                   </div>
                 </div>
@@ -243,11 +366,23 @@ export default function LandingPage() {
                       Access counseling and emotional support anytime, anywhere. You can message your counselor between sessions or schedule live appointments at times that work best for you, all from your phone or computer.
                     </p>
                   </div>
-                  <div className="flex-1 w-full lg:w-auto">
+                  <div 
+                    className="flex-1 w-full lg:w-auto"
+                    style={{
+                      transform: 'translateZ(0)',
+                      contain: 'layout style paint',
+                    }}
+                  >
                     <img
                       src="https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=800&h=600&fit=crop&auto=format&q=80"
                       alt="24/7 support accessibility"
                       className="w-full h-auto rounded-2xl shadow-xl"
+                      loading="lazy"
+                      decoding="async"
+                      style={{
+                        transform: 'translateZ(0)',
+                        willChange: 'transform',
+                      }}
                     />
                   </div>
                 </div>
@@ -255,7 +390,13 @@ export default function LandingPage() {
             </div>
 
             {/* Our Approach to Care Section */}
-            <div className="relative w-full pt-8 px-6 bg-transparent">
+            <div 
+              className="relative w-full pt-8 px-6 bg-transparent"
+              style={{
+                transform: 'translateZ(0)',
+                contain: 'layout style paint',
+              }}
+            >
               <div className="max-w-7xl mx-auto">
                 {/* Section Title */}
                 <h2 className="font-jakarta-sans text-4xl lg:text-5xl font-semibold text-foreground text-center mb-20">
@@ -347,7 +488,13 @@ export default function LandingPage() {
             </div>
 
             {/* Call to Action Section */}
-            <div className="relative w-full pt-8 pb-20 px-6 bg-transparent">
+            <div 
+              className="relative w-full pt-8 pb-20 px-6 bg-transparent"
+              style={{
+                transform: 'translateZ(0)',
+                contain: 'layout style paint',
+              }}
+            >
               <div className="max-w-7xl mx-auto">
                 <div className="relative rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/10 p-12 lg:p-16 text-center overflow-hidden">
                   {/* Decorative gradient blob */}
@@ -372,7 +519,13 @@ export default function LandingPage() {
             </div>
 
             {/* FAQ Section */}
-            <div className="relative w-full pt-8 pb-20 px-6 bg-transparent">
+            <div 
+              className="relative w-full pt-8 pb-20 px-6 bg-transparent"
+              style={{
+                transform: 'translateZ(0)',
+                contain: 'layout style paint',
+              }}
+            >
               <FAQSection
                 title="Common Questions"
                 subtitle=""

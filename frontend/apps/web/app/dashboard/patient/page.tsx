@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AnimatedStatCard } from '@workspace/ui/components/animated-stat-card';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
@@ -23,10 +24,11 @@ import {
   Target,
   Users
 } from 'lucide-react';
-import { dummyPatients, dummySessions, dummyResources, dummyMessages, dummyCounselors } from '../../../lib/dummy-data';
+import { dummyPatients, dummySessions, dummyResources, dummyMessages, dummyCounselors, dummyChats } from '../../../lib/dummy-data';
 import { QuickBookingModal } from '@workspace/ui/components/quick-booking-modal';
 
 export default function PatientDashboard() {
+  const router = useRouter();
   const [isQuickBookingOpen, setIsQuickBookingOpen] = useState(false);
   const currentPatient = dummyPatients[0]; // Jean Baptiste
   const upcomingSessions = dummySessions.filter(session => 
@@ -50,6 +52,22 @@ export default function PatientDashboard() {
 
   const handleCloseQuickBooking = () => {
     setIsQuickBookingOpen(false);
+  };
+
+  const handleMessageClick = (message: any) => {
+    // Find the chat that includes this message
+    // For patient, the message should be from/to the patient
+    const chatId = dummyChats.find(chat => 
+      chat.participants.includes(currentPatient?.id || '') &&
+      (message.senderId === currentPatient?.id || message.receiverId === currentPatient?.id)
+    )?.id;
+    
+    if (chatId) {
+      router.push(`/dashboard/patient/chat?chatId=${chatId}`);
+    } else {
+      // Fallback: just navigate to chat page
+      router.push('/dashboard/patient/chat');
+    }
   };
 
   return (
@@ -151,7 +169,10 @@ export default function PatientDashboard() {
               </div>
             </div>
             
-            <Button className="w-full">
+            <Button 
+              className="w-full"
+              onClick={() => router.push('/dashboard/patient/resources')}
+            >
               <Play className="h-4 w-4 mr-2" />
               Continue Learning
             </Button>
@@ -181,7 +202,11 @@ export default function PatientDashboard() {
                         })}
                       </p>
                     </div>
-                    <Button size="sm" variant="outline">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => router.push(`/dashboard/patient/sessions/session/${session.id}`)}
+                    >
                       Join
                     </Button>
                   </div>
@@ -213,7 +238,11 @@ export default function PatientDashboard() {
             {recentMessages.length > 0 ? (
               <div className="space-y-3">
                 {recentMessages.map((message) => (
-                  <div key={message.id} className="flex items-start gap-3 p-3 border rounded-lg">
+                  <div 
+                    key={message.id} 
+                    onClick={() => handleMessageClick(message)}
+                    className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/20 dark:hover:border-primary/30 transition-all duration-200"
+                  >
                     <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                       <MessageCircle className="h-4 w-4 text-blue-600" />
                     </div>
@@ -252,7 +281,11 @@ export default function PatientDashboard() {
           <CardContent>
             <div className="space-y-3">
               {recommendedResources.map((resource) => (
-                <div key={resource.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/20 dark:hover:border-primary/30 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-primary/20 transition-all duration-200 cursor-pointer group">
+                <div 
+                  key={resource.id} 
+                  onClick={() => router.push(`/dashboard/patient/resources?resourceId=${resource.id}`)}
+                  className="flex items-center gap-3 p-3 border rounded-lg hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/20 dark:hover:border-primary/30 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-primary/20 transition-all duration-200 cursor-pointer group"
+                >
                   <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center group-hover:bg-purple-200 dark:group-hover:bg-purple-800/50 transition-colors duration-200">
                     <Play className="h-5 w-5 text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors duration-200" />
                   </div>
@@ -262,7 +295,15 @@ export default function PatientDashboard() {
                       {resource.type.toUpperCase()} • {resource.duration ? `${resource.duration} min` : 'Article'}
                     </p>
                   </div>
-                  <Button size="sm" variant="ghost" className="group-hover:bg-primary/10 dark:group-hover:bg-primary/20 group-hover:text-primary dark:group-hover:text-primary transition-all duration-200">
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/dashboard/patient/resources?resourceId=${resource.id}`);
+                    }}
+                    className="group-hover:bg-primary/10 dark:group-hover:bg-primary/20 group-hover:text-primary dark:group-hover:text-primary transition-all duration-200"
+                  >
                     <Play className="h-4 w-4" />
                   </Button>
                 </div>

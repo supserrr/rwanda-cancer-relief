@@ -56,6 +56,24 @@ function ThemeTogglerButton({
   ...props
 }: ThemeTogglerButtonProps) {
   const { theme, resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <button
+        data-slot="theme-toggler-button"
+        className={cn(buttonVariants({ variant, size, className }))}
+        suppressHydrationWarning
+        {...props}
+      >
+        <Sun />
+      </button>
+    );
+  }
 
   return (
     <ThemeTogglerPrimitive
@@ -73,6 +91,7 @@ function ThemeTogglerButton({
             onClick?.(e);
             toggleTheme(getNextTheme(effective, modes));
           }}
+          suppressHydrationWarning
           {...props}
         >
           {getIcon(effective, resolved, modes)}

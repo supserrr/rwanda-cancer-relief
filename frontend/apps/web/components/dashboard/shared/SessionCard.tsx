@@ -26,7 +26,6 @@ interface SessionCardProps {
   onJoin?: (session: Session) => void;
   onReschedule?: (session: Session) => void;
   onCancel?: (session: Session) => void;
-  onViewNotes?: (session: Session) => void;
   showActions?: boolean;
 }
 
@@ -39,7 +38,6 @@ export function SessionCard({
   onJoin,
   onReschedule,
   onCancel,
-  onViewNotes,
   showActions = true
 }: SessionCardProps) {
   const getStatusIcon = (status: string) => {
@@ -179,16 +177,6 @@ export function SessionCard({
                 onClick={() => onCancel(session)}
               >
                 Cancel
-              </Button>
-            )}
-            {session.status === 'completed' && onViewNotes && (
-              <Button 
-                size="sm" 
-                variant="outline"
-                onClick={() => onViewNotes(session)}
-              >
-                <MessageCircle className="h-4 w-4 mr-2" />
-                View Notes
               </Button>
             )}
           </div>

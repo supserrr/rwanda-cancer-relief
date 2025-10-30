@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { Button } from '@workspace/ui/components/button';
@@ -39,12 +40,28 @@ import { ProfileViewModal } from '@workspace/ui/components/profile-view-modal';
 import { ScheduleSessionModal } from '../../../../components/session/ScheduleSessionModal';
 
 export default function CounselorChatPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [selectedChat, setSelectedChat] = useState(dummyChats[0]?.id || '');
   const [newMessage, setNewMessage] = useState('');
   const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(true);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
+
+  // Check for chatId in URL query params on mount
+  useEffect(() => {
+    const chatId = searchParams.get('chatId');
+    if (chatId) {
+      // Check if chat exists
+      const chat = dummyChats.find(c => c.id === chatId);
+      if (chat) {
+        setSelectedChat(chatId);
+        // Clean up the URL query parameter
+        router.replace('/dashboard/counselor/chat', { scroll: false });
+      }
+    }
+  }, [searchParams, router]);
 
   const activeChat = dummyChats.find(chat => chat.id === selectedChat);
   const activeMessages = dummyMessages.filter(msg => 
@@ -87,12 +104,6 @@ export default function CounselorChatPage() {
     } else {
       alert('Please select a conversation first');
     }
-  };
-
-  const handleAddSessionNotes = () => {
-    console.log('Add session notes');
-    // In a real app, this would open a notes modal
-    alert('Opening session notes editor...');
   };
 
   const handleFlagPatient = () => {
@@ -325,13 +336,6 @@ export default function CounselorChatPage() {
                             <span className="text-foreground">Schedule Session</span>
                           </DropdownMenuItem>
                           <DropdownMenuItem 
-                            onClick={handleAddSessionNotes}
-                            className="hover:bg-primary/10 focus:bg-primary/10 cursor-pointer"
-                          >
-                            <FileText className="mr-2 h-4 w-4 text-primary" />
-                            <span className="text-foreground">Add Session Notes</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
                             onClick={handleFlagPatient}
                             className="hover:bg-primary/10 focus:bg-primary/10 cursor-pointer"
                           >
@@ -422,7 +426,7 @@ export default function CounselorChatPage() {
                 {/* Message Input */}
                 <div className="p-4 border-t">
                   <div className="flex items-center space-x-2">
-                    <Button size="sm" variant="ghost">
+                    <Button size="sm" variant="ghost" title="Attach file">
                       <Paperclip className="h-4 w-4" />
                     </Button>
                     <div className="flex-1 relative">

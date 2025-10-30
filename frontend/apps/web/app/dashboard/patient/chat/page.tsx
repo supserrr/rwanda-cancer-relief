@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { Button } from '@workspace/ui/components/button';
@@ -36,12 +37,28 @@ import { ProfileViewModal } from '@workspace/ui/components/profile-view-modal';
 import { SessionBookingModal } from '../../../../components/session/SessionBookingModal';
 
 export default function PatientChatPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [selectedChat, setSelectedChat] = useState(dummyChats[0]?.id || '');
   const [newMessage, setNewMessage] = useState('');
   const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(true);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [selectedCounselor, setSelectedCounselor] = useState<any>(null);
+
+  // Check for chatId in URL query params on mount
+  useEffect(() => {
+    const chatId = searchParams.get('chatId');
+    if (chatId) {
+      // Check if chat exists
+      const chat = dummyChats.find(c => c.id === chatId);
+      if (chat) {
+        setSelectedChat(chatId);
+        // Clean up the URL query parameter
+        router.replace('/dashboard/patient/chat', { scroll: false });
+      }
+    }
+  }, [searchParams, router]);
 
   const activeChat = dummyChats.find(chat => chat.id === selectedChat);
   const activeMessages = dummyMessages.filter(msg => 
@@ -368,7 +385,7 @@ export default function PatientChatPage() {
                 {/* Message Input */}
                 <div className="p-4 border-t">
                   <div className="flex items-center space-x-2">
-                    <Button size="sm" variant="ghost">
+                    <Button size="sm" variant="ghost" title="Attach file">
                       <Paperclip className="h-4 w-4" />
                     </Button>
                     <div className="flex-1 relative">

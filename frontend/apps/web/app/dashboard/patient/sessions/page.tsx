@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { AnimatedGrid } from '@workspace/ui/components/animated-grid';
@@ -28,6 +28,7 @@ import { Session } from '../../../../lib/types';
 
 export default function PatientSessionsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState('upcoming');
   const [isCounselorSelectionOpen, setIsCounselorSelectionOpen] = useState(false);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
@@ -36,6 +37,56 @@ export default function PatientSessionsPage() {
   const [selectedCounselor, setSelectedCounselor] = useState<any>(null);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const currentPatientId = '1'; // Jean Baptiste
+
+  // Check for counselorId in URL query params on mount
+  useEffect(() => {
+    const counselorId = searchParams.get('counselorId');
+    if (counselorId) {
+      // Map counselors page IDs to dummy data counselors
+      // The counselors page uses IDs 1-4, but we need to map to actual counselor data
+      const counselorMapping: Record<string, string> = {
+        '1': '2', // Dr. Marie Uwimana -> Dr. Marie Claire
+        '2': '6', // Jean-Baptiste Nkurunziza -> Dr. Jean Paul (or find by name)
+        '3': '7', // Dr. Grace Mukamana -> Dr. Immaculee (or find by name)
+        '4': '6', // Paul Nsengimana -> Use Dr. Jean Paul as fallback
+      };
+      
+      // Try to find by mapped ID first
+      const mappedId = counselorMapping[counselorId];
+      let counselor = mappedId ? dummyCounselors.find(c => c.id === mappedId) : null;
+      
+      // If not found, try finding by original ID
+      if (!counselor) {
+        counselor = dummyCounselors.find(c => c.id === counselorId);
+      }
+      
+      // Map counselors page names to dummy data names as fallback
+      const nameMapping: Record<string, string[]> = {
+        '1': ['Dr. Marie Uwimana', 'Dr. Marie Claire'],
+        '2': ['Jean-Baptiste Nkurunziza'],
+        '3': ['Dr. Grace Mukamana', 'Dr. Immaculee'],
+        '4': ['Paul Nsengimana'],
+      };
+      
+      // If still not found, try to find by name (for future compatibility)
+      if (!counselor) {
+        const namesToFind = nameMapping[counselorId];
+        if (namesToFind) {
+          counselor = dummyCounselors.find(c => 
+            namesToFind.some(name => c.name.toLowerCase().includes(name.toLowerCase().replace('Dr. ', '')))
+          );
+        }
+      }
+      
+      // If counselor found, pre-select and open booking modal
+      if (counselor) {
+        setSelectedCounselor(counselor);
+        setIsBookingOpen(true);
+        // Clean up the URL query parameter
+        router.replace('/dashboard/patient/sessions', { scroll: false });
+      }
+    }
+  }, [searchParams, router]);
 
   const upcomingSessions = dummySessions.filter(session => 
     session.patientId === currentPatientId && 
@@ -133,11 +184,6 @@ export default function PatientSessionsPage() {
       console.error('Error cancelling session:', error);
       alert('Failed to cancel session. Please try again.');
     }
-  };
-
-  const handleViewNotes = (session: Session) => {
-    console.log('View session notes:', session.id);
-    // Implement notes viewing logic
   };
 
   const handleQuickBooking = () => {
@@ -281,7 +327,6 @@ export default function PatientSessionsPage() {
                     patientName="Jean Baptiste"
                     counselorName={getCounselorName(session.counselorId)}
                     counselorAvatar={getCounselorAvatar(session.counselorId)}
-                    onViewNotes={handleViewNotes}
                   />
                 ))}
               </div>
@@ -320,7 +365,6 @@ export default function PatientSessionsPage() {
                       onJoin={session.status === 'scheduled' ? handleJoinSession : undefined}
                       onReschedule={session.status === 'scheduled' ? handleRescheduleSession : undefined}
                       onCancel={session.status === 'scheduled' ? handleCancelSession : undefined}
-                      onViewNotes={session.status === 'completed' ? handleViewNotes : undefined}
                     />
                   ))}
                 </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from "@workspace/ui/components/button";
 import { Input } from '@workspace/ui/components/input';
 import { Badge } from '@workspace/ui/components/badge';
@@ -9,6 +10,7 @@ import { Footer } from '@workspace/ui/components/ui/footer';
 import { ThemeTogglerButton } from '@workspace/ui/components/animate-ui/components/buttons/theme-toggler';
 import { RCRLogo } from '@workspace/ui/components/rcr-logo';
 import { Search, Filter, MessageCircle, Video, Phone } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
 
 /**
  * Counselor profile data structure
@@ -100,9 +102,19 @@ const counselors: Counselor[] = [
  */
 function CounselorCard({ counselor }: { counselor: Counselor }) {
   const [isFollowing, setIsFollowing] = useState(false);
+  const router = useRouter();
+  const { isAuthenticated, redirectToSignIn } = useAuth();
 
   const handleFollow = () => {
-    setIsFollowing(!isFollowing);
+    if (!isAuthenticated) {
+      // Redirect to sign in if not authenticated
+      redirectToSignIn();
+      return;
+    }
+    
+    // If authenticated, redirect to patient dashboard sessions page with counselor ID
+    // The counselor ID can be used to pre-select the counselor when booking
+    router.push(`/dashboard/patient/sessions?counselorId=${counselor.id}`);
   };
 
   // Create a description that includes specialties and languages

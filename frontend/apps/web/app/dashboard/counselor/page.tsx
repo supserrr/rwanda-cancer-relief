@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { AnimatedStatCard } from '@workspace/ui/components/animated-stat-card';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
@@ -23,9 +24,10 @@ import {
   Heart,
   Target
 } from 'lucide-react';
-import { dummyCounselors, dummySessions, dummyPatients, dummyMessages } from '../../../lib/dummy-data';
+import { dummyCounselors, dummySessions, dummyPatients, dummyMessages, dummyChats } from '../../../lib/dummy-data';
 
 export default function CounselorDashboard() {
+  const router = useRouter();
   const currentCounselor = dummyCounselors[0]; // Dr. Marie Claire
   const assignedPatients = dummyPatients.filter(patient => 
     currentCounselor?.patients?.includes(patient.id)
@@ -47,6 +49,22 @@ export default function CounselorDashboard() {
   const getPatientAvatar = (patientId: string) => {
     const patient = dummyPatients.find(p => p.id === patientId);
     return patient?.avatar;
+  };
+
+  const handleMessageClick = (message: any) => {
+    // Find the chat that includes this message
+    // For counselor, the message should be from/to the counselor
+    const chatId = dummyChats.find(chat => 
+      chat.participants.includes(currentCounselor?.id || '') &&
+      (message.senderId === currentCounselor?.id || message.receiverId === currentCounselor?.id)
+    )?.id;
+    
+    if (chatId) {
+      router.push(`/dashboard/counselor/chat?chatId=${chatId}`);
+    } else {
+      // Fallback: just navigate to chat page
+      router.push('/dashboard/counselor/chat');
+    }
   };
 
   return (
@@ -116,7 +134,11 @@ export default function CounselorDashboard() {
                     </div>
                     <div className="flex items-center space-x-2">
                       <Badge variant="outline">{session.duration} min</Badge>
-                      <Button size="sm" variant="outline">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => router.push(`/dashboard/counselor/sessions/session/${session.id}`)}
+                      >
                         Join
                       </Button>
                     </div>
@@ -191,7 +213,11 @@ export default function CounselorDashboard() {
                     getPatientName(message.senderId);
                   
                   return (
-                    <div key={message.id} className="flex items-start gap-3 p-3 border rounded-lg">
+                    <div 
+                      key={message.id} 
+                      onClick={() => handleMessageClick(message)}
+                      className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/20 dark:hover:border-primary/30 transition-all duration-200"
+                    >
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={getPatientAvatar(isFromCounselor ? message.receiverId : message.senderId)} />
                         <AvatarFallback>
@@ -239,19 +265,29 @@ export default function CounselorDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button className="w-full justify-start">
+            <Button 
+              className="w-full justify-start"
+              onClick={() => router.push('/dashboard/counselor/sessions')}
+            >
               <Calendar className="h-4 w-4 mr-2" />
               Schedule New Session
             </Button>
-            <Button variant="outline" className="w-full justify-start">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start"
+              onClick={() => router.push('/dashboard/counselor/chat')}
+            >
               <MessageCircle className="h-4 w-4 mr-2" />
               Send Message to Patient
             </Button>
-            <Button variant="outline" className="w-full justify-start">
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Add Session Notes
-            </Button>
-            <Button variant="outline" className="w-full justify-start">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start"
+              onClick={() => {
+                // In a real app, this would open a support ticket or issue reporting modal
+                alert('Report Issue feature - would open issue reporting form');
+              }}
+            >
               <AlertCircle className="h-4 w-4 mr-2" />
               Report Issue
             </Button>

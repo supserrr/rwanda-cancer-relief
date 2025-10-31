@@ -16,6 +16,7 @@ import {
   GraduationCap,
   HelpCircle,
   Server,
+  ClipboardList,
 } from "lucide-react";
 import { UserRole, NavigationItem } from '../../../lib/types';
 import { cn } from "@workspace/ui/lib/utils";
@@ -165,6 +166,13 @@ const navigationItems: NavigationItem[] = [
     badge: 3
   },
   {
+    id: 'resources-review',
+    label: 'Resources Review',
+    icon: 'ClipboardList',
+    path: '/dashboard/admin/resources-review',
+    roles: ['admin']
+  },
+  {
     id: 'training-resources',
     label: 'Training Resources',
     icon: 'GraduationCap',
@@ -205,8 +213,10 @@ const iconMap = {
   Settings,
   UserCheck,
   UserPlus,
+  GraduationCap,
   HelpCircle,
   Server,
+  ClipboardList,
 };
 
 export function DashboardSidebar({ 

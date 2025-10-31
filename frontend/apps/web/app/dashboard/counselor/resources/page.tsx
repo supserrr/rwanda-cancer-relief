@@ -291,6 +291,20 @@ export default function CounselorResourcesPage() {
     console.log('Resource deleted:', resourceId);
   };
 
+  const handlePublishResource = (resourceId: string) => {
+    setResources(prev => prev.map(r => 
+      r.id === resourceId ? { ...r, isPublic: true } : r
+    ));
+    console.log('Resource published:', resourceId);
+  };
+
+  const handleUnpublishResource = (resourceId: string) => {
+    setResources(prev => prev.map(r => 
+      r.id === resourceId ? { ...r, isPublic: false } : r
+    ));
+    console.log('Resource unpublished:', resourceId);
+  };
+
   const handleCloseEditModal = () => {
     setIsEditOpen(false);
     setEditingResource(null);
@@ -434,6 +448,8 @@ export default function CounselorResourcesPage() {
                       onDownload={handleDownloadResource}
                       onEdit={handleEditResource}
                       onDelete={(resource) => handleDeleteResource(resource.id)}
+                      onPublish={(resource) => handlePublishResource(resource.id)}
+                      onUnpublish={(resource) => handleUnpublishResource(resource.id)}
                       showEditActions={true}
                       delay={index * 0.1}
                     />
@@ -503,6 +519,27 @@ export default function CounselorResourcesPage() {
                       >
                         <Download className="h-4 w-4" />
                       </Button>
+                      {resource.isPublic ? (
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="bg-yellow-50 border-yellow-200 hover:bg-yellow-100 hover:text-yellow-700 hover:border-yellow-300 dark:bg-yellow-900/20 dark:border-yellow-800 dark:hover:bg-yellow-900/30 dark:hover:text-yellow-300"
+                          onClick={() => handleUnpublishResource(resource.id)}
+                          title="Unpublish resource"
+                        >
+                          <Lock className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="bg-green-50 border-green-200 hover:bg-green-100 hover:text-green-700 hover:border-green-300 dark:bg-green-900/20 dark:border-green-800 dark:hover:bg-green-900/30 dark:hover:text-green-300"
+                          onClick={() => handlePublishResource(resource.id)}
+                          title="Publish resource"
+                        >
+                          <Globe className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button 
                         size="sm" 
                         variant="outline" 

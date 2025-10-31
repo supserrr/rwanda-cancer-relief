@@ -12,7 +12,9 @@ import {
   Eye,
   Edit,
   Trash2,
-  StarOff
+  StarOff,
+  Globe,
+  Lock
 } from 'lucide-react';
 import { Resource } from '../../../lib/types';
 
@@ -23,6 +25,8 @@ interface ResourceCardProps {
   onEdit?: (resource: Resource) => void;
   onDelete?: (resource: Resource) => void;
   onUnsave?: (resource: Resource) => void;
+  onPublish?: (resource: Resource) => void;
+  onUnpublish?: (resource: Resource) => void;
   showActions?: boolean;
   showEditActions?: boolean;
   delay?: number;
@@ -35,6 +39,8 @@ export function ResourceCard({
   onEdit, 
   onDelete, 
   onUnsave,
+  onPublish,
+  onUnpublish,
   showActions = true, 
   showEditActions = false,
   delay = 0 
@@ -157,6 +163,28 @@ export function ResourceCard({
                 onClick={() => onUnsave(resource)}
               >
                 <StarOff className="h-4 w-4" />
+              </Button>
+            )}
+            {resource.isPublic && onUnpublish && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                className="bg-yellow-50 border-yellow-200 hover:bg-yellow-100 hover:text-yellow-700 hover:border-yellow-300 dark:bg-yellow-900/20 dark:border-yellow-800 dark:hover:bg-yellow-900/30 dark:hover:text-yellow-300"
+                onClick={() => onUnpublish(resource)}
+                title="Unpublish resource"
+              >
+                <Lock className="h-4 w-4" />
+              </Button>
+            )}
+            {!resource.isPublic && onPublish && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                className="bg-green-50 border-green-200 hover:bg-green-100 hover:text-green-700 hover:border-green-300 dark:bg-green-900/20 dark:border-green-800 dark:hover:bg-green-900/30 dark:hover:text-green-300"
+                onClick={() => onPublish(resource)}
+                title="Publish resource"
+              >
+                <Globe className="h-4 w-4" />
               </Button>
             )}
             {onDelete && (

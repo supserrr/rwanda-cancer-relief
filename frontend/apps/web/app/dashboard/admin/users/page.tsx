@@ -7,6 +7,7 @@ import { Input } from '@workspace/ui/components/input';
 import { Button } from '@workspace/ui/components/button';
 import { Badge } from '@workspace/ui/components/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@workspace/ui/components/avatar';
+import { Card, CardContent, CardHeader, CardTitle } from '@workspace/ui/components/card';
 import { 
   Table,
   TableBody,
@@ -41,7 +42,14 @@ export default function AdminUsersPage() {
   const [selectedRole, setSelectedRole] = useState<UserRole | 'all'>('all');
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'active' | 'inactive'>('all');
 
-  const allUsers = [...dummyUsers, ...dummyPatients, ...dummyCounselors];
+  // Combine all users and deduplicate by ID
+  const allUsersMap = new Map();
+  [...dummyUsers, ...dummyPatients, ...dummyCounselors].forEach(user => {
+    if (!allUsersMap.has(user.id)) {
+      allUsersMap.set(user.id, user);
+    }
+  });
+  const allUsers = Array.from(allUsersMap.values());
 
   const filteredUsers = allUsers.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -152,71 +160,67 @@ export default function AdminUsersPage() {
         </AnimatedCard>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <AnimatedCard className="flex-1 p-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
-            <Input
-              placeholder="Search users by name or email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
-            />
-          </div>
-        </AnimatedCard>
+      {/* Search and Filters Bar */}
+      <div className="flex flex-col sm:flex-row gap-4 items-center">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
+          <Input
+            placeholder="Search users by name or email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
+          />
+        </div>
         
-        <AnimatedCard className="p-6">
-          <Select value={selectedRole} onValueChange={(value) => setSelectedRole(value as UserRole | 'all')}>
-            <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
-              <SelectValue placeholder="Role" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Roles</SelectItem>
-              <SelectItem value="patient">Patients</SelectItem>
-              <SelectItem value="counselor">Counselors</SelectItem>
-              <SelectItem value="admin">Admins</SelectItem>
-            </SelectContent>
-          </Select>
-        </AnimatedCard>
+        <Select value={selectedRole} onValueChange={(value) => setSelectedRole(value as UserRole | 'all')}>
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
+            <SelectValue placeholder="Role" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Roles</SelectItem>
+            <SelectItem value="patient">Patients</SelectItem>
+            <SelectItem value="counselor">Counselors</SelectItem>
+            <SelectItem value="admin">Admins</SelectItem>
+          </SelectContent>
+        </Select>
 
-        <AnimatedCard className="p-6">
-          <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as 'all' | 'active' | 'inactive')}>
-            <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
-        </AnimatedCard>
+        <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as 'all' | 'active' | 'inactive')}>
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="inactive">Inactive</SelectItem>
+          </SelectContent>
+        </Select>
 
-        <AnimatedCard className="p-6">
-          <Button variant="outline">
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
-          </Button>
-        </AnimatedCard>
+        <Button variant="outline" className="w-full sm:w-auto">
+          <Filter className="h-4 w-4 mr-2" />
+          Filter
+        </Button>
       </div>
 
       {/* Users Table */}
-      <div className="bg-card border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>User</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Last Login</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+      <AnimatedCard delay={0.5}>
+        <CardHeader>
+          <CardTitle>User List</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Last Login</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
             {filteredUsers.map((user) => (
-              <TableRow key={user.id}>
+              <TableRow key={`${user.id}-${user.role}`}>
                 <TableCell>
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10">
@@ -255,10 +259,16 @@ export default function AdminUsersPage() {
                 </TableCell>
                 <TableCell>
                   <div>
-                    <p className="text-sm">{user.createdAt.toLocaleDateString()}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {Math.floor((Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24))} days ago
-                    </p>
+                    {user.createdAt ? (
+                      <>
+                        <p className="text-sm">{user.createdAt.toLocaleDateString()}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {Math.floor((Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24))} days ago
+                        </p>
+                      </>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">N/A</span>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
@@ -288,9 +298,10 @@ export default function AdminUsersPage() {
                 </TableCell>
               </TableRow>
             ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </AnimatedCard>
 
       {/* Results Summary */}
       <div className="flex items-center justify-between">

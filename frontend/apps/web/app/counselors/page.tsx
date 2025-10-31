@@ -224,12 +224,12 @@ export default function CounselorsPage() {
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-center">
             <div className="relative max-w-md w-full">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-primary" />
               <Input
                 placeholder="Search counselors by name or specialty..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
               />
             </div>
           </div>
@@ -309,7 +309,7 @@ export default function CounselorsPage() {
         }}
         themeToggle={
           <div className="flex items-center justify-center">
-            <ThemeTogglerButton variant="outline" size="icon" direction="ltr" modes={['light', 'dark']} className="h-10 w-10 rounded-full" />
+            <ThemeTogglerButton variant="outline" size="default" direction="ltr" modes={['light', 'dark']} className="h-10 w-10 rounded-full" />
           </div>
         }
       />

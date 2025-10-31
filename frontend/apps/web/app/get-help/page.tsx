@@ -286,7 +286,7 @@ export default function GetHelpPage() {
         }}
         themeToggle={
           <div className="flex items-center justify-center">
-            <ThemeTogglerButton variant="outline" size="icon" direction="ltr" modes={['light', 'dark']} className="h-10 w-10 rounded-full" />
+            <ThemeTogglerButton variant="outline" size="default" direction="ltr" modes={['light', 'dark']} className="h-10 w-10 rounded-full" />
           </div>
         }
       />

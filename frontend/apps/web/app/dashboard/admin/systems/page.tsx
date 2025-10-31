@@ -323,17 +323,17 @@ export default function AdminSystemsPage() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
           <Input
             placeholder="Search components or descriptions..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
           />
         </div>
         
         <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as any)}>
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -346,7 +346,7 @@ export default function AdminSystemsPage() {
         </Select>
 
         <Select value={selectedComponent} onValueChange={(value) => setSelectedComponent(value as any)}>
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
             <SelectValue placeholder="Component" />
           </SelectTrigger>
           <SelectContent>
@@ -368,7 +368,7 @@ export default function AdminSystemsPage() {
       {/* System Health Table */}
       <AnimatedCard delay={0.5}>
         <CardHeader>
-          <CardTitle>System Health</CardTitle>
+          <CardTitle>System Health List</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -444,9 +444,9 @@ export default function AdminSystemsPage() {
       </AnimatedCard>
 
       {/* Maintenance Logs */}
-      <AnimatedCard delay={0.6}>
+      <AnimatedCard delay={0.5}>
         <CardHeader>
-          <CardTitle>Maintenance Tasks</CardTitle>
+          <CardTitle>Maintenance Tasks List</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>

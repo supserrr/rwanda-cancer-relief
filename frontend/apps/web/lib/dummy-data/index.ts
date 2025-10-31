@@ -461,7 +461,7 @@ export const dummyModules: Module[] = [
 ];
 
 // Sample Pending Counselor Applications
-export const dummyPendingCounselors: Counselor[] = [
+export const dummyPendingCounselors: any[] = [
   {
     id: 'pending-1',
     name: 'Dr. Sarah Mukamana',
@@ -477,7 +477,29 @@ export const dummyPendingCounselors: Counselor[] = [
     credentials: 'PhD in Clinical Psychology, Licensed Clinical Psychologist, Certified Trauma Specialist',
     location: 'Musanze, Rwanda',
     phoneNumber: '+250 788 777 888',
-    patients: []
+    patients: [],
+    // Professional License
+    licenseNumber: 'RMC-2023-0456',
+    licenseExpiry: '2025-12-31',
+    issuingAuthority: 'Rwanda Medical Council',
+    // Education
+    highestDegree: 'PhD',
+    university: 'University of Rwanda',
+    graduationYear: '2018',
+    additionalCertifications: ['Licensed Clinical Psychologist', 'Certified Trauma Specialist', 'Oncology Social Work Specialist'],
+    // Specializations & Consultation Types
+    specializations: ['Trauma Therapy', 'Grief Counseling', 'Palliative Care'],
+    consultationTypes: ['video', 'chat', 'phone'],
+    // Experience
+    previousEmployers: 'Rwanda Military Hospital (2019-2023) - Senior Counselor\nButaro Cancer Center (2017-2019) - Trauma Specialist\nKigali Mental Health Clinic (2015-2017) - Clinical Psychologist',
+    // Additional Information
+    motivation: 'I am deeply committed to supporting cancer patients and their families through their journey. Having witnessed the emotional toll of cancer diagnosis and treatment, I want to provide compassionate counseling services through Rwanda Cancer Relief to help individuals and families cope with the challenges they face.',
+    references: 'Dr. Jean Paul Mutabazi, Head of Psychiatry, Rwanda Military Hospital\nEmail: jpmutabazi@rmh.rw | Phone: +250 788 555 666\n\nDr. Marie Claire Mukankusi, Director, Butaro Cancer Center\nEmail: mcmukankusi@bcc.rw | Phone: +250 788 444 555',
+    emergencyContact: 'Jean Baptiste Mukamana (Spouse) - +250 788 777 889',
+    // Document Uploads - Using public PDF URLs
+    resumeFile: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    licenseFile: 'https://www.africau.edu/images/default/sample.pdf',
+    certificationsFile: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
   },
   {
     id: 'pending-2',
@@ -494,7 +516,29 @@ export const dummyPendingCounselors: Counselor[] = [
     credentials: 'MSW in Social Work, Licensed Clinical Social Worker, Family Therapy Certification',
     location: 'Gisenyi, Rwanda',
     phoneNumber: '+250 788 999 000',
-    patients: []
+    patients: [],
+    // Professional License
+    licenseNumber: 'RMC-2022-0321',
+    licenseExpiry: '2024-11-30',
+    issuingAuthority: 'Rwanda Medical Council',
+    // Education
+    highestDegree: 'Master\'s Degree',
+    university: 'National University of Rwanda',
+    graduationYear: '2016',
+    additionalCertifications: ['Licensed Clinical Social Worker', 'Family Therapy Certification'],
+    // Specializations & Consultation Types
+    specializations: ['Family Therapy', 'Cancer Support', 'Couples Counseling'],
+    consultationTypes: ['video', 'phone'],
+    // Experience
+    previousEmployers: 'Gisenyi District Hospital (2020-2023) - Family Counselor\nRwanda Red Cross Society (2017-2020) - Social Worker\nCommunity Health Center Kigali (2015-2017) - Counselor',
+    // Additional Information
+    motivation: 'Family support is crucial when facing cancer. I want to help families understand, communicate, and support each other through this difficult journey. Rwanda Cancer Relief provides the platform to reach more families across Rwanda.',
+    references: 'Dr. Francois Habimana, Medical Director, Gisenyi District Hospital\nEmail: fhabimana@gdh.rw | Phone: +250 788 333 444\n\nUwimana Jeanne, Program Coordinator, Rwanda Red Cross\nEmail: ujeanne@redcross.rw | Phone: +250 788 222 333',
+    emergencyContact: 'Clementine Nkurunziza (Sister) - +250 788 999 001',
+    // Document Uploads - Using public PDF URLs
+    resumeFile: 'https://www.africau.edu/images/default/sample.pdf',
+    licenseFile: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    certificationsFile: 'https://www.africau.edu/images/default/sample.pdf'
   },
   {
     id: 'pending-3',
@@ -511,7 +555,29 @@ export const dummyPendingCounselors: Counselor[] = [
     credentials: 'PhD in Child Psychology, Licensed Clinical Psychologist, Pediatric Oncology Certification',
     location: 'Kigali, Rwanda',
     phoneNumber: '+250 788 111 333',
-    patients: []
+    patients: [],
+    // Professional License
+    licenseNumber: 'RMC-2023-0789',
+    licenseExpiry: '2026-06-30',
+    issuingAuthority: 'Rwanda Medical Council',
+    // Education
+    highestDegree: 'PhD',
+    university: 'University of Kigali',
+    graduationYear: '2017',
+    additionalCertifications: ['Licensed Clinical Psychologist', 'Pediatric Oncology Certification', 'Child & Adolescent Therapy'],
+    // Specializations & Consultation Types
+    specializations: ['Child & Adolescent Therapy', 'Cancer Support', 'Anxiety Management'],
+    consultationTypes: ['video', 'chat'],
+    // Experience
+    previousEmployers: 'King Faisal Hospital (2019-2023) - Pediatric Psychologist\nRwanda Children\'s Cancer Foundation (2017-2019) - Child Counselor\nKigali Youth Center (2015-2017) - Adolescent Counselor',
+    // Additional Information
+    motivation: 'Children and teenagers facing cancer need specialized support. I am passionate about helping young patients and their siblings understand and cope with cancer in an age-appropriate way. Through Rwanda Cancer Relief, I can extend my services to more families.',
+    references: 'Dr. Paul Rusingiza, Head of Pediatrics, King Faisal Hospital\nEmail: prusingiza@kfh.rw | Phone: +250 788 666 777\n\nDr. Alice Mukamana, Executive Director, Rwanda Children\'s Cancer Foundation\nEmail: amukamana@rccf.rw | Phone: +250 788 555 444',
+    emergencyContact: 'Patrick Uwimana (Brother) - +250 788 111 334',
+    // Document Uploads - Using public PDF URLs
+    resumeFile: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    licenseFile: 'https://www.africau.edu/images/default/sample.pdf',
+    certificationsFile: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
   }
 ];
 

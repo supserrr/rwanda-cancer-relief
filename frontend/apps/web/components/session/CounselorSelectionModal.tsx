@@ -99,17 +99,17 @@ export function CounselorSelectionModal({
         {/* Search and Filters */}
         <div className="space-y-4 mb-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
             <Input
               placeholder="Search by name or specialty..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
             />
           </div>
 
           <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
-            <SelectTrigger>
+            <SelectTrigger className="bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
               <SelectValue placeholder="All Specialties" />
             </SelectTrigger>
             <SelectContent>

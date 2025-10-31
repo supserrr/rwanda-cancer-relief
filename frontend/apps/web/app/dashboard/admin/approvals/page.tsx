@@ -46,7 +46,13 @@ import {
   Mail,
   FileText,
   Star,
-  GraduationCap
+  GraduationCap,
+  MessageCircle,
+  Video,
+  Briefcase,
+  Shield,
+  Download,
+  Heart
 } from 'lucide-react';
 import { dummyPendingCounselors } from '../../../../lib/dummy-data';
 import { Counselor } from '../../../../lib/types';
@@ -187,7 +193,7 @@ export default function AdminApprovalsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {dummyPendingCounselors.filter(c => c.languages.length >= 3).length}
+              {dummyPendingCounselors.filter(c => c.languages && c.languages.length >= 3).length}
             </div>
             <p className="text-xs text-muted-foreground">
               3+ languages
@@ -199,17 +205,17 @@ export default function AdminApprovalsPage() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
           <Input
             placeholder="Search by name, email, or specialty..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
           />
         </div>
         
         <Select value={selectedSpecialty} onValueChange={(value) => setSelectedSpecialty(value)}>
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
             <SelectValue placeholder="Specialty" />
           </SelectTrigger>
           <SelectContent>
@@ -222,7 +228,7 @@ export default function AdminApprovalsPage() {
         </Select>
 
         <Select value={selectedExperience} onValueChange={(value) => setSelectedExperience(value)}>
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
             <SelectValue placeholder="Experience" />
           </SelectTrigger>
           <SelectContent>
@@ -241,20 +247,24 @@ export default function AdminApprovalsPage() {
       </div>
 
       {/* Applications Table */}
-      <div className="bg-card border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Counselor</TableHead>
-              <TableHead>Specialty</TableHead>
-              <TableHead>Experience</TableHead>
-              <TableHead>Languages</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead>Applied</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+      <AnimatedCard delay={0.5}>
+        <CardHeader>
+          <CardTitle>Applications List</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Counselor</TableHead>
+                <TableHead>Specialty</TableHead>
+                <TableHead>Experience</TableHead>
+                <TableHead>Languages</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead>Applied</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
             {filteredCounselors.map((counselor) => (
               <TableRow key={counselor.id}>
                 <TableCell>
@@ -283,12 +293,12 @@ export default function AdminApprovalsPage() {
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
-                    {counselor.languages.slice(0, 2).map((lang, index) => (
+                    {counselor.languages?.slice(0, 2).map((lang, index) => (
                       <Badge key={index} variant="secondary" className="text-xs">
                         {lang}
                       </Badge>
-                    ))}
-                    {counselor.languages.length > 2 && (
+                    )) ?? null}
+                    {counselor.languages && counselor.languages.length > 2 && (
                       <Badge variant="secondary" className="text-xs">
                         +{counselor.languages.length - 2}
                       </Badge>
@@ -320,9 +330,10 @@ export default function AdminApprovalsPage() {
                 </TableCell>
               </TableRow>
             ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </AnimatedCard>
 
       {/* Results Summary */}
       <div className="flex items-center justify-between">
@@ -355,7 +366,7 @@ export default function AdminApprovalsPage() {
             <DialogDescription>
               {selectedCounselor && (
                 <span>
-                  {selectedCounselor.specialty} • {selectedCounselor.experience} years experience • {selectedCounselor.languages.length} languages
+                  {selectedCounselor.specialty} • {selectedCounselor.experience} years experience • {selectedCounselor.languages?.length ?? 0} languages
                 </span>
               )}
             </DialogDescription>
@@ -408,11 +419,11 @@ export default function AdminApprovalsPage() {
                   <div>
                     <h5 className="font-medium mb-3 text-sm">Languages</h5>
                     <div className="flex flex-wrap gap-2">
-                      {selectedCounselor.languages.map((language, index) => (
+                      {selectedCounselor.languages?.map((language, index) => (
                         <Badge key={index} variant="secondary" className="text-xs">
                           {language}
                         </Badge>
-                      ))}
+                      )) ?? null}
                     </div>
                   </div>
 
@@ -433,15 +444,138 @@ export default function AdminApprovalsPage() {
                 </div>
               </div>
 
+              {/* Professional License Information */}
+              {(selectedCounselor as any).licenseNumber && (
+                <div className="space-y-6 border-t pt-6">
+                  <h5 className="font-medium flex items-center gap-2 text-sm">
+                    <Shield className="h-4 w-4" />
+                    Professional License
+                  </h5>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">License Number</p>
+                      <p className="text-sm font-medium">{(selectedCounselor as any).licenseNumber || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">License Expiry</p>
+                      <p className="text-sm font-medium">{(selectedCounselor as any).licenseExpiry || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Issuing Authority</p>
+                      <p className="text-sm font-medium">{(selectedCounselor as any).issuingAuthority || 'Not provided'}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Education Information */}
+              {((selectedCounselor as any).highestDegree || (selectedCounselor as any).university) && (
+                <div className="space-y-6 border-t pt-6">
+                  <h5 className="font-medium flex items-center gap-2 text-sm">
+                    <GraduationCap className="h-4 w-4" />
+                    Education & Certifications
+                  </h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(selectedCounselor as any).highestDegree && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Highest Degree</p>
+                        <p className="text-sm font-medium">{(selectedCounselor as any).highestDegree}</p>
+                      </div>
+                    )}
+                    {(selectedCounselor as any).university && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">University/Institution</p>
+                        <p className="text-sm font-medium">{(selectedCounselor as any).university}</p>
+                      </div>
+                    )}
+                    {(selectedCounselor as any).graduationYear && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Graduation Year</p>
+                        <p className="text-sm font-medium">{(selectedCounselor as any).graduationYear}</p>
+                      </div>
+                    )}
+                  </div>
+                  {(selectedCounselor as any).additionalCertifications && (selectedCounselor as any).additionalCertifications.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-xs text-muted-foreground mb-2">Additional Certifications</p>
+                      <div className="flex flex-wrap gap-2">
+                        {(selectedCounselor as any).additionalCertifications.map((cert: string, index: number) => (
+                          <Badge key={index} variant="secondary" className="text-xs">
+                            {cert}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Specializations & Consultation Types */}
+              {((selectedCounselor as any).specializations || (selectedCounselor as any).consultationTypes) && (
+                <div className="space-y-4 border-t pt-6">
+                  {(selectedCounselor as any).specializations && (selectedCounselor as any).specializations.length > 0 && (
+                    <div>
+                      <h5 className="font-medium mb-3 text-sm">Specializations</h5>
+                      <div className="flex flex-wrap gap-2">
+                        {(selectedCounselor as any).specializations.map((spec: string, index: number) => (
+                          <Badge key={index} variant="outline" className="text-xs">
+                            {spec}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {(selectedCounselor as any).consultationTypes && (selectedCounselor as any).consultationTypes.length > 0 && (
+                    <div>
+                      <h5 className="font-medium mb-3 text-sm">Consultation Types</h5>
+                      <div className="flex flex-wrap gap-2">
+                        {(selectedCounselor as any).consultationTypes.map((type: string, index: number) => {
+                          const icons: Record<string, any> = {
+                            chat: MessageCircle,
+                            video: Video,
+                            phone: Phone
+                          };
+                          const labels: Record<string, string> = {
+                            chat: 'Text Chat',
+                            video: 'Video Call',
+                            phone: 'Phone Call'
+                          };
+                          const Icon = icons[type] || MessageCircle;
+                          return (
+                            <Badge key={index} variant="secondary" className="text-xs flex items-center gap-1">
+                              <Icon className="h-3 w-3" />
+                              {labels[type] || type}
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Previous Employers */}
+              {(selectedCounselor as any).previousEmployers && (
+                <div className="space-y-3 border-t pt-6">
+                  <h5 className="font-medium flex items-center gap-2 text-sm">
+                    <Briefcase className="h-4 w-4" />
+                    Previous Employers/Experience
+                  </h5>
+                  <div className="p-4 border rounded-lg bg-muted/50">
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{(selectedCounselor as any).previousEmployers}</p>
+                  </div>
+                </div>
+              )}
+
               {/* Professional Information */}
-              <div className="space-y-6">
+              <div className="space-y-6 border-t pt-6">
                 <div className="space-y-3">
                   <h5 className="font-medium flex items-center gap-2 text-sm">
                     <GraduationCap className="h-4 w-4" />
                     Credentials
                   </h5>
                   <div className="p-4 border rounded-lg bg-muted/50">
-                    <p className="text-sm leading-relaxed">{selectedCounselor.credentials}</p>
+                    <p className="text-sm leading-relaxed">{selectedCounselor.credentials || 'Not provided'}</p>
                   </div>
                 </div>
 
@@ -451,9 +585,128 @@ export default function AdminApprovalsPage() {
                     Professional Bio
                   </h5>
                   <div className="p-4 border rounded-lg bg-muted/50">
-                    <p className="text-sm leading-relaxed">{selectedCounselor.bio}</p>
+                    <p className="text-sm leading-relaxed">{selectedCounselor.bio || 'Not provided'}</p>
                   </div>
                 </div>
+              </div>
+
+              {/* Motivation */}
+              {(selectedCounselor as any).motivation && (
+                <div className="space-y-3 border-t pt-6">
+                  <h5 className="font-medium flex items-center gap-2 text-sm">
+                    <Heart className="h-4 w-4" />
+                    Motivation to Join RCR
+                  </h5>
+                  <div className="p-4 border rounded-lg bg-muted/50">
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{(selectedCounselor as any).motivation}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* References */}
+              {(selectedCounselor as any).references && (
+                <div className="space-y-3 border-t pt-6">
+                  <h5 className="font-medium flex items-center gap-2 text-sm">
+                    <User className="h-4 w-4" />
+                    Professional References
+                  </h5>
+                  <div className="p-4 border rounded-lg bg-muted/50">
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{(selectedCounselor as any).references}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Emergency Contact */}
+              {(selectedCounselor as any).emergencyContact && (
+                <div className="space-y-3 border-t pt-6">
+                  <h5 className="font-medium flex items-center gap-2 text-sm">
+                    <Phone className="h-4 w-4" />
+                    Emergency Contact
+                  </h5>
+                  <div className="p-4 border rounded-lg bg-muted/50">
+                    <p className="text-sm">{(selectedCounselor as any).emergencyContact}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Document Uploads */}
+              <div className="space-y-4 border-t pt-6">
+                <h5 className="font-medium flex items-center gap-2 text-sm">
+                  <Download className="h-4 w-4" />
+                  Uploaded Documents
+                </h5>
+                {(selectedCounselor as any).resumeFile || (selectedCounselor as any).licenseFile || (selectedCounselor as any).certificationsFile ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {(selectedCounselor as any).resumeFile ? (
+                      <a 
+                        href={(selectedCounselor as any).resumeFile}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block p-3 border rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer group"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <FileText className="h-5 w-5 text-primary group-hover:text-primary/80" />
+                          <Download className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-1">Resume/CV</p>
+                        <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">View PDF</p>
+                      </a>
+                    ) : (
+                      <div className="p-3 border border-dashed rounded-lg bg-muted/20">
+                        <FileText className="h-5 w-5 mb-2 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground mb-1">Resume/CV</p>
+                        <p className="text-xs text-muted-foreground">Not uploaded</p>
+                      </div>
+                    )}
+                    {(selectedCounselor as any).licenseFile ? (
+                      <a 
+                        href={(selectedCounselor as any).licenseFile}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block p-3 border rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer group"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <Shield className="h-5 w-5 text-primary group-hover:text-primary/80" />
+                          <Download className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-1">License</p>
+                        <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">View PDF</p>
+                      </a>
+                    ) : (
+                      <div className="p-3 border border-dashed rounded-lg bg-muted/20">
+                        <Shield className="h-5 w-5 mb-2 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground mb-1">License</p>
+                        <p className="text-xs text-muted-foreground">Not uploaded</p>
+                      </div>
+                    )}
+                    {(selectedCounselor as any).certificationsFile ? (
+                      <a 
+                        href={(selectedCounselor as any).certificationsFile}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block p-3 border rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer group"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <Award className="h-5 w-5 text-primary group-hover:text-primary/80" />
+                          <Download className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-1">Certifications</p>
+                        <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">View PDF</p>
+                      </a>
+                    ) : (
+                      <div className="p-3 border border-dashed rounded-lg bg-muted/20">
+                        <Award className="h-5 w-5 mb-2 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground mb-1">Certifications</p>
+                        <p className="text-xs text-muted-foreground">Not uploaded</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-6 border border-dashed rounded-lg bg-muted/20 text-center">
+                    <Download className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">No documents uploaded</p>
+                  </div>
+                )}
               </div>
             </div>
           )}

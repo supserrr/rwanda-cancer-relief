@@ -56,7 +56,6 @@ export default function CounselorTrainingPage() {
   const [selectedDifficulty, setSelectedDifficulty] = useState<'all' | string>('all');
   const [sortBy, setSortBy] = useState<'relevance' | 'title' | 'downloads' | 'rating' | 'createdAt'>('relevance');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [view, setView] = useState<'grid' | 'list'>('grid');
   const [selectedTraining, setSelectedTraining] = useState<TrainingResource | null>(null);
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
@@ -269,17 +268,17 @@ export default function CounselorTrainingPage() {
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
           <Input
             placeholder="Search training resources..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
           />
         </div>
         
         <Select value={selectedCategory} onValueChange={(value) => setSelectedCategory(value)}>
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
@@ -292,7 +291,7 @@ export default function CounselorTrainingPage() {
         </Select>
 
         <Select value={selectedType} onValueChange={(value) => setSelectedType(value)}>
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
             <SelectValue placeholder="Type" />
           </SelectTrigger>
           <SelectContent>
@@ -305,7 +304,7 @@ export default function CounselorTrainingPage() {
         </Select>
 
         <Select value={selectedDifficulty} onValueChange={(value) => setSelectedDifficulty(value)}>
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
             <SelectValue placeholder="Difficulty" />
           </SelectTrigger>
           <SelectContent>
@@ -320,7 +319,7 @@ export default function CounselorTrainingPage() {
 
         <div className="flex items-center gap-2">
           <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
-            <SelectTrigger className="w-44"><SelectValue placeholder="Sort by" /></SelectTrigger>
+            <SelectTrigger className="w-44 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"><SelectValue placeholder="Sort by" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="relevance">Relevance</SelectItem>
               <SelectItem value="createdAt">Newest</SelectItem>
@@ -330,21 +329,16 @@ export default function CounselorTrainingPage() {
             </SelectContent>
           </Select>
           <Select value={sortDir} onValueChange={(v: any) => setSortDir(v)}>
-            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-28 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="asc">Asc</SelectItem>
               <SelectItem value="desc">Desc</SelectItem>
             </SelectContent>
           </Select>
-          <div className="ml-auto flex items-center gap-2">
-            <Button variant={view === 'grid' ? 'default' : 'outline'} size="sm" onClick={() => setView('grid')}>Grid</Button>
-            <Button variant={view === 'list' ? 'default' : 'outline'} size="sm" onClick={() => setView('list')}>List</Button>
-          </div>
         </div>
       </div>
 
       {/* Resources */}
-      {view === 'grid' ? (
       <AnimatedGrid className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" staggerDelay={0.1}>
         {filteredResources.map((tr) => (
           <ResourceCard
@@ -356,42 +350,6 @@ export default function CounselorTrainingPage() {
           />
         ))}
       </AnimatedGrid>
-      ) : (
-        <div className="space-y-3">
-          {filteredResources.map((resource) => (
-            <div
-              key={resource.id}
-              className="relative overflow-hidden p-4 border rounded-xl bg-gradient-to-br from-primary/5 via-background to-background hover:from-primary/10 transition-colors cursor-pointer"
-              onClick={() => handleViewDetails(resource)}
-            >
-              <div className="pointer-events-none absolute -top-12 -left-12 h-40 w-40 bg-primary/20 blur-3xl rounded-full" />
-              <div className="pointer-events-none absolute -bottom-10 -right-10 h-36 w-36 bg-secondary/30 blur-3xl rounded-full" />
-              <div className="relative flex items-center justify-between">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="p-2 rounded-lg bg-primary/10 flex-shrink-0">{getTypeIcon(resource.type)}</div>
-                  <div className="min-w-0">
-                    <div className="font-medium truncate">{resource.title}</div>
-                    <div className="text-sm text-muted-foreground truncate">{resource.instructor}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1"><Clock className="h-3 w-3" />{resource.duration}</div>
-                  <div className="flex items-center gap-1"><Star className="h-3 w-3 text-yellow-500" />{resource.rating}</div>
-                  <div className="flex items-center gap-1"><Download className="h-3 w-3" />{resource.downloads}</div>
-                  <div className="flex items-center gap-2">
-                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleToggleBookmark(resource.id); }}>
-                      <Bookmark className={`h-4 w-4 ${bookmarkedResources.has(resource.id) ? 'fill-current text-primary' : ''}`} />
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleMarkComplete(resource.id); }}>
-                      <CheckCircle className={`h-4 w-4 ${completedResources.has(resource.id) ? 'text-green-500' : 'text-muted-foreground'}`} />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Results Summary */}
       <div className="flex items-center justify-between">

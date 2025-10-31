@@ -265,17 +265,17 @@ export default function AdminSupportPage() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
           <Input
             placeholder="Search tickets by subject or description..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
           />
         </div>
         
         <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as any)}>
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -288,7 +288,7 @@ export default function AdminSupportPage() {
         </Select>
 
         <Select value={selectedPriority} onValueChange={(value) => setSelectedPriority(value as any)}>
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
             <SelectValue placeholder="Priority" />
           </SelectTrigger>
           <SelectContent>
@@ -307,20 +307,24 @@ export default function AdminSupportPage() {
       </div>
 
       {/* Tickets Table */}
-      <div className="bg-card border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Ticket</TableHead>
-              <TableHead>User</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Priority</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead>Updated</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+      <AnimatedCard delay={0.5}>
+        <CardHeader>
+          <CardTitle>Support Tickets List</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Ticket</TableHead>
+                <TableHead>User</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Priority</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Updated</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
             {filteredTickets.map((ticket) => {
               const user = getUserInfo(ticket.userId);
               
@@ -392,9 +396,10 @@ export default function AdminSupportPage() {
                 </TableRow>
               );
             })}
-          </TableBody>
-        </Table>
-      </div>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </AnimatedCard>
 
       {/* Results Summary */}
       <div className="flex items-center justify-between">

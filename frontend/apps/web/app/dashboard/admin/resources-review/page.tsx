@@ -38,8 +38,6 @@ import {
   Filter,
   SortAsc,
   SortDesc,
-  Grid3X3,
-  List,
   FileText,
   Video,
   BookOpen,
@@ -66,7 +64,6 @@ export default function AdminResourcesReviewPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [resources, setResources] = useState<Resource[]>(dummyResources);
   
   // Modal states
@@ -203,8 +200,8 @@ export default function AdminResourcesReviewPage() {
     }
   };
 
-  const handleViewArticle = (resource: Resource) => {
-    setViewingArticle(resource);
+  const handleViewArticle = (resource: any) => {
+    setViewingArticle(resource as Resource);
     setIsArticleViewerOpen(true);
   };
 
@@ -315,87 +312,67 @@ export default function AdminResourcesReviewPage() {
       </div>
 
       {/* Search and Filters */}
-      <AnimatedCard delay={0.5}>
-        <div className="p-4 space-y-4">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search by title, description, publisher, or tags..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            
-            <Select value={selectedType} onValueChange={setSelectedType}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                {resourceTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                {statusOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                {sortOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-            >
-              {sortOrder === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
-            </Button>
-
-            <div className="flex gap-2">
-              <Button
-                variant={viewMode === 'grid' ? 'default' : 'outline'}
-                size="icon"
-                onClick={() => setViewMode('grid')}
-              >
-                <Grid3X3 className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={viewMode === 'list' ? 'default' : 'outline'}
-                size="icon"
-                onClick={() => setViewMode('list')}
-              >
-                <List className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+      <div className="flex flex-col lg:flex-row gap-4 items-center">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
+          <Input
+            placeholder="Search by title, description, publisher, or tags..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
+          />
         </div>
-      </AnimatedCard>
+        
+        <Select value={selectedType} onValueChange={setSelectedType}>
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
+            <SelectValue placeholder="Type" />
+          </SelectTrigger>
+          <SelectContent>
+            {resourceTypes.map((type) => (
+              <SelectItem key={type} value={type}>
+                {type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-      {/* Resources List/Grid */}
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            {statusOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
+            <SelectValue placeholder="Sort by" />
+          </SelectTrigger>
+          <SelectContent>
+            {sortOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+        >
+          {sortOrder === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
+        </Button>
+
+      </div>
+
+      {/* Resources Grid */}
       {filteredResources.length === 0 ? (
         <AnimatedCard delay={0.6}>
           <div className="p-12 text-center">
@@ -404,7 +381,7 @@ export default function AdminResourcesReviewPage() {
             <p className="text-muted-foreground">Try adjusting your search or filters</p>
           </div>
         </AnimatedCard>
-      ) : viewMode === 'grid' ? (
+      ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredResources.map((resource, index) => {
             const TypeIcon = getTypeIcon(resource.type);
@@ -507,95 +484,6 @@ export default function AdminResourcesReviewPage() {
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
-                  </div>
-                </div>
-              </AnimatedCard>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filteredResources.map((resource, index) => {
-            const TypeIcon = getTypeIcon(resource.type);
-            return (
-              <AnimatedCard key={resource.id} delay={0.05 * index}>
-                <div className="p-4">
-                  <div className="flex items-center gap-4">
-                    <TypeIcon className="h-6 w-6 text-primary flex-shrink-0" />
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-4 mb-2">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold mb-1">{resource.title}</h3>
-                          <p className="text-sm text-muted-foreground line-clamp-1">{resource.description}</p>
-                        </div>
-                        <Badge variant={resource.isPublic ? 'default' : 'secondary'}>
-                          {resource.isPublic ? (
-                            <>
-                              <Globe className="h-3 w-3 mr-1" />
-                              Published
-                            </>
-                          ) : (
-                            <>
-                              <Lock className="h-3 w-3 mr-1" />
-                              Unpublished
-                            </>
-                          )}
-                        </Badge>
-                      </div>
-
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          <span>{resource.publisher}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          <span>{new Date(resource.createdAt).toLocaleDateString()}</span>
-                        </div>
-                        <Badge className={getTypeColor(resource.type)} variant="outline">
-                          {resource.type}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewResource(resource)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditResource(resource)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant={resource.isPublic ? 'outline' : 'default'}
-                        size="sm"
-                        onClick={() => resource.isPublic 
-                          ? handleUnpublishResource(resource.id)
-                          : handlePublishResource(resource.id)
-                        }
-                      >
-                        {resource.isPublic ? (
-                          <Lock className="h-4 w-4" />
-                        ) : (
-                          <Globe className="h-4 w-4" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteClick(resource)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
                   </div>
                 </div>
               </AnimatedCard>

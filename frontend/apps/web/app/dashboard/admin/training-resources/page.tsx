@@ -335,17 +335,17 @@ export default function AdminTrainingResourcesPage() {
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
           <Input
             placeholder="Search resources..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
           />
         </div>
         
         <Select value={selectedCategory} onValueChange={(value) => setSelectedCategory(value)}>
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
@@ -358,7 +358,7 @@ export default function AdminTrainingResourcesPage() {
         </Select>
 
         <Select value={selectedType} onValueChange={(value) => setSelectedType(value)}>
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
             <SelectValue placeholder="Type" />
           </SelectTrigger>
           <SelectContent>
@@ -371,7 +371,7 @@ export default function AdminTrainingResourcesPage() {
         </Select>
 
         <Select value={selectedDifficulty} onValueChange={(value) => setSelectedDifficulty(value)}>
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
             <SelectValue placeholder="Difficulty" />
           </SelectTrigger>
           <SelectContent>
@@ -391,7 +391,7 @@ export default function AdminTrainingResourcesPage() {
 
         <div className="flex gap-2 items-center">
           <Select value={sortBy} onValueChange={(v: any) => { setSortBy(v); setPage(1); }}>
-            <SelectTrigger className="w-44"><SelectValue placeholder="Sort by" /></SelectTrigger>
+            <SelectTrigger className="w-44 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"><SelectValue placeholder="Sort by" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="createdAt">Newest</SelectItem>
               <SelectItem value="title">Title</SelectItem>
@@ -400,7 +400,7 @@ export default function AdminTrainingResourcesPage() {
             </SelectContent>
           </Select>
           <Select value={sortDir} onValueChange={(v: any) => { setSortDir(v); setPage(1); }}>
-            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-28 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="asc">Asc</SelectItem>
               <SelectItem value="desc">Desc</SelectItem>
@@ -427,9 +427,9 @@ export default function AdminTrainingResourcesPage() {
       </div>
 
       {viewMode === 'table' ? (
-      <AnimatedCard delay={0.05}>
-        <CardHeader className="pb-0">
-          <CardTitle className="text-sm font-medium">Resources</CardTitle>
+      <AnimatedCard delay={0.5}>
+        <CardHeader>
+          <CardTitle>Training Resources List</CardTitle>
         </CardHeader>
         <CardContent>
         <Table>
@@ -598,7 +598,7 @@ export default function AdminTrainingResourcesPage() {
         </p>
         <div className="flex items-center space-x-2">
           <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
-            <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-24 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="10">10 / page</SelectItem>
               <SelectItem value="20">20 / page</SelectItem>

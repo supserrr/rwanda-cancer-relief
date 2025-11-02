@@ -187,10 +187,10 @@ export default function CounselorChatPage() {
         description="Communicate with your patients and provide ongoing support"
       />
 
-      <div className="grid gap-4 md:gap-6 lg:grid-cols-4 h-[calc(100vh-16rem)] md:h-[600px]">
+      <div className="flex lg:grid gap-0 lg:gap-6 lg:grid-cols-4 h-[calc(100vh-16rem)] md:h-[600px]">
         {/* Chat List */}
-        <div className={`lg:col-span-1 ${showConversations ? 'block' : 'hidden lg:block'}`}>
-          <AnimatedCard delay={0.5} className="h-full flex flex-col">
+        <div className={`lg:col-span-1 flex-1 lg:flex-none ${showConversations ? 'flex' : 'hidden lg:block'}`}>
+          <AnimatedCard delay={0.5} className="h-full flex flex-col w-full">
             <CardHeader className="p-3 md:p-6 pb-2 md:pb-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm md:text-base font-semibold">Patient Conversations</h3>
@@ -294,8 +294,8 @@ export default function CounselorChatPage() {
         </div>
 
         {/* Chat Area */}
-        <div className={`col-span-1 lg:col-span-3 ${showConversations ? 'hidden lg:block' : 'block'}`}>
-          <AnimatedCard delay={0.7} className="h-full flex flex-col">
+        <div className={`flex-1 lg:col-span-3 ${showConversations ? 'hidden lg:block' : 'flex'}`}>
+          <AnimatedCard delay={0.7} className="h-full flex flex-col w-full">
             {activeChat ? (
               <>
                 {/* Chat Header */}

@@ -26,7 +26,6 @@ A comprehensive role-based dashboard interface built with Next.js, React, Tailwi
 
 ```
 app/
-├── dashboard-demo/          # Main demo page
 ├── dashboard/               # Role-based dashboard routes
 │   ├── patient/            # Patient dashboard pages
 │   ├── counselor/          # Counselor dashboard pages
@@ -50,8 +49,7 @@ app/
    ```
 
 3. **Access the Dashboard**
-   - Visit `http://localhost:3000/dashboard-demo` to see the role selection interface
-   - Or directly access:
+   - Direct access to role-specific dashboards:
      - Patient: `http://localhost:3000/dashboard/patient`
      - Counselor: `http://localhost:3000/dashboard/counselor`
      - Admin: `http://localhost:3000/dashboard/admin`
@@ -129,7 +127,7 @@ interface Session {
 
 ### Adding New Pages
 1. Create a new page component in the appropriate role directory
-2. Add the route to the sidebar navigation in `Sidebar.tsx`
+2. Add the route to the sidebar navigation in `DashboardSidebar.tsx`
 3. Update the layout component if needed
 
 ### Styling

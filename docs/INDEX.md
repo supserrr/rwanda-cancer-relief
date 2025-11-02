@@ -59,8 +59,6 @@ Located in `docs/apps/`:
 
 - **[Web App Building Guide](apps/BUILDING_GUIDE.md)** - Building and development guide for the main web application
 - **[Web App Landing Page](apps/LANDING_PAGE.md)** - Landing page documentation and features
-- **[Demos App Building Guide](apps/demos-building-guide.md)** - Building guide for the demos application
-- **[Demos App Landing Page](apps/demos-landing-page.md)** - Landing page documentation for demos
 
 ## 🔧 Development Documentation
 

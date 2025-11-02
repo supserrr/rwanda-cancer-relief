@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useAuth } from '../../../../hooks/use-auth';
+import { useAuth } from '../../../../components/auth/AuthProvider';
 import { SpiralAnimation } from '@/components/ui/spiral-animation';
 import { PromptBox } from '@workspace/ui/components/ui/chatgpt-prompt-input';
 import { ChatThreadsSidebar } from '../../../../components/dashboard/shared/ChatThreadsSidebar';

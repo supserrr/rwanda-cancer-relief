@@ -10,7 +10,7 @@ import { Footer } from '@workspace/ui/components/ui/footer';
 import { ThemeTogglerButton } from '@workspace/ui/components/animate-ui/components/buttons/theme-toggler';
 import { RCRLogo } from '@workspace/ui/components/rcr-logo';
 import { Search, Filter, MessageCircle, Video, Phone } from 'lucide-react';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 /**
  * Counselor profile data structure

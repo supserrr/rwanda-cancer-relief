@@ -17,7 +17,7 @@ import {
   CheckCircle,
   AlertCircle
 } from 'lucide-react';
-import { useAuth } from '../../../../../../hooks/use-auth';
+import { useAuth } from '../../../../../../components/auth/AuthProvider';
 import { dummySessions, dummyPatients, dummyCounselors } from '../../../../../../lib/dummy-data';
 import { Session } from '../../../../../../lib/types';
 

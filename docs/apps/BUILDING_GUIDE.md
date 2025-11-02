@@ -53,10 +53,12 @@ Tell me what sections you want and where, and I'll add them for you!
 
 ```
 /                    → Landing Page (we're building this!)
-/demos              → All component demos
-/demo               → Mini Navbar demo
-/helix-demo         → Helix Hero demo
-... (all other demos)
+/about               → About Us
+/contact             → Contact
+/counselors          → Counselor Directory
+/dashboard/patient   → Patient Dashboard
+/dashboard/counselor → Counselor Dashboard
+/dashboard/admin     → Admin Dashboard
 ```
 
 ---
@@ -64,8 +66,8 @@ Tell me what sections you want and where, and I'll add them for you!
 ## ✅ What's Set Up
 
 - ✅ Clean starting page
-- ✅ All demos moved to `/demos`
-- ✅ Quick access button to demos
+- ✅ Core pages and routes
+- ✅ Component library ready
 - ✅ Ready to add sections
 
 ---

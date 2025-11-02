@@ -243,9 +243,9 @@ All documentation follows these principles:
 
 ### For New Users
 1. Read [Main README](README.md)
-2. Follow [Quick Start Guide](docs/guides/QUICK_START.md)
-3. Browse [All Components](docs/overview/ALL_COMPONENTS_OVERVIEW.md)
-4. Try [Component Demos](README.md#demo-pages)
+2. Follow [Quick Start Guide](docs/components/guides/QUICK_START.md)
+3. Browse [All Components](docs/components/overview/ALL_COMPONENTS_OVERVIEW.md)
+4. Explore the [Application](http://localhost:3000)
 
 ### For Developers
 1. Review [Setup Guide](docs/setup/README.md)
@@ -254,10 +254,10 @@ All documentation follows these principles:
 4. Reference [Architecture](docs/overview/INTEGRATION_SUMMARY.md)
 
 ### For Finding Components
-1. Browse [Component Catalog](docs/overview/ALL_COMPONENTS_OVERVIEW.md)
+1. Browse [Component Catalog](docs/components/overview/ALL_COMPONENTS_OVERVIEW.md)
 2. Or use [Quick Reference](docs/INDEX.md)
-3. Then read [Integration Guide](docs/components/)
-4. Finally check [Demo Page](README.md#demo-pages)
+3. Then read [Integration Guides](docs/components/integration/)
+4. Explore [Component Library](docs/components/COMPONENT_LIBRARY_README.md)
 
 ---
 
@@ -270,9 +270,7 @@ All documentation follows these principles:
 - [Integration Summary](docs/overview/INTEGRATION_SUMMARY.md)
 
 ### Applications
-- [Web App](http://localhost:3000) - 25 demo pages
-- [Dash](http://localhost:3001) - Admin dashboard
-- [Dashy](http://localhost:3002) - Analytics dashboard
+- [Web App](http://localhost:3000) - Main application
 
 ### External
 - [Next.js](https://nextjs.org/docs)

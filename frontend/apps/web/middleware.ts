@@ -23,8 +23,7 @@ export function middleware(request: NextRequest) {
     '/contact',
     '/counselors',
     '/get-help',
-    '/api/chat',
-    '/dashboard-demo'
+    '/api/chat'
   ]
   
   // Auth routes (signin, signup)

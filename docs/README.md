@@ -67,8 +67,6 @@ Located in `docs/apps/`:
 
 - **[Web App Building Guide](./apps/BUILDING_GUIDE.md)** - Building and development guide for the main web application
 - **[Web App Landing Page](./apps/LANDING_PAGE.md)** - Landing page documentation and features
-- **[Demos App Building Guide](./apps/demos-building-guide.md)** - Building guide for the demos application
-- **[Demos App Landing Page](./apps/demos-landing-page.md)** - Landing page documentation for demos
 
 ---
 
@@ -91,13 +89,14 @@ pnpm dev
 This starts the web application:
 - Web App: `http://localhost:3000`
 
-### 2. Explore Demo Pages
+### 2. Explore the Application
 
-Visit `http://localhost:3000` to see 23 demo pages showcasing:
-- UI components
-- AI features
-- Interactive elements
-- Form components
+Visit `http://localhost:3000` to access:
+- Landing page
+- Counselor directory
+- Role-based dashboards (Patient, Counselor, Admin)
+- AI chat features
+- Session booking and management
 
 ### 3. Component Usage
 

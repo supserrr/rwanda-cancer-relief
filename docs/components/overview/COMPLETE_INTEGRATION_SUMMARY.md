@@ -6,26 +6,28 @@ Comprehensive overview of all components, applications, and features integrated 
 
 ```
 rwanda-cancer-relief/
-├── apps/
-│   ├── web/           # Main website (Port 3000) - 23 demo pages
-│   ├── dash/          # Admin dashboard (Port 3001)
-│   └── dashy/         # Analytics dashboard (Port 3002)
-└── packages/
-    ├── ui/            # 60+ shared UI components
-    ├── eslint-config/ # Shared ESLint rules
-    └── typescript-config/ # Shared TypeScript config
+├── frontend/
+│   ├── apps/
+│   │   └── web/       # Main web application (Port 3000)
+│   └── packages/
+│       ├── ui/        # Shared UI component library
+│       ├── eslint-config/ # Shared ESLint rules
+│       └── typescript-config/ # Shared TypeScript config
+├── backend/           # Backend services (coming soon)
+└── docs/              # Comprehensive documentation
 ```
 
-## Applications (3 Total)
+## Applications
 
-### 1. Web App (Port 3000)
-Main public-facing website with 23 demo pages
-
-### 2. Dash (Port 3001)
-Admin dashboard for platform management
-
-### 3. Dashy (Port 3002)
-Analytics dashboard with advanced data visualization
+### Web App (Port 3000)
+Main Rwanda Cancer Relief platform with:
+- Public landing page
+- Counselor directory
+- Role-based dashboards (Patient, Counselor, Admin)
+- Video conferencing (Jitsi)
+- AI chat assistant
+- Session management
+- Resource library
 
 ## UI Components (60+ Total)
 
@@ -100,45 +102,30 @@ Located in `apps/web/components/ai-elements/`:
 4. **Feature Card** - Service showcase cards
 5. **Logo Cloud** - Partner logo showcase
 
-## Demo Pages (25 Total)
+## Application Routes
 
-### Web App Demos (23)
+### Public Routes
+- `/` - Landing page
+- `/about` - About us
+- `/contact` - Contact page
+- `/counselors` - Counselor directory
+- `/get-help` - Get help information
 
-#### UI Component Demos (11)
-1. `/demo` - Mini Navbar
-2. `/helix-demo` - Helix Hero
-3. `/feature-spotlight-demo` - Feature Spotlight
-4. `/services-demo` - Services Grid
-5. `/parallax-demo` - Parallax Scroll
-6. `/features-demo` - Features Grid
-7. `/faq-demo` - FAQ Section
-8. `/cta-demo` - Call to Action
-9. `/footer-demo` - Footer
-10. `/svg-scroll-demo` - SVG Scroll Animation
-11. `/cancer-services` - Cancer Services Page
+### Authentication
+- `/signin` - Sign in
+- `/signup` - Sign up
+- `/signup/patient` - Patient registration
+- `/signup/counselor` - Counselor registration
 
-#### AI & Interactive Demos (12)
-1. `/ai-demo` - AI Chatbot with streaming
-2. `/orb-demo` - ElevenLabs 3D Orb
-3. `/audio-player-demo` - Audio Player
-4. `/waveform-demo` - Waveform visualizations
-5. `/shimmering-text-demo` - Animated text
-6. `/conversation-bar-demo` - Voice interface
-7. `/profile-card-demo` - Profile cards
-8. `/user-profile-card-demo` - User profile cards
-9. `/stats-demo` - Stats sections
-10. `/feature-card-demo` - Feature cards
-11. `/multi-step-form-demo` - Multi-step forms
-12. `/logo-cloud-demo` - Logo cloud
-
-### Dashboard Demos (2)
-1. `http://localhost:3001/demo` - Dash admin demo
-2. `http://localhost:3002/pages/demo` - Dashy analytics demo
+### Dashboard Routes
+- `/dashboard/patient` - Patient dashboard
+- `/dashboard/counselor` - Counselor dashboard
+- `/dashboard/admin` - Admin dashboard
 
 ## Dependencies Installed
 
 ### Core Frameworks
-- Next.js 15.4.5 (web), 15.2.3 (dash), 15.1.6 (dashy)
+- Next.js 15.4.5
 - React 19.1.1
 - TypeScript 5.9.2
 

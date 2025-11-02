@@ -49,7 +49,7 @@ import {
 } from 'lucide-react';
 import { dummyResources } from '../../../../lib/dummy-data';
 import { Resource } from '../../../../lib/types';
-import { useAuth } from '../../../../hooks/use-auth';
+import { useAuth } from '../../../../components/auth/AuthProvider';
 
 /**
  * Admin Resources Review Page

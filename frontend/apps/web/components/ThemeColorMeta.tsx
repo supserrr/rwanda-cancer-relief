@@ -3,34 +3,47 @@
 import { useEffect } from "react";
 
 /**
- * Sets theme-color meta tag based on current color scheme
+ * Sets theme-color meta tag based on current DOM theme state
  * for seamless iOS Safari overscroll area blending
  */
 export function ThemeColorMeta() {
   useEffect(() => {
-    // Remove any existing theme-color meta tags
-    const existingTags = document.querySelectorAll('meta[name="theme-color"]');
-    existingTags.forEach(tag => tag.remove());
+    // Function to update theme-color based on current DOM state
+    const updateThemeColor = () => {
+      // Remove any existing theme-color meta tags
+      const existingTags = document.querySelectorAll('meta[name="theme-color"]');
+      existingTags.forEach(tag => tag.remove());
 
-    // Create new meta tags for light and dark modes
-    const lightTag = document.createElement('meta');
-    lightTag.name = 'theme-color';
-    lightTag.content = '#fafaf9';
-    lightTag.setAttribute('media', '(prefers-color-scheme: light)');
-    
-    const darkTag = document.createElement('meta');
-    darkTag.name = 'theme-color';
-    darkTag.content = '#0f0f0f';
-    darkTag.setAttribute('media', '(prefers-color-scheme: dark)');
+      // Check if dark class is present on html element
+      const isDark = document.documentElement.classList.contains('dark');
+      
+      // Create theme-color meta tag based on current theme
+      const themeColorTag = document.createElement('meta');
+      themeColorTag.name = 'theme-color';
+      themeColorTag.content = isDark ? '#0f0f0f' : '#fafaf9';
+      
+      // Add to head
+      document.head.appendChild(themeColorTag);
+    };
 
-    // Add to head
-    document.head.appendChild(lightTag);
-    document.head.appendChild(darkTag);
+    // Initial update
+    updateThemeColor();
 
-    // Cleanup function
+    // Watch for class changes on html element
+    const observer = new MutationObserver(() => {
+      updateThemeColor();
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+
+    // Cleanup
     return () => {
-      lightTag.remove();
-      darkTag.remove();
+      observer.disconnect();
+      const existingTags = document.querySelectorAll('meta[name="theme-color"]');
+      existingTags.forEach(tag => tag.remove());
     };
   }, []);
 

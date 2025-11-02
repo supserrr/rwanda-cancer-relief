@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { Sidebar, SidebarBody, SidebarLink, useSidebar } from "@workspace/ui/components/ui/sidebar";
 import { RCRLogo } from "@workspace/ui/components/rcr-logo";
 import {
@@ -28,8 +28,8 @@ interface DashboardSidebarProps {
   currentPath: string;
   onNavigate: (path: string) => void;
   className?: string;
-  open?: boolean;
-  setOpen?: React.Dispatch<React.SetStateAction<boolean>>;
+  open: boolean;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const navigationItems: NavigationItem[] = [
@@ -226,13 +226,9 @@ export function DashboardSidebar({
   currentPath, 
   onNavigate, 
   className,
-  open: openProp,
-  setOpen: setOpenProp
+  open,
+  setOpen
 }: DashboardSidebarProps) {
-  const [openState, setOpenState] = useState(false);
-  
-  const open = openProp !== undefined ? openProp! : openState;
-  const setOpen = setOpenProp !== undefined ? setOpenProp! : setOpenState;
   
   const filteredItems = navigationItems.filter(item => 
     item.roles.includes(userRole)

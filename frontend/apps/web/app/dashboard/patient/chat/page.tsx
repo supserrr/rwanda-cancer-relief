@@ -162,7 +162,7 @@ export default function PatientChatPage() {
       <div className="grid gap-6 lg:grid-cols-4 h-[calc(100vh-280px)] md:h-[600px]">
         {/* Chat List */}
         <div className={`lg:col-span-1 ${showConversations ? 'block' : 'hidden lg:block'}`}>
-          <AnimatedCard delay={0.5} className="h-full">
+          <AnimatedCard delay={0.5} className="h-full flex flex-col">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold">Conversations</h3>
@@ -206,8 +206,8 @@ export default function PatientChatPage() {
                 />
               </div>
             </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="h-[480px]">
+            <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
+              <ScrollArea className="flex-1">
                 <div className="space-y-1">
                   {dummyChats.map((chat) => {
                     const counselorId = chat.participants.find((id: string) => id !== '1');

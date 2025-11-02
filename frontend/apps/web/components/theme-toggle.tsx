@@ -13,7 +13,7 @@ import { motion } from "framer-motion"
  * with smooth animations and cancer purple theme colors
  */
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
 
   // Prevent hydration mismatch
@@ -29,6 +29,8 @@ export function ThemeToggle() {
     )
   }
 
+  const currentTheme = resolvedTheme || theme
+
   return (
     <motion.div
       whileHover={{ scale: 1.05 }}
@@ -38,14 +40,14 @@ export function ThemeToggle() {
       <Button
         variant="outline"
         size="icon"
-        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        onClick={() => setTheme(currentTheme === "dark" ? "light" : "dark")}
         className="w-10 h-10 hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-all duration-200"
       >
         <motion.div
           initial={false}
           animate={{ 
-            rotate: theme === "dark" ? 180 : 0,
-            scale: theme === "dark" ? 0.8 : 1
+            rotate: currentTheme === "dark" ? 180 : 0,
+            scale: currentTheme === "dark" ? 0.8 : 1
           }}
           transition={{ 
             type: "spring", 
@@ -59,8 +61,8 @@ export function ThemeToggle() {
         <motion.div
           initial={false}
           animate={{ 
-            rotate: theme === "dark" ? 0 : -180,
-            scale: theme === "dark" ? 1 : 0.8
+            rotate: currentTheme === "dark" ? 0 : -180,
+            scale: currentTheme === "dark" ? 1 : 0.8
           }}
           transition={{ 
             type: "spring", 

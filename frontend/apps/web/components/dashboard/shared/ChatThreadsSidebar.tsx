@@ -116,13 +116,9 @@ export function ChatThreadsSidebar({
   };
 
   return (
-    <div className={cn("flex flex-col bg-gradient-to-br from-primary/5 via-background to-primary/10 rounded-r-3xl border-r border-primary/20 shadow-sm w-full lg:w-64 relative overflow-hidden", className)} style={{ height: '100%' }}>
-      {/* Decorative gradient blobs */}
-      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-2xl -z-0"></div>
-      <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary/10 rounded-full blur-2xl -z-0"></div>
-      
+    <div className={cn("flex flex-col bg-sidebar rounded-r-3xl border-r border-sidebar-border w-full lg:w-64 relative overflow-hidden", className)} style={{ height: '100%' }}>
       {/* Header */}
-      <div className="p-3 md:p-4 border-b border-primary/20 space-y-2 md:space-y-3 relative z-10">
+      <div className="p-3 md:p-4 border-b border-sidebar-border space-y-2 md:space-y-3 relative z-10">
         {/* New Chat Button */}
         <Button
           variant="default"

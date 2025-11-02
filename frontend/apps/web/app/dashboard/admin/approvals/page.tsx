@@ -59,8 +59,8 @@ import { Counselor } from '../../../../lib/types';
 
 export default function AdminApprovalsPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSpecialty, setSelectedSpecialty] = useState<&apos;all&apos; | string>('all');
-  const [selectedExperience, setSelectedExperience] = useState<&apos;all&apos; | string>('all');
+  const [selectedSpecialty, setSelectedSpecialty] = useState<'all' | string>('all');
+  const [selectedExperience, setSelectedExperience] = useState<'all' | string>('all');
   const [selectedCounselor, setSelectedCounselor] = useState<Counselor | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -72,11 +72,11 @@ export default function AdminApprovalsPage() {
                          counselor.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          counselor.specialty.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSpecialty = selectedSpecialty === 'all' || counselor.specialty === selectedSpecialty;
-    const matchesExperience = selectedExperience === &apos;all&apos; || 
-      (selectedExperience === &apos;0-2&apos; && counselor.experience <= 2) ||
-      (selectedExperience === &apos;3-5&apos; && counselor.experience >= 3 && counselor.experience <= 5) ||
-      (selectedExperience === &apos;6-10&apos; && counselor.experience >= 6 && counselor.experience <= 10) ||
-      (selectedExperience === &apos;10+&apos; && counselor.experience > 10);
+    const matchesExperience = selectedExperience === 'all' || 
+      (selectedExperience === '0-2' && counselor.experience <= 2) ||
+      (selectedExperience === '3-5' && counselor.experience >= 3 && counselor.experience <= 5) ||
+      (selectedExperience === '6-10' && counselor.experience >= 6 && counselor.experience <= 10) ||
+      (selectedExperience === '10+' && counselor.experience > 10);
     
     return matchesSearch && matchesSpecialty && matchesExperience;
   });
@@ -131,71 +131,71 @@ export default function AdminApprovalsPage() {
   };
 
   return (
-    <div className=&quot;space-y-6&quot;>
+    <div className="space-y-6">
       <AnimatedPageHeader
-        title=&quot;Counselor Approvals&quot;
-        description=&quot;Review and approve pending counselor applications&quot;
+        title="Counselor Approvals"
+        description="Review and approve pending counselor applications"
       />
 
       {/* Stats Cards */}
-      <div className=&quot;grid gap-4 md:grid-cols-4&quot;>
+      <div className="grid gap-4 md:grid-cols-4">
         <AnimatedCard delay={0.1}>
-          <CardHeader className=&quot;flex flex-row items-center justify-between space-y-0 pb-2&quot;>
-            <CardTitle className=&quot;text-sm font-medium&quot;>Pending Applications</CardTitle>
-            <Clock className=&quot;h-4 w-4 text-muted-foreground&quot; />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending Applications</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className=&quot;text-2xl font-bold&quot;>
+            <div className="text-2xl font-bold">
               {dummyPendingCounselors.length}
             </div>
-            <p className=&quot;text-xs text-muted-foreground&quot;>
+            <p className="text-xs text-muted-foreground">
               Awaiting review
             </p>
           </CardContent>
         </AnimatedCard>
 
         <AnimatedCard delay={0.2}>
-          <CardHeader className=&quot;flex flex-row items-center justify-between space-y-0 pb-2&quot;>
-            <CardTitle className=&quot;text-sm font-medium&quot;>This Week</CardTitle>
-            <Calendar className=&quot;h-4 w-4 text-muted-foreground&quot; />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">This Week</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className=&quot;text-2xl font-bold&quot;>
+            <div className="text-2xl font-bold">
               {dummyPendingCounselors.filter(c => 
                 new Date(c.createdAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
               ).length}
             </div>
-            <p className=&quot;text-xs text-muted-foreground&quot;>
+            <p className="text-xs text-muted-foreground">
               New applications
             </p>
           </CardContent>
         </AnimatedCard>
 
         <AnimatedCard delay={0.3}>
-          <CardHeader className=&quot;flex flex-row items-center justify-between space-y-0 pb-2&quot;>
-            <CardTitle className=&quot;text-sm font-medium&quot;>High Experience</CardTitle>
-            <Award className=&quot;h-4 w-4 text-muted-foreground&quot; />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">High Experience</CardTitle>
+            <Award className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className=&quot;text-2xl font-bold&quot;>
+            <div className="text-2xl font-bold">
               {dummyPendingCounselors.filter(c => c.experience >= 5).length}
             </div>
-            <p className=&quot;text-xs text-muted-foreground&quot;>
+            <p className="text-xs text-muted-foreground">
               5+ years experience
             </p>
           </CardContent>
         </AnimatedCard>
 
         <AnimatedCard delay={0.4}>
-          <CardHeader className=&quot;flex flex-row items-center justify-between space-y-0 pb-2&quot;>
-            <CardTitle className=&quot;text-sm font-medium&quot;>Multi-lingual</CardTitle>
-            <User className=&quot;h-4 w-4 text-muted-foreground&quot; />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Multi-lingual</CardTitle>
+            <User className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className=&quot;text-2xl font-bold&quot;>
+            <div className="text-2xl font-bold">
               {dummyPendingCounselors.filter(c => c.languages && c.languages.length >= 3).length}
             </div>
-            <p className=&quot;text-xs text-muted-foreground&quot;>
+            <p className="text-xs text-muted-foreground">
               3+ languages
             </p>
           </CardContent>
@@ -203,45 +203,45 @@ export default function AdminApprovalsPage() {
       </div>
 
       {/* Filters */}
-      <div className=&quot;flex flex-col sm:flex-row gap-4&quot;>
-        <div className=&quot;relative flex-1&quot;>
-          <Search className=&quot;absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4&quot; />
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
           <Input
-            placeholder=&quot;Search by name, email, or specialty...&quot;
+            placeholder="Search by name, email, or specialty..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className=&quot;pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10&quot;
+            className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
           />
         </div>
         
         <Select value={selectedSpecialty} onValueChange={(value) => setSelectedSpecialty(value)}>
-          <SelectTrigger className=&quot;w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10&quot;>
-            <SelectValue placeholder=&quot;Specialty&quot; />
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
+            <SelectValue placeholder="Specialty" />
           </SelectTrigger>
           <SelectContent>
             {specialties.map((specialty) => (
               <SelectItem key={specialty} value={specialty}>
-                {specialty === &apos;all&apos; ? &apos;All Specialties&apos; : specialty}
+                {specialty === 'all' ? 'All Specialties' : specialty}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
 
         <Select value={selectedExperience} onValueChange={(value) => setSelectedExperience(value)}>
-          <SelectTrigger className=&quot;w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10&quot;>
-            <SelectValue placeholder=&quot;Experience&quot; />
+          <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
+            <SelectValue placeholder="Experience" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value=&quot;all&quot;>All Experience</SelectItem>
-            <SelectItem value=&quot;0-2&quot;>0-2 years</SelectItem>
-            <SelectItem value=&quot;3-5&quot;>3-5 years</SelectItem>
-            <SelectItem value=&quot;6-10&quot;>6-10 years</SelectItem>
-            <SelectItem value=&quot;10+&quot;>10+ years</SelectItem>
+            <SelectItem value="all">All Experience</SelectItem>
+            <SelectItem value="0-2">0-2 years</SelectItem>
+            <SelectItem value="3-5">3-5 years</SelectItem>
+            <SelectItem value="6-10">6-10 years</SelectItem>
+            <SelectItem value="10+">10+ years</SelectItem>
           </SelectContent>
         </Select>
 
-        <Button variant=&quot;outline&quot;>
-          <Filter className=&quot;h-4 w-4 mr-2&quot; />
+        <Button variant="outline">
+          <Filter className="h-4 w-4 mr-2" />
           Filter
         </Button>
       </div>
@@ -261,28 +261,28 @@ export default function AdminApprovalsPage() {
                 <TableHead>Languages</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead>Applied</TableHead>
-                <TableHead className=&quot;text-right&quot;>Actions</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
             {filteredCounselors.map((counselor) => (
               <TableRow key={counselor.id}>
                 <TableCell>
-                  <div className=&quot;flex items-center space-x-3&quot;>
-                    <Avatar className=&quot;h-10 w-10&quot;>
+                  <div className="flex items-center space-x-3">
+                    <Avatar className="h-10 w-10">
                       <AvatarImage src={counselor.avatar} alt={counselor.name} />
                       <AvatarFallback>
-                        {counselor.name.split(&apos; &apos;).map((n: string) => n[0]).join(&apos;')}
+                        {counselor.name.split(' ').map((n: string) => n[0]).join('')}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className=&quot;font-medium&quot;>{counselor.name}</p>
-                      <p className=&quot;text-sm text-muted-foreground&quot;>{counselor.email}</p>
+                      <p className="font-medium">{counselor.name}</p>
+                      <p className="text-sm text-muted-foreground">{counselor.email}</p>
                     </div>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge variant=&quot;outline&quot; className=&quot;border-primary/20&quot;>
+                  <Badge variant="outline" className="border-primary/20">
                     {counselor.specialty}
                   </Badge>
                 </TableCell>
@@ -292,38 +292,38 @@ export default function AdminApprovalsPage() {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <div className=&quot;flex flex-wrap gap-1&quot;>
+                  <div className="flex flex-wrap gap-1">
                     {counselor.languages?.slice(0, 2).map((lang: string, index: number) => (
-                      <Badge key={index} variant=&quot;secondary&quot; className=&quot;text-xs&quot;>
+                      <Badge key={index} variant="secondary" className="text-xs">
                         {lang}
                       </Badge>
                     )) ?? null}
                     {counselor.languages && counselor.languages.length > 2 && (
-                      <Badge variant=&quot;secondary&quot; className=&quot;text-xs&quot;>
+                      <Badge variant="secondary" className="text-xs">
                         +{counselor.languages.length - 2}
                       </Badge>
                     )}
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className=&quot;flex items-center gap-1 text-sm text-muted-foreground&quot;>
-                    <MapPin className=&quot;h-3 w-3&quot; />
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <MapPin className="h-3 w-3" />
                     <span>{counselor.location}</span>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className=&quot;text-sm&quot;>
+                  <div className="text-sm">
                     {counselor.createdAt.toLocaleDateString()}
                   </div>
                 </TableCell>
-                <TableCell className=&quot;text-right&quot;>
-                  <div className=&quot;flex items-center justify-end space-x-2&quot;>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end space-x-2">
                     <Button
-                      size=&quot;sm&quot;
-                      variant=&quot;outline&quot;
+                      size="sm"
+                      variant="outline"
                       onClick={() => handleViewDetails(counselor)}
                     >
-                      <Eye className=&quot;h-4 w-4 mr-2&quot; />
+                      <Eye className="h-4 w-4 mr-2" />
                       Review
                     </Button>
                   </div>
@@ -336,15 +336,15 @@ export default function AdminApprovalsPage() {
       </AnimatedCard>
 
       {/* Results Summary */}
-      <div className=&quot;flex items-center justify-between&quot;>
-        <p className=&quot;text-sm text-muted-foreground&quot;>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
           Showing {filteredCounselors.length} of {dummyPendingCounselors.length} applications
         </p>
-        <div className=&quot;flex items-center space-x-2&quot;>
-          <Button variant=&quot;outline&quot; size=&quot;sm&quot;>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" size="sm">
             Export CSV
           </Button>
-          <Button variant=&quot;outline&quot; size=&quot;sm&quot;>
+          <Button variant="outline" size="sm">
             Bulk Actions
           </Button>
         </div>
@@ -352,15 +352,15 @@ export default function AdminApprovalsPage() {
 
       {/* Counselor Detail Modal */}
       <Dialog open={isDetailModalOpen} onOpenChange={handleCloseModal}>
-        <DialogContent className=&quot;max-w-4xl max-h-[90vh] overflow-y-auto&quot;>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className=&quot;flex items-center gap-3&quot;>
-              <div className=&quot;p-2 rounded-lg bg-primary/10&quot;>
-                <User className=&quot;h-5 w-5 text-primary&quot; />
+            <DialogTitle className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <User className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <span className=&quot;text-muted-foreground&quot;>Counselor Application</span>
-                <h3 className=&quot;text-lg font-semibold&quot;>{selectedCounselor?.name}</h3>
+                <span className="text-muted-foreground">Counselor Application</span>
+                <h3 className="text-lg font-semibold">{selectedCounselor?.name}</h3>
               </div>
             </DialogTitle>
             <DialogDescription>
@@ -373,54 +373,54 @@ export default function AdminApprovalsPage() {
           </DialogHeader>
 
           {selectedCounselor && (
-            <div className=&quot;space-y-6 mt-6&quot;>
+            <div className="space-y-6 mt-6">
               {/* Basic Information */}
-              <div className=&quot;grid gap-6 md:grid-cols-2&quot;>
-                <div className=&quot;space-y-4&quot;>
-                  <div className=&quot;flex items-start gap-4&quot;>
-                    <Avatar className=&quot;h-16 w-16 flex-shrink-0&quot;>
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-4">
+                  <div className="flex items-start gap-4">
+                    <Avatar className="h-16 w-16 flex-shrink-0">
                       <AvatarImage src={selectedCounselor.avatar} alt={selectedCounselor.name} />
-                      <AvatarFallback className=&quot;text-lg&quot;>
-                        {selectedCounselor.name.split(&apos; &apos;).map(n => n[0]).join(&apos;')}
+                      <AvatarFallback className="text-lg">
+                        {selectedCounselor.name.split(' ').map(n => n[0]).join('')}
                       </AvatarFallback>
                     </Avatar>
-                    <div className=&quot;min-w-0 flex-1 space-y-2&quot;>
-                      <h4 className=&quot;text-lg font-semibold&quot;>{selectedCounselor.name}</h4>
-                      <div className=&quot;space-y-1&quot;>
-                        <div className=&quot;flex items-center gap-1 text-sm text-muted-foreground&quot;>
-                          <Mail className=&quot;h-3 w-3 flex-shrink-0&quot; />
-                          <span className=&quot;break-all&quot;>{selectedCounselor.email}</span>
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <h4 className="text-lg font-semibold">{selectedCounselor.name}</h4>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Mail className="h-3 w-3 flex-shrink-0" />
+                          <span className="break-all">{selectedCounselor.email}</span>
                         </div>
-                        <div className=&quot;flex items-center gap-1 text-sm text-muted-foreground&quot;>
-                          <Phone className=&quot;h-3 w-3 flex-shrink-0&quot; />
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Phone className="h-3 w-3 flex-shrink-0" />
                           <span>{selectedCounselor.phoneNumber}</span>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className=&quot;space-y-3&quot;>
-                    <div className=&quot;flex items-center gap-2&quot;>
-                      <MapPin className=&quot;h-4 w-4 text-muted-foreground flex-shrink-0&quot; />
-                      <span className=&quot;text-sm&quot;>{selectedCounselor.location}</span>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span className="text-sm">{selectedCounselor.location}</span>
                     </div>
-                    <div className=&quot;flex items-center gap-2&quot;>
-                      <Award className=&quot;h-4 w-4 text-muted-foreground flex-shrink-0&quot; />
-                      <span className=&quot;text-sm&quot;>{selectedCounselor.specialty}</span>
+                    <div className="flex items-center gap-2">
+                      <Award className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span className="text-sm">{selectedCounselor.specialty}</span>
                     </div>
-                    <div className=&quot;flex items-center gap-2&quot;>
-                      <Clock className=&quot;h-4 w-4 text-muted-foreground flex-shrink-0&quot; />
-                      <span className=&quot;text-sm&quot;>{selectedCounselor.experience} years experience</span>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span className="text-sm">{selectedCounselor.experience} years experience</span>
                     </div>
                   </div>
                 </div>
 
-                <div className=&quot;space-y-4&quot;>
+                <div className="space-y-4">
                   <div>
-                    <h5 className=&quot;font-medium mb-3 text-sm&quot;>Languages</h5>
-                    <div className=&quot;flex flex-wrap gap-2&quot;>
+                    <h5 className="font-medium mb-3 text-sm">Languages</h5>
+                    <div className="flex flex-wrap gap-2">
                       {selectedCounselor.languages?.map((language, index) => (
-                        <Badge key={index} variant=&quot;secondary&quot; className=&quot;text-xs&quot;>
+                        <Badge key={index} variant="secondary" className="text-xs">
                           {language}
                         </Badge>
                       )) ?? null}
@@ -428,16 +428,16 @@ export default function AdminApprovalsPage() {
                   </div>
 
                   <div>
-                    <h5 className=&quot;font-medium mb-3 text-sm&quot;>Availability</h5>
-                    <Badge className=&quot;bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400&quot;>
+                    <h5 className="font-medium mb-3 text-sm">Availability</h5>
+                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
                       {selectedCounselor.availability}
                     </Badge>
                   </div>
 
                   <div>
-                    <h5 className=&quot;font-medium mb-3 text-sm&quot;>Application Date</h5>
-                    <div className=&quot;flex items-center gap-1 text-sm text-muted-foreground&quot;>
-                      <Calendar className=&quot;h-3 w-3 flex-shrink-0&quot; />
+                    <h5 className="font-medium mb-3 text-sm">Application Date</h5>
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Calendar className="h-3 w-3 flex-shrink-0" />
                       <span>{selectedCounselor.createdAt.toLocaleDateString()}</span>
                     </div>
                   </div>
@@ -446,23 +446,23 @@ export default function AdminApprovalsPage() {
 
               {/* Professional License Information */}
               {(selectedCounselor as any).licenseNumber && (
-                <div className=&quot;space-y-6 border-t pt-6&quot;>
-                  <h5 className=&quot;font-medium flex items-center gap-2 text-sm&quot;>
-                    <Shield className=&quot;h-4 w-4&quot; />
+                <div className="space-y-6 border-t pt-6">
+                  <h5 className="font-medium flex items-center gap-2 text-sm">
+                    <Shield className="h-4 w-4" />
                     Professional License
                   </h5>
-                  <div className=&quot;grid grid-cols-1 md:grid-cols-3 gap-4&quot;>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <p className=&quot;text-xs text-muted-foreground mb-1&quot;>License Number</p>
-                      <p className=&quot;text-sm font-medium&quot;>{(selectedCounselor as any).licenseNumber || &apos;Not provided&apos;}</p>
+                      <p className="text-xs text-muted-foreground mb-1">License Number</p>
+                      <p className="text-sm font-medium">{(selectedCounselor as any).licenseNumber || 'Not provided'}</p>
                     </div>
                     <div>
-                      <p className=&quot;text-xs text-muted-foreground mb-1&quot;>License Expiry</p>
-                      <p className=&quot;text-sm font-medium&quot;>{(selectedCounselor as any).licenseExpiry || &apos;Not provided&apos;}</p>
+                      <p className="text-xs text-muted-foreground mb-1">License Expiry</p>
+                      <p className="text-sm font-medium">{(selectedCounselor as any).licenseExpiry || 'Not provided'}</p>
                     </div>
                     <div>
-                      <p className=&quot;text-xs text-muted-foreground mb-1&quot;>Issuing Authority</p>
-                      <p className=&quot;text-sm font-medium&quot;>{(selectedCounselor as any).issuingAuthority || &apos;Not provided&apos;}</p>
+                      <p className="text-xs text-muted-foreground mb-1">Issuing Authority</p>
+                      <p className="text-sm font-medium">{(selectedCounselor as any).issuingAuthority || 'Not provided'}</p>
                     </div>
                   </div>
                 </div>
@@ -470,37 +470,37 @@ export default function AdminApprovalsPage() {
 
               {/* Education Information */}
               {((selectedCounselor as any).highestDegree || (selectedCounselor as any).university) && (
-                <div className=&quot;space-y-6 border-t pt-6&quot;>
-                  <h5 className=&quot;font-medium flex items-center gap-2 text-sm&quot;>
-                    <GraduationCap className=&quot;h-4 w-4&quot; />
+                <div className="space-y-6 border-t pt-6">
+                  <h5 className="font-medium flex items-center gap-2 text-sm">
+                    <GraduationCap className="h-4 w-4" />
                     Education & Certifications
                   </h5>
-                  <div className=&quot;grid grid-cols-1 md:grid-cols-2 gap-4&quot;>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {(selectedCounselor as any).highestDegree && (
                       <div>
-                        <p className=&quot;text-xs text-muted-foreground mb-1&quot;>Highest Degree</p>
-                        <p className=&quot;text-sm font-medium&quot;>{(selectedCounselor as any).highestDegree}</p>
+                        <p className="text-xs text-muted-foreground mb-1">Highest Degree</p>
+                        <p className="text-sm font-medium">{(selectedCounselor as any).highestDegree}</p>
                       </div>
                     )}
                     {(selectedCounselor as any).university && (
                       <div>
-                        <p className=&quot;text-xs text-muted-foreground mb-1&quot;>University/Institution</p>
-                        <p className=&quot;text-sm font-medium&quot;>{(selectedCounselor as any).university}</p>
+                        <p className="text-xs text-muted-foreground mb-1">University/Institution</p>
+                        <p className="text-sm font-medium">{(selectedCounselor as any).university}</p>
                       </div>
                     )}
                     {(selectedCounselor as any).graduationYear && (
                       <div>
-                        <p className=&quot;text-xs text-muted-foreground mb-1&quot;>Graduation Year</p>
-                        <p className=&quot;text-sm font-medium&quot;>{(selectedCounselor as any).graduationYear}</p>
+                        <p className="text-xs text-muted-foreground mb-1">Graduation Year</p>
+                        <p className="text-sm font-medium">{(selectedCounselor as any).graduationYear}</p>
                       </div>
                     )}
                   </div>
                   {(selectedCounselor as any).additionalCertifications && (selectedCounselor as any).additionalCertifications.length > 0 && (
-                    <div className=&quot;mt-4&quot;>
-                      <p className=&quot;text-xs text-muted-foreground mb-2&quot;>Additional Certifications</p>
-                      <div className=&quot;flex flex-wrap gap-2&quot;>
+                    <div className="mt-4">
+                      <p className="text-xs text-muted-foreground mb-2">Additional Certifications</p>
+                      <div className="flex flex-wrap gap-2">
                         {(selectedCounselor as any).additionalCertifications.map((cert: string, index: number) => (
-                          <Badge key={index} variant=&quot;secondary&quot; className=&quot;text-xs&quot;>
+                          <Badge key={index} variant="secondary" className="text-xs">
                             {cert}
                           </Badge>
                         ))}
@@ -512,13 +512,13 @@ export default function AdminApprovalsPage() {
 
               {/* Specializations & Consultation Types */}
               {((selectedCounselor as any).specializations || (selectedCounselor as any).consultationTypes) && (
-                <div className=&quot;space-y-4 border-t pt-6&quot;>
+                <div className="space-y-4 border-t pt-6">
                   {(selectedCounselor as any).specializations && (selectedCounselor as any).specializations.length > 0 && (
                     <div>
-                      <h5 className=&quot;font-medium mb-3 text-sm&quot;>Specializations</h5>
-                      <div className=&quot;flex flex-wrap gap-2&quot;>
+                      <h5 className="font-medium mb-3 text-sm">Specializations</h5>
+                      <div className="flex flex-wrap gap-2">
                         {(selectedCounselor as any).specializations.map((spec: string, index: number) => (
-                          <Badge key={index} variant=&quot;outline&quot; className=&quot;text-xs&quot;>
+                          <Badge key={index} variant="outline" className="text-xs">
                             {spec}
                           </Badge>
                         ))}
@@ -527,8 +527,8 @@ export default function AdminApprovalsPage() {
                   )}
                   {(selectedCounselor as any).consultationTypes && (selectedCounselor as any).consultationTypes.length > 0 && (
                     <div>
-                      <h5 className=&quot;font-medium mb-3 text-sm&quot;>Consultation Types</h5>
-                      <div className=&quot;flex flex-wrap gap-2&quot;>
+                      <h5 className="font-medium mb-3 text-sm">Consultation Types</h5>
+                      <div className="flex flex-wrap gap-2">
                         {(selectedCounselor as any).consultationTypes.map((type: string, index: number) => {
                           const icons: Record<string, any> = {
                             chat: MessageCircle,
@@ -542,8 +542,8 @@ export default function AdminApprovalsPage() {
                           };
                           const Icon = icons[type] || MessageCircle;
                           return (
-                            <Badge key={index} variant=&quot;secondary&quot; className=&quot;text-xs flex items-center gap-1&quot;>
-                              <Icon className=&quot;h-3 w-3&quot; />
+                            <Badge key={index} variant="secondary" className="text-xs flex items-center gap-1">
+                              <Icon className="h-3 w-3" />
                               {labels[type] || type}
                             </Badge>
                           );
@@ -556,178 +556,178 @@ export default function AdminApprovalsPage() {
 
               {/* Previous Employers */}
               {(selectedCounselor as any).previousEmployers && (
-                <div className=&quot;space-y-3 border-t pt-6&quot;>
-                  <h5 className=&quot;font-medium flex items-center gap-2 text-sm&quot;>
-                    <Briefcase className=&quot;h-4 w-4&quot; />
+                <div className="space-y-3 border-t pt-6">
+                  <h5 className="font-medium flex items-center gap-2 text-sm">
+                    <Briefcase className="h-4 w-4" />
                     Previous Employers/Experience
                   </h5>
-                  <div className=&quot;p-4 border rounded-lg bg-muted/50&quot;>
-                    <p className=&quot;text-sm leading-relaxed whitespace-pre-wrap&quot;>{(selectedCounselor as any).previousEmployers}</p>
+                  <div className="p-4 border rounded-lg bg-muted/50">
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{(selectedCounselor as any).previousEmployers}</p>
                   </div>
                 </div>
               )}
 
               {/* Professional Information */}
-              <div className=&quot;space-y-6 border-t pt-6&quot;>
-                <div className=&quot;space-y-3&quot;>
-                  <h5 className=&quot;font-medium flex items-center gap-2 text-sm&quot;>
-                    <GraduationCap className=&quot;h-4 w-4&quot; />
+              <div className="space-y-6 border-t pt-6">
+                <div className="space-y-3">
+                  <h5 className="font-medium flex items-center gap-2 text-sm">
+                    <GraduationCap className="h-4 w-4" />
                     Credentials
                   </h5>
-                  <div className=&quot;p-4 border rounded-lg bg-muted/50&quot;>
-                    <p className=&quot;text-sm leading-relaxed&quot;>{selectedCounselor.credentials || &apos;Not provided&apos;}</p>
+                  <div className="p-4 border rounded-lg bg-muted/50">
+                    <p className="text-sm leading-relaxed">{selectedCounselor.credentials || 'Not provided'}</p>
                   </div>
                 </div>
 
-                <div className=&quot;space-y-3&quot;>
-                  <h5 className=&quot;font-medium flex items-center gap-2 text-sm&quot;>
-                    <FileText className=&quot;h-4 w-4&quot; />
+                <div className="space-y-3">
+                  <h5 className="font-medium flex items-center gap-2 text-sm">
+                    <FileText className="h-4 w-4" />
                     Professional Bio
                   </h5>
-                  <div className=&quot;p-4 border rounded-lg bg-muted/50&quot;>
-                    <p className=&quot;text-sm leading-relaxed&quot;>{selectedCounselor.bio || &apos;Not provided&apos;}</p>
+                  <div className="p-4 border rounded-lg bg-muted/50">
+                    <p className="text-sm leading-relaxed">{selectedCounselor.bio || 'Not provided'}</p>
                   </div>
                 </div>
               </div>
 
               {/* Motivation */}
               {(selectedCounselor as any).motivation && (
-                <div className=&quot;space-y-3 border-t pt-6&quot;>
-                  <h5 className=&quot;font-medium flex items-center gap-2 text-sm&quot;>
-                    <Heart className=&quot;h-4 w-4&quot; />
+                <div className="space-y-3 border-t pt-6">
+                  <h5 className="font-medium flex items-center gap-2 text-sm">
+                    <Heart className="h-4 w-4" />
                     Motivation to Join RCR
                   </h5>
-                  <div className=&quot;p-4 border rounded-lg bg-muted/50&quot;>
-                    <p className=&quot;text-sm leading-relaxed whitespace-pre-wrap&quot;>{(selectedCounselor as any).motivation}</p>
+                  <div className="p-4 border rounded-lg bg-muted/50">
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{(selectedCounselor as any).motivation}</p>
                   </div>
                 </div>
               )}
 
               {/* References */}
               {(selectedCounselor as any).references && (
-                <div className=&quot;space-y-3 border-t pt-6&quot;>
-                  <h5 className=&quot;font-medium flex items-center gap-2 text-sm&quot;>
-                    <User className=&quot;h-4 w-4&quot; />
+                <div className="space-y-3 border-t pt-6">
+                  <h5 className="font-medium flex items-center gap-2 text-sm">
+                    <User className="h-4 w-4" />
                     Professional References
                   </h5>
-                  <div className=&quot;p-4 border rounded-lg bg-muted/50&quot;>
-                    <p className=&quot;text-sm leading-relaxed whitespace-pre-wrap&quot;>{(selectedCounselor as any).references}</p>
+                  <div className="p-4 border rounded-lg bg-muted/50">
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{(selectedCounselor as any).references}</p>
                   </div>
                 </div>
               )}
 
               {/* Emergency Contact */}
               {(selectedCounselor as any).emergencyContact && (
-                <div className=&quot;space-y-3 border-t pt-6&quot;>
-                  <h5 className=&quot;font-medium flex items-center gap-2 text-sm&quot;>
-                    <Phone className=&quot;h-4 w-4&quot; />
+                <div className="space-y-3 border-t pt-6">
+                  <h5 className="font-medium flex items-center gap-2 text-sm">
+                    <Phone className="h-4 w-4" />
                     Emergency Contact
                   </h5>
-                  <div className=&quot;p-4 border rounded-lg bg-muted/50&quot;>
-                    <p className=&quot;text-sm&quot;>{(selectedCounselor as any).emergencyContact}</p>
+                  <div className="p-4 border rounded-lg bg-muted/50">
+                    <p className="text-sm">{(selectedCounselor as any).emergencyContact}</p>
                   </div>
                 </div>
               )}
 
               {/* Document Uploads */}
-              <div className=&quot;space-y-4 border-t pt-6&quot;>
-                <h5 className=&quot;font-medium flex items-center gap-2 text-sm&quot;>
-                  <Download className=&quot;h-4 w-4&quot; />
+              <div className="space-y-4 border-t pt-6">
+                <h5 className="font-medium flex items-center gap-2 text-sm">
+                  <Download className="h-4 w-4" />
                   Uploaded Documents
                 </h5>
                 {(selectedCounselor as any).resumeFile || (selectedCounselor as any).licenseFile || (selectedCounselor as any).certificationsFile ? (
-                  <div className=&quot;grid grid-cols-1 md:grid-cols-3 gap-4&quot;>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {(selectedCounselor as any).resumeFile ? (
                       <a 
                         href={(selectedCounselor as any).resumeFile}
-                        target=&quot;_blank&quot;
-                        rel=&quot;noopener noreferrer&quot;
-                        className=&quot;block p-3 border rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer group&quot;
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block p-3 border rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer group"
                       >
-                        <div className=&quot;flex items-center justify-between mb-2&quot;>
-                          <FileText className=&quot;h-5 w-5 text-primary group-hover:text-primary/80&quot; />
-                          <Download className=&quot;h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity&quot; />
+                        <div className="flex items-center justify-between mb-2">
+                          <FileText className="h-5 w-5 text-primary group-hover:text-primary/80" />
+                          <Download className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
-                        <p className=&quot;text-xs text-muted-foreground mb-1&quot;>Resume/CV</p>
-                        <p className=&quot;text-sm font-medium truncate group-hover:text-primary transition-colors&quot;>View PDF</p>
+                        <p className="text-xs text-muted-foreground mb-1">Resume/CV</p>
+                        <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">View PDF</p>
                       </a>
                     ) : (
-                      <div className=&quot;p-3 border border-dashed rounded-lg bg-muted/20&quot;>
-                        <FileText className=&quot;h-5 w-5 mb-2 text-muted-foreground&quot; />
-                        <p className=&quot;text-xs text-muted-foreground mb-1&quot;>Resume/CV</p>
-                        <p className=&quot;text-xs text-muted-foreground&quot;>Not uploaded</p>
+                      <div className="p-3 border border-dashed rounded-lg bg-muted/20">
+                        <FileText className="h-5 w-5 mb-2 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground mb-1">Resume/CV</p>
+                        <p className="text-xs text-muted-foreground">Not uploaded</p>
                       </div>
                     )}
                     {(selectedCounselor as any).licenseFile ? (
                       <a 
                         href={(selectedCounselor as any).licenseFile}
-                        target=&quot;_blank&quot;
-                        rel=&quot;noopener noreferrer&quot;
-                        className=&quot;block p-3 border rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer group&quot;
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block p-3 border rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer group"
                       >
-                        <div className=&quot;flex items-center justify-between mb-2&quot;>
-                          <Shield className=&quot;h-5 w-5 text-primary group-hover:text-primary/80&quot; />
-                          <Download className=&quot;h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity&quot; />
+                        <div className="flex items-center justify-between mb-2">
+                          <Shield className="h-5 w-5 text-primary group-hover:text-primary/80" />
+                          <Download className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
-                        <p className=&quot;text-xs text-muted-foreground mb-1&quot;>License</p>
-                        <p className=&quot;text-sm font-medium truncate group-hover:text-primary transition-colors&quot;>View PDF</p>
+                        <p className="text-xs text-muted-foreground mb-1">License</p>
+                        <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">View PDF</p>
                       </a>
                     ) : (
-                      <div className=&quot;p-3 border border-dashed rounded-lg bg-muted/20&quot;>
-                        <Shield className=&quot;h-5 w-5 mb-2 text-muted-foreground&quot; />
-                        <p className=&quot;text-xs text-muted-foreground mb-1&quot;>License</p>
-                        <p className=&quot;text-xs text-muted-foreground&quot;>Not uploaded</p>
+                      <div className="p-3 border border-dashed rounded-lg bg-muted/20">
+                        <Shield className="h-5 w-5 mb-2 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground mb-1">License</p>
+                        <p className="text-xs text-muted-foreground">Not uploaded</p>
                       </div>
                     )}
                     {(selectedCounselor as any).certificationsFile ? (
                       <a 
                         href={(selectedCounselor as any).certificationsFile}
-                        target=&quot;_blank&quot;
-                        rel=&quot;noopener noreferrer&quot;
-                        className=&quot;block p-3 border rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer group&quot;
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block p-3 border rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer group"
                       >
-                        <div className=&quot;flex items-center justify-between mb-2&quot;>
-                          <Award className=&quot;h-5 w-5 text-primary group-hover:text-primary/80&quot; />
-                          <Download className=&quot;h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity&quot; />
+                        <div className="flex items-center justify-between mb-2">
+                          <Award className="h-5 w-5 text-primary group-hover:text-primary/80" />
+                          <Download className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
-                        <p className=&quot;text-xs text-muted-foreground mb-1&quot;>Certifications</p>
-                        <p className=&quot;text-sm font-medium truncate group-hover:text-primary transition-colors&quot;>View PDF</p>
+                        <p className="text-xs text-muted-foreground mb-1">Certifications</p>
+                        <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">View PDF</p>
                       </a>
                     ) : (
-                      <div className=&quot;p-3 border border-dashed rounded-lg bg-muted/20&quot;>
-                        <Award className=&quot;h-5 w-5 mb-2 text-muted-foreground&quot; />
-                        <p className=&quot;text-xs text-muted-foreground mb-1&quot;>Certifications</p>
-                        <p className=&quot;text-xs text-muted-foreground&quot;>Not uploaded</p>
+                      <div className="p-3 border border-dashed rounded-lg bg-muted/20">
+                        <Award className="h-5 w-5 mb-2 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground mb-1">Certifications</p>
+                        <p className="text-xs text-muted-foreground">Not uploaded</p>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className=&quot;p-6 border border-dashed rounded-lg bg-muted/20 text-center&quot;>
-                    <Download className=&quot;h-8 w-8 text-muted-foreground mx-auto mb-2&quot; />
-                    <p className=&quot;text-sm text-muted-foreground&quot;>No documents uploaded</p>
+                  <div className="p-6 border border-dashed rounded-lg bg-muted/20 text-center">
+                    <Download className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">No documents uploaded</p>
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          <DialogFooter className=&quot;gap-2&quot;>
-            <Button variant=&quot;outline&quot; onClick={handleCloseModal}>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={handleCloseModal}>
               Close
             </Button>
             <Button
-              variant=&quot;destructive&quot;
+              variant="destructive"
               onClick={() => selectedCounselor && handleReject(selectedCounselor.id)}
               disabled={isProcessing}
             >
               {isProcessing ? (
                 <>
-                  <div className=&quot;animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2&quot; />
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
                   Processing...
                 </>
               ) : (
                 <>
-                  <XCircle className=&quot;h-4 w-4 mr-2&quot; />
+                  <XCircle className="h-4 w-4 mr-2" />
                   Reject
                 </>
               )}
@@ -735,16 +735,16 @@ export default function AdminApprovalsPage() {
             <Button
               onClick={() => selectedCounselor && handleApprove(selectedCounselor.id)}
               disabled={isProcessing}
-              className=&quot;bg-green-600 hover:bg-green-700&quot;
+              className="bg-green-600 hover:bg-green-700"
             >
               {isProcessing ? (
                 <>
-                  <div className=&quot;animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2&quot; />
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
                   Processing...
                 </>
               ) : (
                 <>
-                  <CheckCircle className=&quot;h-4 w-4 mr-2&quot; />
+                  <CheckCircle className="h-4 w-4 mr-2" />
                   Approve
                 </>
               )}

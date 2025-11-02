@@ -275,8 +275,8 @@ export default function CounselorChatPage() {
                             </div>
                             <p className="text-xs text-muted-foreground truncate">
                               {chat.lastMessage?.content ? 
-                                (chat.lastMessage.content.length > 50 
-                                  ? chat.lastMessage.content.substring(0, 50) + '...' 
+                                (chat.lastMessage.content.length > 30 
+                                  ? chat.lastMessage.content.substring(0, 30) + '...' 
                                   : chat.lastMessage.content)
                                 : 'No messages yet'}
                             </p>

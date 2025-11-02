@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Sidebar, SidebarBody, SidebarLink, useSidebar, SidebarProvider } from "@workspace/ui/components/ui/sidebar";
+import { Sidebar, SidebarBody, SidebarLink, useSidebar } from "@workspace/ui/components/ui/sidebar";
 import { RCRLogo } from "@workspace/ui/components/rcr-logo";
 import {
   LayoutDashboard,
@@ -262,7 +262,6 @@ export function DashboardSidebar({
 
   return (
     <div className={cn("h-full", className)}>
-      <SidebarProvider>
       <Sidebar open={open} setOpen={setOpen}>
         <SidebarBody className="justify-between gap-10" hideMobileTrigger>
           <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
@@ -283,7 +282,6 @@ export function DashboardSidebar({
           </div>
         </SidebarBody>
       </Sidebar>
-      </SidebarProvider>
     </div>
   );
 }

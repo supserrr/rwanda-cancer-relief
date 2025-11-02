@@ -192,6 +192,13 @@ export default function AdminResourcesReviewPage() {
     setDeleteConfirmOpen(true);
   };
 
+  const handleDeleteResource = (resourceId: string) => {
+    const resource = resources.find(r => r.id === resourceId);
+    if (resource) {
+      handleDeleteClick(resource);
+    }
+  };
+
   const handleDeleteConfirm = () => {
     if (resourceToDelete) {
       setResources(prev => prev.filter(r => r.id !== resourceToDelete.id));
@@ -210,15 +217,15 @@ export default function AdminResourcesReviewPage() {
     setViewingArticle(null);
   };
 
-  const handleDownloadResource = (resource: Resource) => {
+  const handleDownloadResource = (resource: Resource | any) => {
     console.log('Download resource:', resource.title);
   };
 
-  const handleShareResource = (resource: Resource) => {
+  const handleShareResource = (resource: Resource | any) => {
     console.log('Share resource:', resource.title);
   };
 
-  const handleBookmarkResource = (resource: Resource) => {
+  const handleBookmarkResource = (resource: Resource | any) => {
     console.log('Bookmark resource:', resource.title);
   };
 
@@ -512,7 +519,7 @@ export default function AdminResourcesReviewPage() {
           isOpen={isEditOpen}
           onClose={handleCloseEditModal}
           onSave={handleSaveResource}
-          onDelete={handleDeleteClick}
+          onDelete={handleDeleteResource}
         />
       )}
 
@@ -535,7 +542,6 @@ export default function AdminResourcesReviewPage() {
           onShare={handleShareResource}
           onBookmark={handleBookmarkResource}
           onDownload={handleDownloadResource}
-          onEdit={handleEditResource}
         />
       )}
 

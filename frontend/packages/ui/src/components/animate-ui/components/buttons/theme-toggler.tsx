@@ -34,8 +34,8 @@ const getNextTheme = (
   modes: ThemeSelection[],
 ): ThemeSelection => {
   const i = modes.indexOf(effective);
-  if (i === -1) return modes[0];
-  return modes[(i + 1) % modes.length];
+  if (i === -1) return modes[0] || 'light';
+  return modes[(i + 1) % modes.length] || 'light';
 };
 
 type ThemeTogglerButtonProps = React.ComponentProps<'button'> &

@@ -447,7 +447,7 @@ export default function PatientChatPage() {
             setSelectedCounselor(null);
           }}
           counselor={selectedCounselor}
-          onConfirm={handleConfirmBooking}
+          onBookingConfirmed={handleConfirmBooking}
         />
       )}
     </div>

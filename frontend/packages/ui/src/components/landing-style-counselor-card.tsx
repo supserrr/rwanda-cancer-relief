@@ -48,7 +48,7 @@ export function LandingStyleCounselorCard({
   const consultationTypes: ('chat' | 'video' | 'phone')[] = ['chat', 'video', 'phone'];
 
   // Use working placeholder images
-  const placeholderImages = [
+  const placeholderImages: string[] = [
     'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&h=400&fit=crop&auto=format&q=80',
     'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&auto=format&q=80',
     'https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=400&h=400&fit=crop&auto=format&q=80',
@@ -56,13 +56,14 @@ export function LandingStyleCounselorCard({
   ];
 
   // Get a consistent image based on counselor ID
-  const getImageUrl = () => {
+  const getImageUrl = (): string => {
     if (avatar && !avatar.startsWith('/avatars/')) {
       return avatar;
     }
     // Use ID to get consistent placeholder
     const index = parseInt(id) % placeholderImages.length;
-    return placeholderImages[index];
+    const image = placeholderImages[index];
+    return image || placeholderImages[0] || 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&h=400&fit=crop&auto=format&q=80';
   };
 
   const getAvailabilityBadge = () => {
@@ -111,7 +112,7 @@ export function LandingStyleCounselorCard({
         className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
         onError={(e) => {
           // Fallback to first placeholder if image fails to load
-          e.currentTarget.src = placeholderImages[0];
+          e.currentTarget.src = placeholderImages[0] || '';
         }}
       />
 

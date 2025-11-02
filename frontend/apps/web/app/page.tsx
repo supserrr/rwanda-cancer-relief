@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
+import { motion, useScroll, useTransform, useSpring, type MotionValue } from 'framer-motion';
 import { useRef } from 'react';
 import { Button } from "@workspace/ui/components/button";
 import { Navbar } from "@workspace/ui/components/ui/mini-navbar";
@@ -10,7 +10,6 @@ import { ClockIcon } from '@workspace/ui/components/clock';
 import { ShieldCheckIcon } from '@workspace/ui/components/shield-check';
 import { FAQSection } from '@workspace/ui/components/ui/faqsection';
 import { Footer } from '@workspace/ui/components/ui/footer';
-import { RCRLogo } from '@workspace/ui/components/rcr-logo';
 
 /**
  * Props for the LinePath component.
@@ -23,7 +22,7 @@ interface LinePathProps {
   /**
    * Scroll progress value from Framer Motion.
    */
-  scrollYProgress: any;
+  scrollYProgress: MotionValue<number>;
 }
 
 /**
@@ -86,7 +85,6 @@ export default function LandingPage() {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
-    layoutEffect: false,
     offset: ['start start', 'end end'],
   });
 

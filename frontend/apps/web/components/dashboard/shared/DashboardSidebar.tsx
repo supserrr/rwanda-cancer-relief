@@ -225,7 +225,7 @@ export function DashboardSidebar({
   onNavigate, 
   className 
 }: DashboardSidebarProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   
   const filteredItems = navigationItems.filter(item => 
     item.roles.includes(userRole)

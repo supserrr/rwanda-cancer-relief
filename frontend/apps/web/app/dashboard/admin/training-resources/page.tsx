@@ -80,10 +80,10 @@ export default function AdminTrainingResourcesPage() {
   const [uploadForm, setUploadForm] = useState({
     title: '',
     description: '',
-    type: 'course' as const,
+    type: 'course' as 'course' | 'workshop' | 'video' | 'document' | 'presentation',
     category: '',
     duration: '',
-    difficulty: 'Beginner' as const,
+    difficulty: 'Beginner' as 'Beginner' | 'Intermediate' | 'Advanced',
     instructor: '',
     learningObjectives: '',
     tags: ''

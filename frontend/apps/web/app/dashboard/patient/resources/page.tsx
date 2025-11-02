@@ -75,17 +75,17 @@ export default function PatientResourcesPage() {
     setSelectedResource(null);
   };
 
-  const handleDownloadResource = (resource: Resource) => {
+  const handleDownloadResource = (resource: Resource | any) => {
     console.log('Download resource:', resource.title);
     // Implement download logic
   };
 
-  const handleShareResource = (resource: Resource) => {
+  const handleShareResource = (resource: Resource | any) => {
     console.log('Share resource:', resource.title);
     // Implement share logic
   };
 
-  const handleBookmarkResource = (resource: Resource) => {
+  const handleBookmarkResource = (resource: Resource | any) => {
     console.log('Bookmark resource:', resource.title);
     // Toggle saved state
     setSavedResources(prev => 

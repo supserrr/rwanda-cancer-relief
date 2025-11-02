@@ -11,7 +11,8 @@ import {
   Module,
   DashboardStats,
   SystemHealth,
-  MaintenanceLog
+  MaintenanceLog,
+  TrainingResource
 } from '../types';
 
 // Sample Users

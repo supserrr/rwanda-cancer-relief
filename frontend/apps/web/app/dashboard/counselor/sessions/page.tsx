@@ -318,7 +318,6 @@ export default function CounselorSessionsPage() {
                     patientName={getPatientName(session.patientId)}
                     counselorName="Dr. Marie Claire"
                     patientAvatar={getPatientAvatar(session.patientId)}
-                    onViewNotes={handleViewNotes}
                   />
                 ))}
               </div>

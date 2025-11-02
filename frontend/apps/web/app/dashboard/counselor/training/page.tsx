@@ -138,7 +138,7 @@ export default function CounselorTrainingPage() {
   };
 
   const handleCloseModal = () => {
-    setIsDetailModalOpen(false);
+    setIsViewerOpen(false);
     setSelectedResource(null);
   };
 

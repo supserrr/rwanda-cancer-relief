@@ -35,7 +35,7 @@ import {
   FileText,
   Flag
 } from 'lucide-react';
-import { dummyChats, dummyMessages, dummyPatients } from '../../../../lib/dummy-data';
+import { dummyChats, dummyMessages, dummyPatients, dummyCounselors } from '../../../../lib/dummy-data';
 import { ProfileViewModal } from '@workspace/ui/components/profile-view-modal';
 import { ScheduleSessionModal } from '../../../../components/session/ScheduleSessionModal';
 
@@ -48,6 +48,7 @@ export default function CounselorChatPage() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
+  const currentCounselor = dummyCounselors[0]; // Dr. Marie Uwimana
 
   // Check for chatId in URL query params on mount
   useEffect(() => {
@@ -480,15 +481,18 @@ export default function CounselorChatPage() {
       )}
 
       {/* Schedule Session Modal */}
-      {selectedPatient && (
+      {isScheduleOpen && (
         <ScheduleSessionModal
           isOpen={isScheduleOpen}
           onClose={() => {
             setIsScheduleOpen(false);
             setSelectedPatient(null);
           }}
-          patient={selectedPatient}
-          onConfirm={handleConfirmSchedule}
+          counselorId={currentCounselor?.id || '2'}
+          counselorName={currentCounselor?.name || 'Dr. Marie Uwimana'}
+          patients={dummyPatients}
+          preselectedPatientId={selectedPatient?.id}
+          onSchedule={handleConfirmSchedule}
         />
       )}
     </div>

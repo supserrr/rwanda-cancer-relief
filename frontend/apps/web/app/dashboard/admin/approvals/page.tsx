@@ -272,7 +272,7 @@ export default function AdminApprovalsPage() {
                     <Avatar className="h-10 w-10">
                       <AvatarImage src={counselor.avatar} alt={counselor.name} />
                       <AvatarFallback>
-                        {counselor.name.split(' ').map(n => n[0]).join('')}
+                        {counselor.name.split(' ').map((n: string) => n[0]).join('')}
                       </AvatarFallback>
                     </Avatar>
                     <div>
@@ -293,7 +293,7 @@ export default function AdminApprovalsPage() {
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
-                    {counselor.languages?.slice(0, 2).map((lang, index) => (
+                    {counselor.languages?.slice(0, 2).map((lang: string, index: number) => (
                       <Badge key={index} variant="secondary" className="text-xs">
                         {lang}
                       </Badge>

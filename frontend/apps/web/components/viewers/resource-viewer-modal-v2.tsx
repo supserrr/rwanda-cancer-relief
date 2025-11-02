@@ -6,6 +6,7 @@ import { Button } from '@workspace/ui/components/button';
 import { Badge } from '@workspace/ui/components/badge';
 import { Download, Share2, Bookmark, ExternalLink, Play } from 'lucide-react';
 import { VideoPlayer } from '../ui/video-player';
+import { Resource } from '../../lib/types';
 
 type ResourceLike = {
   id: string;
@@ -20,16 +21,17 @@ type ResourceLike = {
   isYouTube?: boolean;
   youtubeUrl?: string;
   content?: string;
+  isPublic?: boolean;
 };
 
 interface ResourceViewerModalV2Props {
-  resource: ResourceLike;
+  resource: ResourceLike | Resource;
   isOpen: boolean;
   onClose: () => void;
-  onDownload?: (resource: ResourceLike) => void;
-  onShare?: (resource: ResourceLike) => void;
-  onBookmark?: (resource: ResourceLike) => void;
-  onViewArticle?: (resource: ResourceLike) => void;
+  onDownload?: (resource: ResourceLike | Resource) => void;
+  onShare?: (resource: ResourceLike | Resource) => void;
+  onBookmark?: (resource: ResourceLike | Resource) => void;
+  onViewArticle?: (resource: ResourceLike | Resource) => void;
 }
 
 export function ResourceViewerModalV2({ resource, isOpen, onClose, onDownload, onShare, onBookmark, onViewArticle }: ResourceViewerModalV2Props) {

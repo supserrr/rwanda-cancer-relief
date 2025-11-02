@@ -1,5 +1,3 @@
-import Image from 'next/image';
-
 interface RCRLogoProps {
   variant?: 'full' | 'simple';
   className?: string;
@@ -29,7 +27,7 @@ export function RCRLogo({
     : 'Rwanda Cancer Relief - Logo';
 
   return (
-    <Image
+    <img
       src={logoSrc}
       alt={altText}
       width={width}
@@ -40,7 +38,6 @@ export function RCRLogo({
         height: `${height}px`,
         objectFit: 'contain'
       }}
-      priority
     />
   );
 }

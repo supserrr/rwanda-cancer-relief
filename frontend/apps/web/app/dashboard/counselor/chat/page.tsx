@@ -187,7 +187,7 @@ export default function CounselorChatPage() {
         description="Communicate with your patients and provide ongoing support"
       />
 
-      <div className="grid gap-4 md:gap-6 lg:grid-cols-4 h-[calc(100vh-280px)] md:h-[600px]">
+      <div className="grid gap-4 md:gap-6 lg:grid-cols-4 h-[calc(100vh-16rem)] md:h-[600px]">
         {/* Chat List */}
         <div className={`lg:col-span-1 ${showConversations ? 'block' : 'hidden lg:block'}`}>
           <AnimatedCard delay={0.5} className="h-full flex flex-col">

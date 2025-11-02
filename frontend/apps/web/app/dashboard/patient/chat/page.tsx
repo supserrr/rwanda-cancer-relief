@@ -30,7 +30,8 @@ import {
   Bell,
   BellOff,
   User,
-  Calendar
+  Calendar,
+  ArrowLeft
 } from 'lucide-react';
 import { dummyChats, dummyMessages, dummyCounselors } from '../../../../lib/dummy-data';
 import { ProfileViewModal } from '@workspace/ui/components/profile-view-modal';
@@ -157,9 +158,9 @@ export default function PatientChatPage() {
         description="Chat with your counselors and get support when you need it"
       />
 
-      <div className="grid gap-6 lg:grid-cols-4 h-[600px]">
+      <div className="grid gap-6 lg:grid-cols-4 h-[calc(100vh-280px)] md:h-[600px]">
         {/* Chat List */}
-        <div className="lg:col-span-1">
+        <div className="hidden lg:col-span-1 lg:block">
           <AnimatedCard delay={0.5} className="h-full">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -261,7 +262,7 @@ export default function PatientChatPage() {
         </div>
 
         {/* Chat Area */}
-        <div className="lg:col-span-3">
+        <div className="col-span-1 lg:col-span-3">
           <AnimatedCard delay={0.7} className="h-full flex flex-col">
             {activeChat ? (
               <>
@@ -383,10 +384,10 @@ export default function PatientChatPage() {
                 </CardContent>
 
                 {/* Message Input */}
-                <div className="p-4 border-t">
-                  <div className="flex items-center space-x-2">
-                    <Button size="sm" variant="ghost" title="Attach file">
-                      <Paperclip className="h-4 w-4" />
+                <div className="p-2 md:p-4 border-t">
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="ghost" title="Attach file" className="h-10 w-10 p-0">
+                      <Paperclip className="h-5 w-5" />
                     </Button>
                     <div className="flex-1 relative">
                       <Input
@@ -394,18 +395,18 @@ export default function PatientChatPage() {
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                         onKeyPress={handleKeyPress}
-                        className="pr-10"
+                        className="pr-10 h-10"
                       />
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="absolute right-1 top-1/2 transform -translate-y-1/2"
+                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
                       >
                         <Smile className="h-4 w-4" />
                       </Button>
                     </div>
-                    <Button onClick={handleSendMessage} disabled={!newMessage.trim()}>
-                      <Send className="h-4 w-4" />
+                    <Button onClick={handleSendMessage} disabled={!newMessage.trim()} className="h-10 w-10 p-0">
+                      <Send className="h-5 w-5" />
                     </Button>
                   </div>
                 </div>

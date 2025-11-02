@@ -113,7 +113,7 @@ function ThemeToggler({
         .animate(
           { clipPath: [fromClip, toClip] },
           {
-            duration: 700,
+            duration: 300,
             easing: 'ease-in-out',
             pseudoElement: '::view-transition-new(root)',
           },

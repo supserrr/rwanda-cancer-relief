@@ -330,15 +330,15 @@ export default function CounselorResourcesPage() {
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="view" className="flex items-center gap-2">
             <Eye className="h-4 w-4" />
-            View Resources
+            <span className="hidden md:inline">View Resources</span>
           </TabsTrigger>
           <TabsTrigger value="saved" className="flex items-center gap-2">
             <Download className="h-4 w-4" />
-            Saved Resources
+            <span className="hidden md:inline">Saved Resources</span>
           </TabsTrigger>
           <TabsTrigger value="manage" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
-            Add Resources
+            <span className="hidden md:inline">Add Resources</span>
           </TabsTrigger>
         </TabsList>
 

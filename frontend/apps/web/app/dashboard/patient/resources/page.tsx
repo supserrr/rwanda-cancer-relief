@@ -178,27 +178,27 @@ export default function PatientResourcesPage() {
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="all" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
-            All
+            <span className="hidden md:inline">All</span>
           </TabsTrigger>
           <TabsTrigger value="saved" className="flex items-center gap-2">
             <Download className="h-4 w-4" />
-            Saved
+            <span className="hidden md:inline">Saved</span>
           </TabsTrigger>
           <TabsTrigger value="audio" className="flex items-center gap-2">
             <Play className="h-4 w-4" />
-            Audio
+            <span className="hidden md:inline">Audio</span>
           </TabsTrigger>
           <TabsTrigger value="pdf" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
-            PDF
+            <span className="hidden md:inline">PDF</span>
           </TabsTrigger>
           <TabsTrigger value="video" className="flex items-center gap-2">
             <Video className="h-4 w-4" />
-            Video
+            <span className="hidden md:inline">Video</span>
           </TabsTrigger>
           <TabsTrigger value="article" className="flex items-center gap-2">
             <BookOpen className="h-4 w-4" />
-            Articles
+            <span className="hidden md:inline">Articles</span>
           </TabsTrigger>
         </TabsList>
 

@@ -56,14 +56,6 @@ function ThemeToggler({
 
       setCurrent({ effective: theme, resolved });
       onImmediateChange?.(theme);
-      
-      // Apply class to html element immediately
-      if (resolved === 'dark') {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-      
       setTheme(theme);
     },
     [onImmediateChange, setTheme],

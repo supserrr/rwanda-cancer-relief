@@ -24,7 +24,7 @@ export default function CounselorAIChatPage() {
   const [activeThreadId, setActiveThreadId] = useState<string | undefined>();
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
-  const [showSidebar, setShowSidebar] = useState(true); // Control sidebar visibility on mobile
+  const [showSidebar, setShowSidebar] = useState(false); // Control sidebar visibility on mobile
   useEffect(() => {
     // Scroll to bottom when messages change
     const timer = setTimeout(() => {
@@ -106,13 +106,11 @@ export default function CounselorAIChatPage() {
 
   const handleThreadSelect = (threadId: string) => {
     setActiveThreadId(threadId);
-    setShowSidebar(false); // Hide sidebar on mobile when thread selected
     console.log('Selected thread:', threadId);
   };
 
   const handleNewThread = () => {
     setActiveThreadId(undefined);
-    setShowSidebar(false); // Hide sidebar on mobile when new thread created
     console.log('Creating new thread');
   };
 
@@ -129,20 +127,27 @@ export default function CounselorAIChatPage() {
 
       {/* Main Chat Area */}
       <div className="relative flex-1 flex flex-col overflow-hidden">
-        {/* Mobile Header with Back Button */}
-        {!showSidebar && (
-          <div className="lg:hidden px-4 py-2 border-b bg-sidebar">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowSidebar(true)}
-              className="h-10"
-            >
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              Back to Conversations
-            </Button>
-          </div>
-        )}
+        {/* Mobile Header with Menu Toggle */}
+        <div className="lg:hidden px-4 py-2 border-b bg-sidebar">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowSidebar(!showSidebar)}
+            className="h-10"
+          >
+            {showSidebar ? (
+              <>
+                <ArrowLeft className="h-5 w-5 mr-2" />
+                Back to Chat
+              </>
+            ) : (
+              <>
+                <Menu className="h-5 w-5 mr-2" />
+                Conversations
+              </>
+            )}
+          </Button>
+        </div>
         {/* Main Content Area */}
         <div className={`relative z-10 w-full flex flex-col items-center p-3 md:p-6 flex-1 overflow-hidden ${messages.length === 0 ? 'justify-center' : ''}`}>
           {/* Messages Display */}

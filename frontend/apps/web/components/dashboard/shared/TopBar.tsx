@@ -90,7 +90,8 @@ export function TopBar({
               variant="ghost"
               size="lg"
               onClick={onToggleSidebar}
-              className="md:hidden h-12 w-12"
+              className="h-12 w-12"
+              aria-label="Toggle sidebar"
             >
               <Menu className="h-6 w-6" />
             </Button>

@@ -230,8 +230,10 @@ export function DashboardSidebar({
   setOpen: setOpenProp
 }: DashboardSidebarProps) {
   const [openState, setOpenState] = useState(true);
-  const open = openProp !== undefined ? openProp : openState;
-  const setOpen = setOpenProp !== undefined ? setOpenProp : setOpenState;
+  const isControlled = openProp !== undefined;
+  
+  const open = isControlled ? openProp! : openState;
+  const setOpen = isControlled ? setOpenProp! : setOpenState;
   
   const filteredItems = navigationItems.filter(item => 
     item.roles.includes(userRole)
@@ -262,7 +264,7 @@ export function DashboardSidebar({
 
   return (
     <div className={cn("h-full", className)}>
-      <Sidebar open={open} setOpen={setOpen}>
+      <Sidebar open={open} setOpen={setOpen} animate={true}>
         <SidebarBody className="justify-between gap-10" hideMobileTrigger>
           <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
             <RCRLogoComponent />

@@ -51,6 +51,7 @@ export default function CounselorChatPage() {
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const currentCounselor = dummyCounselors[0]; // Dr. Marie Uwimana
   const [showConversations, setShowConversations] = useState(true);
+  const [previewLength, setPreviewLength] = useState(30);
 
   // Check for chatId in URL query params on mount
   useEffect(() => {
@@ -65,6 +66,26 @@ export default function CounselorChatPage() {
       }
     }
   }, [searchParams, router]);
+
+  // Update preview length based on screen size
+  useEffect(() => {
+    const updatePreviewLength = () => {
+      const width = window.innerWidth;
+      if (width < 640) {
+        setPreviewLength(20); // Mobile
+      } else if (width < 768) {
+        setPreviewLength(30); // Small tablets
+      } else if (width < 1024) {
+        setPreviewLength(40); // Tablets
+      } else {
+        setPreviewLength(50); // Desktop
+      }
+    };
+
+    updatePreviewLength();
+    window.addEventListener('resize', updatePreviewLength);
+    return () => window.removeEventListener('resize', updatePreviewLength);
+  }, []);
 
   const activeChat = dummyChats.find(chat => chat.id === selectedChat);
   const activeMessages = dummyMessages.filter(msg => 
@@ -275,8 +296,8 @@ export default function CounselorChatPage() {
                             </div>
                             <p className="text-xs text-muted-foreground truncate">
                               {chat.lastMessage?.content ? 
-                                (chat.lastMessage.content.length > 30 
-                                  ? chat.lastMessage.content.substring(0, 30) + '...' 
+                                (chat.lastMessage.content.length > previewLength 
+                                  ? chat.lastMessage.content.substring(0, previewLength) + '...' 
                                   : chat.lastMessage.content)
                                 : 'No messages yet'}
                             </p>

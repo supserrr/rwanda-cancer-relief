@@ -128,149 +128,15 @@ export interface JitsiMeetExternalAPI {
   getIFrame(): unknown; // HTMLIFrameElement (DOM type, use in frontend)
   dispose(): void;
 
-  // Commands
-  executeCommand(command: string, ...args: unknown[]): void;
-  executeCommands(commands: Record<string, unknown[]>): void;
-
   // Event Listeners
   on(event: string, listener: (...args: unknown[]) => void): void;
   off(event: string, listener: (...args: unknown[]) => void): void;
-  addEventListener(event: string, listener: (...args: unknown[]) => void): void;
-  removeEventListener(event: string, listener: (...args: unknown[]) => void): void;
-}
+  addListener(event: string, listener: (...args: unknown[]) => void): void;
+  removeListener(event: string, listener: (...args: unknown[]) => void): void;
 
-/**
- * Jitsi Meet Commands
- * 
- * Available commands for executeCommand
- */
-export interface JitsiMeetCommands {
-  // Participant Settings
-  displayName: (name: string) => void;
-  email: (email: string) => void;
-
-  // Room Management
-  password: (password: string) => void;
-  subject: (subject: string) => void;
-  localSubject: (subject: string) => void;
-  toggleLobby: (enabled: boolean) => void;
-
-  // Media Control
-  toggleAudio: () => void;
-  toggleVideo: () => void;
-  toggleCamera: (facingMode?: 'user' | 'environment') => void;
-  toggleCameraMirror: () => void;
-  setVideoQuality: (height: number) => void;
-  setAudioOnly: (enable: boolean) => void;
-
-  // UI Control
-  toggleFilmStrip: () => void;
-  toggleChat: () => void;
-  toggleRaiseHand: () => void;
-  toggleShareScreen: () => void;
-  toggleSubtitles: () => void;
-  toggleTileView: () => void;
-  toggleWhiteboard: () => void;
-  toggleParticipantsPane: (enabled: boolean) => void;
-  setTileView: (enabled: boolean) => void;
-
-  // Video Sharing
-  startShareVideo: (url: string) => void;
-  stopShareVideo: () => void;
-
-  // Participant Control
-  pinParticipant: (id?: string) => void;
-  setLargeVideoParticipant: (participantId?: string, videoType?: 'camera' | 'desktop') => void;
-  setParticipantVolume: (participantID: string, volume: number) => void;
-  muteEveryone: (mediaType?: 'audio' | 'video') => void;
-  kickParticipant: (participantID: string) => void;
-  grantModerator: (participantID: string) => void;
-
-  // Chat
-  sendChatMessage: (message: string, to?: string, ignorePrivacy?: boolean) => void;
-  initiatePrivateChat: (participantID: string) => void;
-  cancelPrivateChat: () => void;
-
-  // Moderation
-  toggleModeration: (enable: boolean, mediaType?: 'audio' | 'video') => void;
-  askToUnmute: (participantId: string) => void;
-  approveVideo: (participantId: string) => void;
-  rejectParticipant: (participantId: string, mediaType?: 'audio' | 'video') => void;
-
-  // Recording
-  startRecording: (options: {
-    mode: 'local' | 'file' | 'stream';
-    dropboxToken?: string;
-    onlySelf?: boolean;
-    shouldShare?: boolean;
-    rtmpStreamKey?: string;
-    rtmpBroadcastID?: string;
-    youtubeStreamKey?: string;
-    youtubeBroadcastID?: string;
-    extraMetadata?: Record<string, unknown>;
-    transcription?: boolean;
-  }) => void;
-  stopRecording: (mode: 'local' | 'file' | 'stream', transcription?: boolean) => void;
-
-  // Breakout Rooms
-  addBreakoutRoom: (name?: string) => void;
-  autoAssignToBreakoutRooms: () => void;
-  closeBreakoutRoom: (roomId: string) => void;
-  joinBreakoutRoom: (roomId?: string) => void;
-  removeBreakoutRoom: (breakoutRoomJid: string) => void;
-  sendParticipantToRoom: (participantId: string, roomId: string) => void;
-
-  // Virtual Background
-  setVirtualBackground: (enabled: boolean, backgroundImage: string) => void;
-  setBlurredBackground: (blurType: 'slight-blur' | 'blur' | 'none') => void;
-  toggleVirtualBackgroundDialog: () => void;
-
-  // Noise Suppression
-  setNoiseSuppressionEnabled: (enabled: boolean) => void;
-
-  // Follow Me
-  setFollowMe: (value: boolean, recorderOnly?: boolean) => void;
-
-  // Subtitles
-  setSubtitles: (enabled: boolean, displaySubtitles?: boolean, language?: string | null) => void;
-
-  // Configuration
-  overwriteConfig: (config: Record<string, unknown>) => void;
-  setAssumedBandwidthBps: (assumedBandwidthBps: number) => void;
-
-  // Participant Messages
-  sendCameraFacingMode: (receiverParticipantId: string, facingMode?: 'user' | 'environment') => void;
-  sendEndpointTextMessage: (receiverParticipantId: string, text: string) => void;
-  sendTones: (options: {
-    tones: string;
-    duration?: number;
-    pause?: number;
-  }) => void;
-
-  // Lobby
-  answerKnockingParticipant: (id: string, approved: boolean) => void;
-
-  // Notifications
-  showNotification: (options: {
-    title: string;
-    description: string;
-    customActions?: Array<{ label: string; uuid: string }>;
-    uid?: string;
-    type?: 'normal' | 'success' | 'warning' | 'error';
-    timeout?: 'short' | 'medium' | 'long' | 'sticky';
-  }) => void;
-  hideNotification: (uid: string) => void;
-
-  // Participant Names
-  overwriteNames: (participants: Array<{ id: string; name: string }>) => void;
-
-  // Resize
-  resizeFilmStrip: (options: { width: number }) => void;
-  resizeLargeVideo: (width: number, height: number) => void;
-
-  // Conference Control
-  hangup: () => void;
-  endConference: () => void;
+  // Commands
+  executeCommand(command: string, ...args: unknown[]): void;
+  executeCommands(commands: Record<string, unknown[]>): void;
 }
 
 /**

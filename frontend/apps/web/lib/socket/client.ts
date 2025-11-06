@@ -66,16 +66,32 @@ let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
 
 /**
  * Get Socket.IO server URL
+ * 
+ * Note: This application uses Supabase for all backend operations.
+ * Socket.IO is only used if a separate backend server is configured.
+ * If no URL is set, returns empty string to prevent connection attempts.
  */
 function getSocketUrl(): string {
   if (typeof window === 'undefined') {
     return '';
   }
-  return process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
+  // In production, don't default to localhost - use Supabase Realtime instead
+  const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL;
+  if (!socketUrl && process.env.NODE_ENV === 'production') {
+    // In production, if no socket URL is configured, return empty to prevent connection
+    console.warn('Socket.IO URL is not configured. This application uses Supabase Realtime for real-time features.');
+    return '';
+  }
+  // Development fallback
+  return socketUrl || 'http://localhost:10000';
 }
 
 /**
  * Initialize Socket.IO client
+ * 
+ * Note: This application uses Supabase for all backend operations.
+ * Socket.IO is only used if a separate backend server is configured.
+ * If no URL is configured, this will not attempt to connect.
  */
 export function initSocket(): Socket<ServerToClientEvents, ClientToServerEvents> {
   if (socket?.connected) {
@@ -83,6 +99,14 @@ export function initSocket(): Socket<ServerToClientEvents, ClientToServerEvents>
   }
 
   const url = getSocketUrl();
+  
+  // If no URL is configured, don't attempt to connect
+  if (!url) {
+    console.warn('Socket.IO URL is not configured. Use Supabase Realtime for real-time features.');
+    // Return a mock socket that won't connect
+    return null as unknown as Socket<ServerToClientEvents, ClientToServerEvents>;
+  }
+  
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth-token') : null;
 
   socket = io(url, {

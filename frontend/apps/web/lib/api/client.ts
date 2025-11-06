@@ -5,8 +5,16 @@
  * error handling, and request/response interceptors
  */
 
+import { env } from '@/src/env';
+
 // Backend API base URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
+// Note: This application uses Supabase for all backend operations.
+// The API client is only used if a separate backend API is configured.
+// If NEXT_PUBLIC_API_URL is not set, all API operations should use Supabase directly.
+const API_BASE_URL = env.NEXT_PUBLIC_API_URL || 
+  (process.env.NODE_ENV === 'production' 
+    ? null // In production, if no API_URL is set, use Supabase instead
+    : 'http://localhost:10000'); // Development fallback
 
 /**
  * API response wrapper
@@ -76,6 +84,15 @@ async function request<T>(
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  // Check if API_BASE_URL is configured
+  if (!API_BASE_URL) {
+    throw new ApiError(
+      'Backend API is not configured. This application uses Supabase for all backend operations. ' +
+      'Please use Supabase client methods instead of API client methods.',
+      0
+    );
   }
 
   // Add /api prefix if not already present (except for health check)
@@ -165,11 +182,16 @@ async function request<T>(
           stack: error.stack,
         });
         
-        const errorMessage = `Unable to connect to backend server at ${API_BASE_URL}. Please ensure:
-1. The backend server is running
-2. CORS is properly configured
-3. No browser extensions are blocking the request
-4. The frontend is running on http://localhost:3000`;
+        // Provide production-aware error message
+        const isProduction = process.env.NODE_ENV === 'production';
+        const errorMessage = isProduction
+          ? `Unable to connect to backend server. This application uses Supabase for all backend operations. ` +
+            `If you need a separate backend API, please set NEXT_PUBLIC_API_URL in your Vercel environment variables. ` +
+            `Otherwise, use Supabase client methods directly.`
+          : `Unable to connect to backend server at ${API_BASE_URL}. ` +
+            `This application uses Supabase for all backend operations. ` +
+            `If you need a separate backend API, ensure it's running and NEXT_PUBLIC_API_URL is configured. ` +
+            `Otherwise, use Supabase client methods directly.`;
         
         throw new ApiError(errorMessage, 0);
       }
@@ -294,16 +316,21 @@ export async function post<T>(
       if (isFetchError) {
         console.error('Fetch error details:', {
           url,
-    method: 'POST',
+          method: 'POST',
           error: error.message,
           stack: error.stack,
         });
         
-        const errorMessage = `Unable to connect to backend server at ${API_BASE_URL}. Please ensure:
-1. The backend server is running
-2. CORS is properly configured
-3. No browser extensions are blocking the request
-4. The frontend is running on http://localhost:3000`;
+        // Provide production-aware error message
+        const isProduction = process.env.NODE_ENV === 'production';
+        const errorMessage = isProduction
+          ? `Unable to connect to backend server. This application uses Supabase for all backend operations. ` +
+            `If you need a separate backend API, please set NEXT_PUBLIC_API_URL in your Vercel environment variables. ` +
+            `Otherwise, use Supabase client methods directly.`
+          : `Unable to connect to backend server at ${API_BASE_URL}. ` +
+            `This application uses Supabase for all backend operations. ` +
+            `If you need a separate backend API, ensure it's running and NEXT_PUBLIC_API_URL is configured. ` +
+            `Otherwise, use Supabase client methods directly.`;
         
         throw new ApiError(errorMessage, 0);
       }

@@ -2,9 +2,15 @@
  * Integration test script
  * 
  * Tests the connection between frontend and backend
+ * 
+ * Note: This application uses Supabase for all backend operations.
+ * This script is only useful if a separate backend API is configured.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 
+  (process.env.NODE_ENV === 'production' 
+    ? null 
+    : 'http://localhost:10000');
 
 /**
  * Test API health endpoint
@@ -85,6 +91,15 @@ async function testAuthEndpoints(): Promise<boolean> {
 async function runTests() {
   console.log('\n🧪 Testing Frontend-Backend Integration...\n');
 
+  // Check if API URL is configured
+  if (!API_URL) {
+    console.log('⚠️  No backend API URL configured.');
+    console.log('   This application uses Supabase for all backend operations.');
+    console.log('   If you need to test a separate backend API, set NEXT_PUBLIC_API_URL.');
+    console.log('\n');
+    process.exit(0);
+  }
+
   console.log('1. Testing health endpoint...');
   const healthOk = await testHealth();
   console.log(healthOk ? '   ✅ Health endpoint working' : '   ❌ Health endpoint failed');
@@ -109,8 +124,10 @@ async function runTests() {
     console.log(`      curl ${API_URL}/health`);
     console.log('   3. Verify environment variables:');
     console.log('      Create .env.local in frontend/apps/web/');
-      console.log('      NEXT_PUBLIC_API_URL=http://localhost:10000');
+    console.log('      NEXT_PUBLIC_API_URL=http://localhost:10000');
     console.log('   4. Check backend logs for errors');
+    console.log('\n   Note: This application uses Supabase for all backend operations.');
+    console.log('   If no backend API is needed, you can skip these tests.');
   }
 
   console.log('\n');

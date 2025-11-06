@@ -5,7 +5,13 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "outputs": [".next/**", "!.next/cache/**"],
+      "env": [
+        "ASSISTANT_API_KEY",
+        "SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET",
+        "SUPABASE_KEY",
+        "SUPABASE_ACCESS_TOKEN"
+      ]
     },
     "lint": {
       "dependsOn": ["^lint"]

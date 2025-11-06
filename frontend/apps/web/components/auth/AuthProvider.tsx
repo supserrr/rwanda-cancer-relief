@@ -1,8 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { AuthService, AuthSession, User, UserRole, getDashboardRoute, ROLES } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/client';
 
 /**
  * Authentication context interface with complete API
@@ -47,14 +48,80 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const userRole = user?.role || 'guest';
 
   /**
-   * Check authentication status from storage
+   * Create a single Supabase client instance to avoid multiple GoTrueClient instances
+   * Only create if Supabase is configured
    */
-  const checkAuth = () => {
+  const supabaseClient = useMemo(() => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (supabaseUrl && supabaseAnonKey) {
+      try {
+        return createClient();
+      } catch (error) {
+        console.warn('Failed to create Supabase client:', error);
+        return null;
+      }
+    }
+    
+    return null;
+  }, []);
+
+  /**
+   * Check authentication status from storage and verify with backend
+   * Also checks Supabase session for OAuth authentication
+   */
+  const checkAuth = async () => {
+    // First, check Supabase session (for OAuth) - only if Supabase is configured
+    if (supabaseClient) {
+      try {
+        const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+        
+        if (session && !sessionError) {
+      // User is authenticated via Supabase (OAuth)
+      // Convert Supabase user to our User type
+      const supabaseUser = session.user;
+      const userMetadata = supabaseUser.user_metadata || {};
+      
+      const currentUser: User = {
+        id: supabaseUser.id,
+        email: supabaseUser.email || '',
+        name: userMetadata.full_name || userMetadata.name || supabaseUser.email || '',
+        role: (userMetadata.role as UserRole) || 'guest',
+        avatar: userMetadata.avatar_url || supabaseUser.user_metadata?.avatar_url,
+        isVerified: supabaseUser.email_confirmed_at !== null,
+        createdAt: new Date(supabaseUser.created_at),
+        updatedAt: new Date(supabaseUser.updated_at || supabaseUser.created_at),
+      };
+      
+          setUser(currentUser);
+          AuthSession.setUser(currentUser);
+          AuthSession.setToken(session.access_token);
+          setIsLoading(false);
+          return;
+        }
+      } catch (error) {
+        // Supabase not configured or error, fall through to backend auth
+        console.warn('Supabase auth check failed, using backend auth:', error);
+      }
+    }
+    
+    // Fallback to backend token-based auth
     const token = AuthSession.getToken();
     const userData = AuthSession.getUser();
     
     if (token && userData) {
-      setUser(userData);
+      try {
+        // Verify token by getting current user from backend
+        const currentUser = await AuthService.getCurrentUser();
+        setUser(currentUser);
+        AuthSession.setUser(currentUser);
+      } catch (error) {
+        // Token is invalid, clear storage
+        console.error('Token verification failed:', error);
+        AuthSession.clear();
+        setUser(null);
+      }
     } else {
       setUser(null);
     }
@@ -116,6 +183,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     setIsLoading(true);
     try {
+      // Sign out from Supabase (for OAuth) - only if configured
+      if (supabaseClient) {
+        try {
+          await supabaseClient.auth.signOut();
+        } catch (error) {
+          // Supabase not configured, continue with backend signout
+          console.warn('Supabase signout failed, continuing with backend signout:', error);
+        }
+      }
+      
+      // Sign out from backend (for token-based auth)
       await AuthService.signOut();
       setUser(null);
       router.push('/signin');
@@ -126,10 +204,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Check auth on mount
+  // Check auth on mount and when pathname changes
   useEffect(() => {
     checkAuth();
-  }, []);
+    
+    // Listen for Supabase auth state changes (for OAuth) - only if configured
+    if (supabaseClient) {
+      try {
+        const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((event, session) => {
+          if (event === 'SIGNED_IN' && session) {
+            // User signed in via OAuth, refresh auth state
+            checkAuth();
+          } else if (event === 'SIGNED_OUT') {
+            // User signed out, clear state
+            setUser(null);
+            AuthSession.clear();
+          }
+        });
+        
+        return () => {
+          subscription.unsubscribe();
+        };
+      } catch (error) {
+        // Supabase not configured, no subscription needed
+        console.warn('Supabase auth state listener not available:', error);
+      }
+    }
+  }, [pathname, supabaseClient]);
 
   // Handle route protection
   useEffect(() => {

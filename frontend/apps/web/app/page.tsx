@@ -102,12 +102,16 @@ export default function LandingPage() {
 
       
       {/* Wrapper for scroll tracking */}
-      <div className="relative w-full">
+      <div 
+        className="relative w-full"
+        style={{ position: 'relative' }}
+      >
         {/* Scroll Target - invisible element for tracking */}
         <div 
           ref={ref} 
           className="absolute top-0 left-0 w-full h-[350vh] pointer-events-none"
           style={{
+            position: 'absolute',
             contain: 'strict',
             willChange: 'transform',
             transform: 'translateZ(0)',

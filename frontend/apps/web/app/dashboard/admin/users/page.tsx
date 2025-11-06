@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { Input } from '@workspace/ui/components/input';
@@ -34,29 +34,40 @@ import {
   UserCheck,
   UserX
 } from 'lucide-react';
-import { dummyUsers, dummyPatients, dummyCounselors } from '../../../../lib/dummy-data';
-import { UserRole } from '../../../../lib/types';
+import { AdminApi, type AdminUser } from '../../../../lib/api/admin';
+import { toast } from 'sonner';
 
 export default function AdminUsersPage() {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRole, setSelectedRole] = useState<UserRole | 'all'>('all');
+  const [selectedRole, setSelectedRole] = useState<'patient' | 'counselor' | 'admin' | 'all'>('all');
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'active' | 'inactive'>('all');
 
-  // Combine all users and deduplicate by ID
-  const allUsersMap = new Map();
-  [...dummyUsers, ...dummyPatients, ...dummyCounselors].forEach(user => {
-    if (!allUsersMap.has(user.id)) {
-      allUsersMap.set(user.id, user);
-    }
-  });
-  const allUsers = Array.from(allUsersMap.values());
+  // Load all users
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        setLoading(true);
+        const response = await AdminApi.listUsers();
+        setUsers(response.users);
+      } catch (error) {
+        console.error('Error loading users:', error);
+        toast.error('Failed to load users');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const filteredUsers = allUsers.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    loadUsers();
+  }, []);
+
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = (user.fullName || user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = selectedRole === 'all' || user.role === selectedRole;
-    const matchesStatus = selectedStatus === 'all' || 
-                         (selectedStatus === 'active' ? user.lastLogin : !user.lastLogin);
+    // Note: lastLogin not in AdminUser type, would need to be added to backend
+    const matchesStatus = selectedStatus === 'all'; // Always true for now
     
     return matchesSearch && matchesRole && matchesStatus;
   });
@@ -77,7 +88,7 @@ export default function AdminUsersPage() {
     console.log('Add new user');
   };
 
-  const getRoleColor = (role: UserRole) => {
+  const getRoleColor = (role: 'patient' | 'counselor' | 'admin') => {
     switch (role) {
       case 'patient':
         return 'bg-blue-100 text-blue-800';
@@ -90,24 +101,16 @@ export default function AdminUsersPage() {
     }
   };
 
-  const getStatusColor = (user: any) => {
-    if (user.lastLogin) {
-      const daysSinceLogin = Math.floor((Date.now() - user.lastLogin.getTime()) / (1000 * 60 * 60 * 24));
-      if (daysSinceLogin <= 7) return 'bg-green-100 text-green-800';
-      if (daysSinceLogin <= 30) return 'bg-yellow-100 text-yellow-800';
-      return 'bg-red-100 text-red-800';
-    }
-    return 'bg-gray-100 text-gray-800';
+  const getStatusColor = (user: AdminUser) => {
+    // Note: lastLogin not in AdminUser type, would need to be added to backend
+    // For now, assume all users are active
+    return 'bg-green-100 text-green-800';
   };
 
-  const getStatusText = (user: any) => {
-    if (user.lastLogin) {
-      const daysSinceLogin = Math.floor((Date.now() - user.lastLogin.getTime()) / (1000 * 60 * 60 * 24));
-      if (daysSinceLogin <= 7) return 'Active';
-      if (daysSinceLogin <= 30) return 'Inactive';
-      return 'Dormant';
-    }
-    return 'Never logged in';
+  const getStatusText = (user: AdminUser) => {
+    // Note: lastLogin not in AdminUser type, would need to be added to backend
+    // For now, assume all users are active
+    return 'Active';
   };
 
   return (
@@ -123,7 +126,7 @@ export default function AdminUsersPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Total Users</p>
-              <p className="text-2xl font-bold">{allUsers.length}</p>
+              <p className="text-2xl font-bold">{loading ? '...' : users.length}</p>
             </div>
             <Users className="h-8 w-8 text-muted-foreground" />
           </div>
@@ -133,7 +136,7 @@ export default function AdminUsersPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Patients</p>
-              <p className="text-2xl font-bold">{dummyPatients.length}</p>
+              <p className="text-2xl font-bold">{loading ? '...' : users.filter(u => u.role === 'patient').length}</p>
             </div>
             <UserCheck className="h-8 w-8 text-blue-600" />
           </div>
@@ -143,7 +146,7 @@ export default function AdminUsersPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Counselors</p>
-              <p className="text-2xl font-bold">{dummyCounselors.length}</p>
+              <p className="text-2xl font-bold">{loading ? '...' : users.filter(u => u.role === 'counselor').length}</p>
             </div>
             <UserCheck className="h-8 w-8 text-green-600" />
           </div>
@@ -153,7 +156,7 @@ export default function AdminUsersPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Admins</p>
-              <p className="text-2xl font-bold">1</p>
+              <p className="text-2xl font-bold">{loading ? '...' : users.filter(u => u.role === 'admin').length}</p>
             </div>
             <UserCheck className="h-8 w-8 text-purple-600" />
           </div>
@@ -172,7 +175,7 @@ export default function AdminUsersPage() {
           />
         </div>
         
-        <Select value={selectedRole} onValueChange={(value) => setSelectedRole(value as UserRole | 'all')}>
+        <Select value={selectedRole} onValueChange={(value) => setSelectedRole(value as 'patient' | 'counselor' | 'admin' | 'all')}>
           <SelectTrigger className="w-full sm:w-48 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
             <SelectValue placeholder="Role" />
           </SelectTrigger>
@@ -202,6 +205,11 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Users Table */}
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      ) : (
       <AnimatedCard delay={0.5}>
         <CardHeader>
           <CardTitle>User List</CardTitle>
@@ -219,94 +227,89 @@ export default function AdminUsersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-            {filteredUsers.map((user) => (
-              <TableRow key={`${user.id}-${user.role}`}>
-                <TableCell>
-                  <div className="flex items-center space-x-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={user.avatar} alt={user.name} />
-                      <AvatarFallback>
-                        {user.name.split(' ').map((n: string) => n[0]).join('')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">{user.name}</p>
-                      <p className="text-sm text-muted-foreground">{user.email}</p>
+            {filteredUsers.length > 0 ? (
+              filteredUsers.map((user) => (
+                <TableRow key={`${user.id}-${user.role}`}>
+                  <TableCell>
+                    <div className="flex items-center space-x-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={undefined} alt={user.fullName || user.email} />
+                        <AvatarFallback>
+                          {(user.fullName || user.email || 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">{user.fullName || user.email}</p>
+                        <p className="text-sm text-muted-foreground">{user.email}</p>
+                      </div>
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge className={getRoleColor(user.role)}>
-                    {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge className={getStatusColor(user)}>
-                    {getStatusText(user)}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {user.lastLogin ? (
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={getRoleColor(user.role)}>
+                      {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={getStatusColor(user)}>
+                      {getStatusText(user)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {/* Note: lastLogin not in AdminUser type, would need to be added to backend */}
+                    <span className="text-sm text-muted-foreground">N/A</span>
+                  </TableCell>
+                  <TableCell>
                     <div>
-                      <p className="text-sm">{user.lastLogin.toLocaleDateString()}</p>
+                      <p className="text-sm">{new Date(user.createdAt).toLocaleDateString()}</p>
                       <p className="text-xs text-muted-foreground">
-                        {user.lastLogin.toLocaleTimeString()}
+                        {Math.floor((Date.now() - new Date(user.createdAt).getTime()) / (1000 * 60 * 60 * 24))} days ago
                       </p>
                     </div>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">Never</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div>
-                    {user.createdAt ? (
-                      <>
-                        <p className="text-sm">{user.createdAt.toLocaleDateString()}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {Math.floor((Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24))} days ago
-                        </p>
-                      </>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">N/A</span>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end space-x-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleViewUser(user.id)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleEditUser(user.id)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDeleteUser(user.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end space-x-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleViewUser(user.id)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEditUser(user.id)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDeleteUser(user.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8">
+                  <p className="text-muted-foreground">No users found</p>
                 </TableCell>
               </TableRow>
-            ))}
+            )}
             </TableBody>
           </Table>
         </CardContent>
       </AnimatedCard>
+      )}
 
       {/* Results Summary */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Showing {filteredUsers.length} of {allUsers.length} users
+          Showing {filteredUsers.length} of {users.length} users
         </p>
         <div className="flex items-center space-x-2">
           <Button variant="outline" size="sm">

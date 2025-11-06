@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { ResourceCard } from '../../../../components/dashboard/shared/ResourceCard';
@@ -47,9 +47,11 @@ import {
   Calendar,
   User
 } from 'lucide-react';
-import { dummyResources } from '../../../../lib/dummy-data';
-import { Resource } from '../../../../lib/types';
+import { Resource } from '@/lib/api/resources';
+import { useResources } from '../../../../hooks/useResources';
+import { ResourcesApi } from '../../../../lib/api/resources';
 import { useAuth } from '../../../../components/auth/AuthProvider';
+import { toast } from 'sonner';
 
 /**
  * Admin Resources Review Page
@@ -64,7 +66,9 @@ export default function AdminResourcesReviewPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [resources, setResources] = useState<Resource[]>(dummyResources);
+  
+  // Load all resources (admin can see all)
+  const { resources, loading, updateResource, deleteResource } = useResources();
   
   // Modal states
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
@@ -94,35 +98,37 @@ export default function AdminResourcesReviewPage() {
   ];
 
   // Filter and sort resources
-  const filteredResources = resources.filter(resource => {
-    const matchesSearch = resource.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         resource.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         resource.publisher.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         resource.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesType = selectedType === 'all' || resource.type === selectedType;
-    const matchesStatus = statusFilter === 'all' || 
-                         (statusFilter === 'public' && resource.isPublic) ||
-                         (statusFilter === 'private' && !resource.isPublic);
-    
-    return matchesSearch && matchesType && matchesStatus;
-  }).sort((a, b) => {
-    let comparison = 0;
-    switch (sortBy) {
-      case 'date':
-        comparison = a.createdAt.getTime() - b.createdAt.getTime();
-        break;
-      case 'title':
-        comparison = a.title.localeCompare(b.title);
-        break;
-      case 'type':
-        comparison = a.type.localeCompare(b.type);
-        break;
-      case 'publisher':
-        comparison = a.publisher.localeCompare(b.publisher);
-        break;
-    }
-    return sortOrder === 'asc' ? comparison : -comparison;
-  });
+  const filteredResources = useMemo(() => {
+    return resources.filter(resource => {
+      const matchesSearch = resource.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (resource.description?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                           (resource.publisher?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                           (resource.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())));
+      const matchesType = selectedType === 'all' || resource.type === selectedType;
+      const matchesStatus = statusFilter === 'all' || 
+                           (statusFilter === 'public' && resource.isPublic) ||
+                           (statusFilter === 'private' && !resource.isPublic);
+      
+      return matchesSearch && matchesType && matchesStatus;
+    }).sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'date':
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          break;
+        case 'title':
+          comparison = a.title.localeCompare(b.title);
+          break;
+        case 'type':
+          comparison = a.type.localeCompare(b.type);
+          break;
+        case 'publisher':
+          comparison = (a.publisher || '').localeCompare(b.publisher || '');
+          break;
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+  }, [resources, searchTerm, selectedType, statusFilter, sortBy, sortOrder]);
 
   const handleViewResource = (resource: Resource) => {
     setSelectedResource(resource);
@@ -154,37 +160,73 @@ export default function AdminResourcesReviewPage() {
     setEditingArticle(null);
   };
 
-  const handleSaveResource = (updatedResource: Resource) => {
-    setResources(prev => prev.map(r => r.id === updatedResource.id ? updatedResource : r));
-    setIsEditOpen(false);
-    setEditingResource(null);
+  // Convert API Resource to UI Resource type
+  const convertToUIResource = (apiResource: Resource): any => {
+    return {
+      ...apiResource,
+      createdAt: new Date(apiResource.createdAt),
+      url: apiResource.url || '',
+      views: 0,
+      downloads: 0,
+      updatedAt: new Date(apiResource.createdAt),
+    };
   };
 
-  const handleSaveArticle = (article: Resource) => {
-    setResources(prev => {
-      const existingIndex = prev.findIndex(r => r.id === article.id);
-      if (existingIndex >= 0) {
-        const updated = [...prev];
-        updated[existingIndex] = article;
-        return updated;
-      } else {
-        return [...prev, article];
-      }
-    });
-    setIsArticleEditorOpen(false);
-    setEditingArticle(null);
+  const handleSaveResource = async (updatedResource: any) => {
+    try {
+      await updateResource(updatedResource.id, {
+        title: updatedResource.title,
+        description: updatedResource.description,
+        type: updatedResource.type,
+        tags: updatedResource.tags,
+        isPublic: updatedResource.isPublic,
+      });
+      toast.success('Resource updated successfully!');
+      setIsEditOpen(false);
+      setEditingResource(null);
+    } catch (error) {
+      console.error('Error updating resource:', error);
+      toast.error('Failed to update resource. Please try again.');
+    }
   };
 
-  const handlePublishResource = (resourceId: string) => {
-    setResources(prev => prev.map(r => 
-      r.id === resourceId ? { ...r, isPublic: true } : r
-    ));
+  const handleSaveArticle = async (article: any) => {
+    try {
+      await updateResource(article.id, {
+        title: article.title,
+        description: article.description,
+        type: article.type,
+        tags: article.tags,
+        isPublic: article.isPublic,
+        content: article.content,
+      });
+      toast.success('Article updated successfully!');
+      setIsArticleEditorOpen(false);
+      setEditingArticle(null);
+    } catch (error) {
+      console.error('Error updating article:', error);
+      toast.error('Failed to update article. Please try again.');
+    }
   };
 
-  const handleUnpublishResource = (resourceId: string) => {
-    setResources(prev => prev.map(r => 
-      r.id === resourceId ? { ...r, isPublic: false } : r
-    ));
+  const handlePublishResource = async (resourceId: string) => {
+    try {
+      await updateResource(resourceId, { isPublic: true });
+      toast.success('Resource published successfully!');
+    } catch (error) {
+      console.error('Error publishing resource:', error);
+      toast.error('Failed to publish resource. Please try again.');
+    }
+  };
+
+  const handleUnpublishResource = async (resourceId: string) => {
+    try {
+      await updateResource(resourceId, { isPublic: false });
+      toast.success('Resource unpublished successfully!');
+    } catch (error) {
+      console.error('Error unpublishing resource:', error);
+      toast.error('Failed to unpublish resource. Please try again.');
+    }
   };
 
   const handleDeleteClick = (resource: Resource) => {
@@ -199,11 +241,17 @@ export default function AdminResourcesReviewPage() {
     }
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (resourceToDelete) {
-      setResources(prev => prev.filter(r => r.id !== resourceToDelete.id));
-      setDeleteConfirmOpen(false);
-      setResourceToDelete(null);
+      try {
+        await deleteResource(resourceToDelete.id);
+        toast.success('Resource deleted successfully!');
+        setDeleteConfirmOpen(false);
+        setResourceToDelete(null);
+      } catch (error) {
+        console.error('Error deleting resource:', error);
+        toast.error('Failed to delete resource. Please try again.');
+      }
     }
   };
 
@@ -217,16 +265,45 @@ export default function AdminResourcesReviewPage() {
     setViewingArticle(null);
   };
 
-  const handleDownloadResource = (resource: Resource | any) => {
-    console.log('Download resource:', resource.title);
+  const handleDownloadResource = async (resource: Resource | any) => {
+    try {
+      // Track download and get signed URL
+      await ResourcesApi.trackView(resource.id);
+      if (resource.url) {
+        window.open(resource.url, '_blank');
+        toast.success('Download started');
+      } else {
+        toast.error('Download URL not available');
+      }
+    } catch (error) {
+      console.error('Error downloading resource:', error);
+      toast.error('Failed to download resource. Please try again.');
+    }
   };
 
-  const handleShareResource = (resource: Resource | any) => {
-    console.log('Share resource:', resource.title);
+  const handleShareResource = async (resource: Resource | any) => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: resource.title,
+          text: resource.description || '',
+          url: resource.url || window.location.href,
+        });
+        toast.success('Resource shared successfully!');
+      } else {
+        // Fallback: copy to clipboard
+        await navigator.clipboard.writeText(resource.url || window.location.href);
+        toast.success('Link copied to clipboard!');
+      }
+    } catch (error) {
+      console.error('Error sharing resource:', error);
+      // User cancelled share, don't show error
+    }
   };
 
   const handleBookmarkResource = (resource: Resource | any) => {
-    console.log('Bookmark resource:', resource.title);
+    // Note: Bookmarking would need to be implemented in the backend
+    toast.info('Bookmarking feature coming soon');
   };
 
   const getTypeIcon = (type: string) => {
@@ -258,6 +335,15 @@ export default function AdminResourcesReviewPage() {
         return 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300';
     }
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -428,7 +514,7 @@ export default function AdminResourcesReviewPage() {
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <User className="h-3 w-3" />
-                      <span>{resource.publisher}</span>
+                      <span>{resource.publisher || 'Unknown'}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
@@ -437,7 +523,7 @@ export default function AdminResourcesReviewPage() {
                   </div>
 
                   {/* Tags */}
-                  {resource.tags.length > 0 && (
+                  {resource.tags && resource.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {resource.tags.slice(0, 3).map((tag) => (
                         <Badge key={tag} variant="outline" className="text-xs">
@@ -502,7 +588,7 @@ export default function AdminResourcesReviewPage() {
       {/* Resource Viewer Modal */}
       {selectedResource && (
         <ResourceViewerModalV2
-          resource={selectedResource}
+          resource={convertToUIResource(selectedResource)}
           isOpen={isViewerOpen}
           onClose={handleCloseViewer}
           onDownload={handleDownloadResource}
@@ -515,7 +601,7 @@ export default function AdminResourcesReviewPage() {
       {/* Resource Edit Modal */}
       {editingResource && (
         <ResourceEditModal
-          resource={editingResource}
+          resource={convertToUIResource(editingResource)}
           isOpen={isEditOpen}
           onClose={handleCloseEditModal}
           onSave={handleSaveResource}
@@ -526,7 +612,7 @@ export default function AdminResourcesReviewPage() {
       {/* Article Editor */}
       {editingArticle && (
         <ArticleEditor
-          article={editingArticle}
+          article={convertToUIResource(editingArticle)}
           isOpen={isArticleEditorOpen}
           onClose={handleCloseArticleEditor}
           onSave={handleSaveArticle}
@@ -536,7 +622,16 @@ export default function AdminResourcesReviewPage() {
       {/* Article Viewer */}
       {viewingArticle && (
         <ArticleViewerV2
-          article={viewingArticle}
+          article={{
+            id: viewingArticle.id,
+            title: viewingArticle.title,
+            content: viewingArticle.content,
+            description: viewingArticle.description,
+            publisher: viewingArticle.publisher,
+            createdAt: new Date(viewingArticle.createdAt),
+            thumbnail: viewingArticle.thumbnail,
+            tags: viewingArticle.tags,
+          }}
           isOpen={isArticleViewerOpen}
           onClose={handleCloseArticleViewer}
           onShare={handleShareResource}

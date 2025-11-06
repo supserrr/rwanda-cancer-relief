@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { SignInPage, Testimonial } from "@workspace/ui/components/ui/sign-in";
 import { validateSignInForm } from '@/lib/validations';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { createClient } from '@/lib/supabase/client';
+import { GoogleOneTap } from '@/components/auth/GoogleOneTap';
 import { TestCredentials } from './test-credentials';
 
 const sampleTestimonials: Testimonial[] = [
@@ -58,13 +60,57 @@ export default function SignInPageDemo() {
       // Use the auth context to sign in (this will handle redirect automatically)
       await signIn(data.email, data.password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign in failed. Please try again.');
+      // Extract error message from API error
+      let errorMessage = 'Sign in failed. Please try again.';
+      
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'object' && err !== null && 'message' in err) {
+        errorMessage = String(err.message);
+      }
+      
+      setError(errorMessage);
     }
   };
 
-  const handleGoogleSignIn = () => {
-    // For now, just show a message - Google OAuth would be implemented here
-    alert("Google Sign-In will be implemented with OAuth integration");
+  const handleGoogleSignIn = async () => {
+    try {
+      setError(null);
+      
+      // Check if Supabase is configured
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      
+      if (!supabaseUrl || !supabaseAnonKey) {
+        setError('Google Sign-In is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local file.');
+        return;
+      }
+      
+      const supabase = createClient();
+      
+      // Get the current pathname to redirect back after OAuth
+      const currentPath = window.location.pathname;
+      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(currentPath)}`;
+      
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (oauthError) {
+        setError(oauthError.message || 'Google sign-in failed. Please try again.');
+      }
+      // If successful, the user will be redirected to Google's consent screen
+      // and then back to our callback route
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google sign-in failed. Please try again.');
+    }
   };
   
   const handleResetPassword = () => {
@@ -106,6 +152,7 @@ export default function SignInPageDemo() {
         </div>
       )}
       <TestCredentials />
+      <GoogleOneTap />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedGrid } from '@workspace/ui/components/animated-grid';
 import { LandingStyleCounselorCard } from '@workspace/ui/components/landing-style-counselor-card';
@@ -16,32 +16,57 @@ import {
   SelectValue,
 } from '@workspace/ui/components/select';
 import { Search, Filter, Star } from 'lucide-react';
-import { dummyCounselors } from '../../../../lib/dummy-data';
+import { AdminApi, type AdminUser } from '../../../../lib/api/admin';
 import { ProfileViewModal } from '@workspace/ui/components/profile-view-modal';
+import { useAuth } from '../../../../components/auth/AuthProvider';
+import { toast } from 'sonner';
 
 export default function PatientCounselorsPage() {
+  const { user } = useAuth();
+  const [counselors, setCounselors] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSpecialty, setSelectedSpecialty] = useState('all');
   const [selectedAvailability, setSelectedAvailability] = useState('all');
-  const [selectedCounselor, setSelectedCounselor] = useState<any>(null);
+  const [selectedCounselor, setSelectedCounselor] = useState<AdminUser | null>(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [selectedProfileCounselor, setSelectedProfileCounselor] = useState<any>(null);
+  const [selectedProfileCounselor, setSelectedProfileCounselor] = useState<AdminUser | null>(null);
 
-  const specialties = ['all', 'Oncology Psychology', 'Grief Counseling', 'Family Therapy'];
+  // Load counselors
+  useEffect(() => {
+    const loadCounselors = async () => {
+      try {
+        setLoading(true);
+        const response = await AdminApi.listUsers({ role: 'counselor' });
+        setCounselors(response.users);
+      } catch (error) {
+        console.error('Error loading counselors:', error);
+        toast.error('Failed to load counselors');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCounselors();
+  }, []);
+
+  // Get unique specialties from counselors
+  const specialties = ['all', ...new Set(counselors.map(c => (c as any).specialty).filter(Boolean))];
   const availabilityOptions = ['all', 'available', 'busy', 'offline'];
 
-  const filteredCounselors = dummyCounselors.filter(counselor => {
-    const matchesSearch = counselor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         counselor.specialty.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSpecialty = selectedSpecialty === 'all' || counselor.specialty === selectedSpecialty;
-    const matchesAvailability = selectedAvailability === 'all' || counselor.availability === selectedAvailability;
+  const filteredCounselors = counselors.filter(counselor => {
+    const matchesSearch = (counselor.fullName || counselor.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         ((counselor as any).specialty || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSpecialty = selectedSpecialty === 'all' || (counselor as any).specialty === selectedSpecialty;
+    // Note: Availability is not in AdminUser type, would need to be added to backend
+    const matchesAvailability = selectedAvailability === 'all'; // Always true for now
     
     return matchesSearch && matchesSpecialty && matchesAvailability;
   });
 
   const handleBookSession = (counselorId: string) => {
-    const counselor = dummyCounselors.find(c => c.id === counselorId);
+    const counselor = counselors.find(c => c.id === counselorId);
     if (counselor) {
       setSelectedCounselor(counselor);
       setIsBookingModalOpen(true);
@@ -60,7 +85,7 @@ export default function PatientCounselorsPage() {
   };
 
   const handleViewProfile = (counselorId: string) => {
-    const counselor = dummyCounselors.find(c => c.id === counselorId);
+    const counselor = counselors.find(c => c.id === counselorId);
     if (counselor) {
       setSelectedProfileCounselor(counselor);
       setIsProfileOpen(true);
@@ -130,17 +155,21 @@ export default function PatientCounselorsPage() {
       </div>
 
       {/* Counselors Grid */}
-      {filteredCounselors.length > 0 ? (
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      ) : filteredCounselors.length > 0 ? (
         <AnimatedGrid className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" staggerDelay={0.1}>
           {filteredCounselors.map((counselor, index) => (
             <LandingStyleCounselorCard
               key={counselor.id}
               id={counselor.id}
-              name={counselor.name}
-              avatar={counselor.avatar}
-              specialty={counselor.specialty}
-              availability={counselor.availability}
-              experience={counselor.experience}
+              name={counselor.fullName || counselor.email || 'Counselor'}
+              avatar={undefined}
+              specialty={(counselor as any).specialty || 'General Counseling'}
+              availability={(counselor as any).availability || 'available'}
+              experience={(counselor as any).experience || 0}
               onBookSession={handleBookSession}
               onViewProfile={handleViewProfile}
               delay={index * 0.1}
@@ -170,41 +199,54 @@ export default function PatientCounselorsPage() {
       )}
 
       {/* Featured Counselors */}
-      <div className="mt-12">
-        <div className="flex items-center gap-2 mb-6">
-          <Star className="h-5 w-5 text-foreground" />
-          <h2 className="text-xl font-semibold">Featured Counselors</h2>
+      {counselors.filter(c => ((c as any).experience || 0) >= 5).length > 0 && (
+        <div className="mt-12">
+          <div className="flex items-center gap-2 mb-6">
+            <Star className="h-5 w-5 text-foreground" />
+            <h2 className="text-xl font-semibold">Featured Counselors</h2>
+          </div>
+          
+          <AnimatedGrid className="grid gap-6 md:grid-cols-2" staggerDelay={0.15}>
+            {counselors
+              .filter(counselor => ((counselor as any).experience || 0) >= 5)
+              .slice(0, 4)
+              .map((counselor, index) => (
+                <div key={counselor.id} className="relative">
+                  <LandingStyleCounselorCard
+                    id={counselor.id}
+                    name={counselor.fullName || counselor.email || 'Counselor'}
+                    avatar={undefined}
+                    specialty={(counselor as any).specialty || 'General Counseling'}
+                    availability={(counselor as any).availability || 'available'}
+                    experience={(counselor as any).experience || 0}
+                    onBookSession={handleBookSession}
+                    onViewProfile={handleViewProfile}
+                    delay={index * 0.15}
+                  />
+                  <Badge className="absolute top-4 left-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0 shadow-lg z-30">
+                    <Star className="w-3 h-3 mr-1 fill-current" />
+                    Featured
+                  </Badge>
+                </div>
+              ))}
+          </AnimatedGrid>
         </div>
-        
-        <AnimatedGrid className="grid gap-6 md:grid-cols-2" staggerDelay={0.15}>
-          {dummyCounselors
-            .filter(counselor => counselor.experience >= 8)
-            .map((counselor, index) => (
-              <div key={counselor.id} className="relative">
-                <LandingStyleCounselorCard
-                  id={counselor.id}
-                  name={counselor.name}
-                  avatar={counselor.avatar}
-                  specialty={counselor.specialty}
-                  availability={counselor.availability}
-                  experience={counselor.experience}
-                  onBookSession={handleBookSession}
-                  onViewProfile={handleViewProfile}
-                  delay={index * 0.15}
-                />
-                <Badge className="absolute top-4 left-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0 shadow-lg z-30">
-                  <Star className="w-3 h-3 mr-1 fill-current" />
-                  Featured
-                </Badge>
-              </div>
-            ))}
-        </AnimatedGrid>
-      </div>
+      )}
 
       {/* Booking Modal */}
       {selectedCounselor && (
         <SessionBookingModal
-          counselor={selectedCounselor}
+          counselor={{
+            id: selectedCounselor.id,
+            name: selectedCounselor.fullName || selectedCounselor.email || 'Counselor',
+            email: selectedCounselor.email,
+            role: 'counselor' as const,
+            avatar: undefined,
+            createdAt: new Date(selectedCounselor.createdAt),
+            specialty: (selectedCounselor as any).specialty || 'General Counseling',
+            experience: (selectedCounselor as any).experience || 0,
+            availability: (selectedCounselor as any).availability || 'available',
+          }}
           isOpen={isBookingModalOpen}
           onClose={handleCloseBookingModal}
           onBookingConfirmed={handleConfirmBooking}
@@ -219,7 +261,17 @@ export default function PatientCounselorsPage() {
             setIsProfileOpen(false);
             setSelectedProfileCounselor(null);
           }}
-          user={selectedProfileCounselor}
+          user={{
+            id: selectedProfileCounselor.id,
+            name: selectedProfileCounselor.fullName || selectedProfileCounselor.email || 'Counselor',
+            email: selectedProfileCounselor.email,
+            role: 'counselor' as const,
+            avatar: undefined,
+            createdAt: new Date(selectedProfileCounselor.createdAt),
+            specialty: (selectedProfileCounselor as any).specialty || 'General Counseling',
+            experience: (selectedProfileCounselor as any).experience || 0,
+            availability: (selectedProfileCounselor as any).availability || 'available',
+          }}
           userType="counselor"
           currentUserRole="patient"
         />

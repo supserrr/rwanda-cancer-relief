@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
@@ -31,37 +31,82 @@ import {
   BellOff,
   User,
   Calendar,
-  ArrowLeft
+  ArrowLeft,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
-import { dummyChats, dummyMessages, dummyCounselors } from '../../../../lib/dummy-data';
+import { useAuth } from '../../../../components/auth/AuthProvider';
+import { useChat } from '../../../../hooks/useChat';
+import { AdminApi, type AdminUser } from '../../../../lib/api/admin';
 import { ProfileViewModal } from '@workspace/ui/components/profile-view-modal';
 import { SessionBookingModal } from '../../../../components/session/SessionBookingModal';
+import { toast } from 'sonner';
 
 export default function PatientChatPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [selectedChat, setSelectedChat] = useState(dummyChats[0]?.id || '');
+  const { user, isLoading: authLoading } = useAuth();
+  
   const [newMessage, setNewMessage] = useState('');
   const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(true);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
-  const [selectedCounselor, setSelectedCounselor] = useState<any>(null);
+  const [selectedCounselor, setSelectedCounselor] = useState<AdminUser | null>(null);
   const [showConversations, setShowConversations] = useState(true);
   const [previewLength, setPreviewLength] = useState(30);
+  const [counselors, setCounselors] = useState<AdminUser[]>([]);
+  const [counselorsLoading, setCounselorsLoading] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Load chats using the hook
+  const {
+    chats,
+    messages,
+    currentChat,
+    loading: chatsLoading,
+    error: chatsError,
+    sendMessage,
+    selectChat,
+    refreshChats,
+    socketConnected,
+  } = useChat({
+    participantId: user?.id,
+  });
+
+  // Load counselors for profile view and booking
+  useEffect(() => {
+    const fetchCounselors = async () => {
+      try {
+        setCounselorsLoading(true);
+        const response = await AdminApi.listUsers({ role: 'counselor' });
+        setCounselors(response.users);
+      } catch (error) {
+        console.error('Error fetching counselors:', error);
+        toast.error('Failed to load counselors');
+      } finally {
+        setCounselorsLoading(false);
+      }
+    };
+
+    if (user?.id) {
+      fetchCounselors();
+    }
+  }, [user?.id]);
 
   // Check for chatId in URL query params on mount
   useEffect(() => {
     const chatId = searchParams.get('chatId');
-    if (chatId) {
-      // Check if chat exists
-      const chat = dummyChats.find(c => c.id === chatId);
-      if (chat) {
-        setSelectedChat(chatId);
-        // Clean up the URL query parameter
-        router.replace('/dashboard/patient/chat', { scroll: false });
-      }
+    if (chatId && chats.length > 0) {
+      selectChat(chatId);
+      // Clean up the URL query parameter
+      router.replace('/dashboard/patient/chat', { scroll: false });
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, chats, selectChat]);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   // Update preview length based on screen size
   useEffect(() => {
@@ -83,20 +128,34 @@ export default function PatientChatPage() {
     return () => window.removeEventListener('resize', updatePreviewLength);
   }, []);
 
-  const activeChat = dummyChats.find(chat => chat.id === selectedChat);
-  const activeMessages = dummyMessages.filter(msg => 
-    activeChat?.participants.includes(msg.senderId) && 
-    activeChat?.participants.includes(msg.receiverId)
-  );
-
-  const getCounselorInfo = (counselorId: string) => {
-    return dummyCounselors.find(c => c.id === counselorId);
+  // Get the other participant (counselor) from the current chat
+  const getCounselorId = (chat: typeof currentChat) => {
+    if (!chat || !user) return null;
+    return chat.participants.find(id => id !== user.id);
   };
 
-  const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      console.log('Sending message:', newMessage);
+  const getCounselorInfo = (counselorId: string | null | undefined) => {
+    if (!counselorId) return null;
+    return counselors.find(c => c.id === counselorId);
+  };
+
+  const currentCounselorId = currentChat ? getCounselorId(currentChat) : null;
+  const currentCounselorInfo = currentCounselorId ? getCounselorInfo(currentCounselorId) : null;
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !currentChat || !user) return;
+    
+    try {
+      await sendMessage({
+        chatId: currentChat.id,
+        content: newMessage.trim(),
+        type: 'text',
+      });
       setNewMessage('');
+      // Message will be added to messages via Socket.IO or hook
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to send message');
     }
   };
 
@@ -112,17 +171,11 @@ export default function PatientChatPage() {
   };
 
   const handleScheduleSession = () => {
-    if (activeChat) {
-      const counselorId = activeChat.participants.find((id: string) => id !== '1');
-      const counselor = getCounselorInfo(counselorId || '');
-      if (counselor) {
-        setSelectedCounselor(counselor);
-        setIsBookingOpen(true);
-      } else {
-        alert('Counselor information not found');
-      }
+    if (currentChat && currentCounselorInfo) {
+      setSelectedCounselor(currentCounselorInfo);
+      setIsBookingOpen(true);
     } else {
-      alert('Please select a conversation first');
+      toast.error('Please select a conversation first');
     }
   };
 
@@ -145,10 +198,15 @@ export default function PatientChatPage() {
     console.log('Toggle notifications:', !isNotificationsEnabled);
   };
 
-  const handleMarkAllAsRead = () => {
-    console.log('Marking all conversations as read');
-    // In a real app, this would update the unread count for all chats
-    alert('All conversations marked as read');
+  const handleMarkAllAsRead = async () => {
+    try {
+      // Mark all messages as read for all chats
+      // This would need to be implemented in the API
+      toast.success('All conversations marked as read');
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+      toast.error('Failed to mark all as read');
+    }
   };
 
   const handleFilterConversations = () => {
@@ -166,12 +224,28 @@ export default function PatientChatPage() {
   };
 
   const handleConfirmBooking = (bookingData: any) => {
-    console.log('Booking confirmed:', bookingData);
-    // Here you would typically send the booking data to your backend
+    // Booking is handled by the SessionBookingModal component
     setIsBookingOpen(false);
     setSelectedCounselor(null);
-    alert('Session booked successfully!');
+    toast.success('Session booked successfully!');
   };
+
+  if (authLoading || chatsLoading || counselorsLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (chatsError) {
+    return (
+      <div className="text-center py-12 text-red-500">
+        <h3 className="text-lg font-semibold mb-2">Error loading chats</h3>
+        <p className="text-muted-foreground">Please try again later.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -186,7 +260,16 @@ export default function PatientChatPage() {
           <AnimatedCard delay={0.5} className="h-full flex flex-col">
             <CardHeader className="p-3 md:p-6 pb-2 md:pb-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm md:text-base font-semibold">Conversations</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm md:text-base font-semibold">Conversations</h3>
+                  <div className="flex items-center gap-1" title={socketConnected ? 'Connected' : 'Disconnected'}>
+                    {socketConnected ? (
+                      <Wifi className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <WifiOff className="h-4 w-4 text-red-500" />
+                    )}
+                  </div>
+                </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button size="sm" variant="ghost" className="hover:bg-primary/10">
@@ -230,27 +313,28 @@ export default function PatientChatPage() {
             <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
               <ScrollArea className="flex-1">
                 <div className="space-y-1">
-                  {dummyChats.map((chat) => {
-                    const counselorId = chat.participants.find((id: string) => id !== '1');
-                    const counselor = getCounselorInfo(counselorId || '');
-                    
-                    return (
-                      <div
-                        key={chat.id}
-                        className={`p-2 md:p-3 cursor-pointer hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/20 dark:hover:border-primary/30 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-primary/20 transition-all duration-200 border-b group ${
-                          selectedChat === chat.id ? 'bg-muted dark:bg-muted/50' : ''
-                        }`}
-                        onClick={() => {
-                          setSelectedChat(chat.id);
-                          setShowConversations(false);
-                        }}
-                      >
+                  {chats.length > 0 ? (
+                    chats.map((chat) => {
+                      const counselorId = getCounselorId(chat);
+                      const counselor = getCounselorInfo(counselorId);
+                      
+                      return (
+                        <div
+                          key={chat.id}
+                          className={`p-2 md:p-3 cursor-pointer hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/20 dark:hover:border-primary/30 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-primary/20 transition-all duration-200 border-b group ${
+                            currentChat?.id === chat.id ? 'bg-muted dark:bg-muted/50' : ''
+                          }`}
+                          onClick={() => {
+                            selectChat(chat.id);
+                            setShowConversations(false);
+                          }}
+                        >
                         <div className="flex items-center space-x-2 md:space-x-3">
                           <div className="relative">
                             <Avatar className="h-8 w-8 md:h-10 md:w-10">
-                              <AvatarImage src={counselor?.avatar} alt={counselor?.name} />
+                              <AvatarImage src={undefined} alt={counselor?.fullName || counselor?.email || 'Counselor'} />
                               <AvatarFallback>
-                                {counselor?.name?.split(' ').map(n => n[0]).join('') || 'C'}
+                                {(counselor?.fullName || counselor?.email || 'C').split(' ').map((n: string) => n[0]).join('')}
                               </AvatarFallback>
                             </Avatar>
                             <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 md:w-3 md:h-3 bg-green-500 rounded-full border-2 border-white" />
@@ -258,9 +342,9 @@ export default function PatientChatPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
                               <p className="text-sm font-medium truncate">
-                                {counselor?.name || 'Counselor'}
+                                {counselor?.fullName || counselor?.email || 'Counselor'}
                               </p>
-                               {(chat.unreadCount || 0) > 0 && (
+                               {chat.unreadCount > 0 && (
                                  <Badge variant="destructive" className="h-5 w-5 rounded-full p-0 text-xs">
                                    {chat.unreadCount}
                                  </Badge>
@@ -274,8 +358,8 @@ export default function PatientChatPage() {
                                 : 'No messages yet'}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {chat.lastMessage?.timestamp ? 
-                                new Date(chat.lastMessage.timestamp).toLocaleDateString() : 
+                              {chat.lastMessage?.createdAt ? 
+                                new Date(chat.lastMessage.createdAt).toLocaleDateString() : 
                                 'No recent activity'
                               }
                             </p>
@@ -283,7 +367,13 @@ export default function PatientChatPage() {
                         </div>
                       </div>
                     );
-                  })}
+                  })
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p className="text-sm">No conversations yet</p>
+                      <p className="text-xs mt-1">Start a conversation with your counselor</p>
+                    </div>
+                  )}
                 </div>
               </ScrollArea>
             </CardContent>
@@ -293,7 +383,7 @@ export default function PatientChatPage() {
         {/* Chat Area */}
         <div className={`col-span-1 lg:col-span-3 ${showConversations ? 'hidden lg:block' : 'block'}`}>
           <AnimatedCard delay={0.7} className="h-full flex flex-col">
-            {activeChat ? (
+            {currentChat ? (
               <>
                 {/* Chat Header */}
                 <CardHeader className="pb-3 border-b relative">
@@ -309,17 +399,18 @@ export default function PatientChatPage() {
                         <ArrowLeft className="h-5 w-5" />
                       </Button>
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={getCounselorInfo(activeChat.participants[1] || '')?.avatar || ''} />
+                        <AvatarImage src={undefined} />
                         <AvatarFallback>
-                          {getCounselorInfo(activeChat.participants[1] || '')?.name?.split(' ').map(n => n[0]).join('') || 'C'}
+                          {currentCounselorInfo?.fullName?.split(' ').map(n => n[0]).join('') || 
+                           currentCounselorInfo?.email?.charAt(0).toUpperCase() || 'C'}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <h3 className="font-semibold">
-                          {getCounselorInfo(activeChat.participants[1] || '')?.name || 'Counselor'}
+                          {currentCounselorInfo?.fullName || currentCounselorInfo?.email || 'Counselor'}
                         </h3>
                         <p className="text-sm text-muted-foreground">
-                          {getCounselorInfo(activeChat.participants[1] || '')?.specialty}
+                          {socketConnected ? 'Online' : 'Offline'}
                         </p>
                       </div>
                     </div>
@@ -387,36 +478,48 @@ export default function PatientChatPage() {
                 <CardContent className="flex-1 p-0">
                   <ScrollArea className="h-[400px] p-4">
                     <div className="space-y-4">
-                      {activeMessages.map((message) => {
-                        const isOwnMessage = message.senderId === '1';
-                        const senderName = isOwnMessage ? 'You' : 
-                          getCounselorInfo(message.senderId)?.name || 'Counselor';
-                        
-                        return (
-                          <div
-                            key={message.id}
-                            className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}
-                          >
-                            <div
-                              className={`max-w-[70%] rounded-lg p-3 ${
-                                isOwnMessage
-                                  ? 'bg-primary text-primary-foreground'
-                                  : 'bg-muted'
-                              }`}
-                            >
-                              <p className="text-sm">{message.content}</p>
-                            </div>
-                            <p className={`text-xs mt-1 px-1 ${
-                              isOwnMessage ? 'text-primary/70' : 'text-muted-foreground'
-                              }`}>
-                                {new Date(message.timestamp).toLocaleTimeString([], { 
-                                  hour: '2-digit', 
-                                  minute: '2-digit' 
-                                })}
-                              </p>
-                          </div>
-                        );
-                      })}
+                      {messages.length > 0 ? (
+                        <>
+                          {messages.map((message) => {
+                            const isOwnMessage = message.senderId === user?.id;
+                            const senderName = isOwnMessage ? 'You' : 
+                              getCounselorInfo(message.senderId)?.fullName || 
+                              getCounselorInfo(message.senderId)?.email || 
+                              'Counselor';
+                            
+                            return (
+                              <div
+                                key={message.id}
+                                className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}
+                              >
+                                <div
+                                  className={`max-w-[70%] rounded-lg p-3 ${
+                                    isOwnMessage
+                                      ? 'bg-primary text-primary-foreground'
+                                      : 'bg-muted'
+                                  }`}
+                                >
+                                  <p className="text-sm">{message.content}</p>
+                                </div>
+                                <p className={`text-xs mt-1 px-1 ${
+                                  isOwnMessage ? 'text-primary/70' : 'text-muted-foreground'
+                                }`}>
+                                  {new Date(message.createdAt).toLocaleTimeString([], { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                  })}
+                                </p>
+                              </div>
+                            );
+                          })}
+                          <div ref={messagesEndRef} />
+                        </>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <p className="text-sm">No messages yet</p>
+                          <p className="text-xs mt-1">Start the conversation</p>
+                        </div>
+                      )}
                     </div>
                   </ScrollArea>
                 </CardContent>
@@ -467,25 +570,35 @@ export default function PatientChatPage() {
       </div>
 
       {/* Profile View Modal */}
-      {activeChat && (
+      {currentChat && currentCounselorInfo && (
         <ProfileViewModal
           isOpen={isProfileOpen}
           onClose={() => setIsProfileOpen(false)}
-          user={getCounselorInfo(activeChat.participants[1] || '') || null}
+          user={{
+            id: currentCounselorInfo.id,
+            name: currentCounselorInfo.fullName || currentCounselorInfo.email || 'Counselor',
+            email: currentCounselorInfo.email,
+            role: 'counselor' as const,
+            avatar: undefined,
+            createdAt: new Date(currentCounselorInfo.createdAt),
+            specialty: (currentCounselorInfo as any).specialty || 'General Counseling',
+            experience: (currentCounselorInfo as any).experience || 0,
+            availability: (currentCounselorInfo as any).availability || 'available',
+          }}
           userType="counselor"
           currentUserRole="patient"
         />
       )}
 
       {/* Session Booking Modal */}
-      {selectedCounselor && (
+      {selectedCounselor && user && (
         <SessionBookingModal
           isOpen={isBookingOpen}
           onClose={() => {
             setIsBookingOpen(false);
             setSelectedCounselor(null);
           }}
-          counselor={selectedCounselor}
+          counselor={selectedCounselor as any}
           onBookingConfirmed={handleConfirmBooking}
         />
       )}

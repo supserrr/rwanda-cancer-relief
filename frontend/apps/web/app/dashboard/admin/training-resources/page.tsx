@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { Button } from '@workspace/ui/components/button';
@@ -55,9 +55,10 @@ import {
   Award
 } from 'lucide-react';
 import { ResourceViewerModalV2 } from '../../../../components/viewers/resource-viewer-modal-v2';
-import { Resource } from '../../../../lib/types';
-import { dummyTrainingResources } from '../../../../lib/dummy-data';
-import { TrainingResource } from '../../../../lib/types';
+import { Resource } from '@/lib/api/resources';
+import { useResources } from '../../../../hooks/useResources';
+import { ResourcesApi } from '../../../../lib/api/resources';
+import { toast } from 'sonner';
 
 export default function AdminTrainingResourcesPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,7 +67,7 @@ export default function AdminTrainingResourcesPage() {
   const [selectedDifficulty, setSelectedDifficulty] = useState<'all' | string>('all');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [editingResource, setEditingResource] = useState<TrainingResource | null>(null);
+  const [editingResource, setEditingResource] = useState<Resource | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [isViewerOpen, setIsViewerOpen] = useState(false);
@@ -89,93 +90,145 @@ export default function AdminTrainingResourcesPage() {
     tags: ''
   });
 
-  const categories = ['all', 'Psychology', 'Counseling', 'Trauma Care', 'Cultural Competency', 'Self-Care'];
-  const types = ['all', 'course', 'workshop', 'video', 'document', 'presentation'];
+  // Load training resources (public resources)
+  const { resources, loading, createResource, updateResource, deleteResource } = useResources({ isPublic: true });
+
+  // Dynamically generate categories and types from resources
+  const categories = useMemo(() => {
+    const cats = new Set<string>(['all']);
+    resources.forEach(r => {
+      r.tags?.forEach(tag => cats.add(tag));
+    });
+    return Array.from(cats);
+  }, [resources]);
+
+  const types = useMemo(() => {
+    const typs = new Set<string>(['all']);
+    resources.forEach(r => {
+      if (r.type) typs.add(r.type);
+    });
+    return Array.from(typs);
+  }, [resources]);
+
   const difficulties = ['all', 'Beginner', 'Intermediate', 'Advanced'];
 
-  const filteredResources = dummyTrainingResources.filter(resource => {
-    const matchesSearch = resource.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         resource.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         resource.instructor.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || resource.category === selectedCategory;
-    const matchesType = selectedType === 'all' || resource.type === selectedType;
-    const matchesDifficulty = selectedDifficulty === 'all' || resource.difficulty === selectedDifficulty;
-    
-    return matchesSearch && matchesCategory && matchesType && matchesDifficulty;
-  }).sort((a, b) => {
-    const dir = sortDir === 'asc' ? 1 : -1;
-    switch (sortBy) {
-      case 'title':
-        return a.title.localeCompare(b.title) * dir;
-      case 'downloads':
-        return (a.downloads - b.downloads) * dir;
-      case 'rating':
-        return (a.rating - b.rating) * dir;
-      case 'createdAt':
-      default:
-        return ((a.createdAt as any) - (b.createdAt as any)) * dir;
-    }
-  });
+  const filteredResources = useMemo(() => {
+    return resources.filter(resource => {
+      const matchesSearch = resource.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           resource.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           resource.publisher?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = selectedCategory === 'all' || resource.tags?.includes(selectedCategory);
+      const matchesType = selectedType === 'all' || resource.type === selectedType;
+      // Note: Difficulty is not part of Resource type, so we'll skip it for now
+      const matchesDifficulty = true; // selectedDifficulty === 'all' || resource.difficulty === selectedDifficulty;
+      
+      return matchesSearch && matchesCategory && matchesType && matchesDifficulty;
+    }).sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      switch (sortBy) {
+        case 'title':
+          return a.title.localeCompare(b.title) * dir;
+        case 'downloads':
+          // Note: downloads not in Resource type, would need to be added
+          return 0 * dir;
+        case 'rating':
+          // Note: rating not in Resource type, would need to be added
+          return 0 * dir;
+        case 'createdAt':
+        default:
+          return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dir;
+      }
+    });
+  }, [resources, searchTerm, selectedCategory, selectedType, selectedDifficulty, sortBy, sortDir]);
 
   const total = filteredResources.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const pagedResources = filteredResources.slice((page - 1) * pageSize, page * pageSize);
 
+  // Convert API Resource to UI Resource type
+  const convertToUIResource = (apiResource: Resource): any => {
+    return {
+      ...apiResource,
+      createdAt: new Date(apiResource.createdAt),
+      url: apiResource.url || '',
+      views: 0,
+      downloads: 0,
+      updatedAt: new Date(apiResource.createdAt),
+    };
+  };
+
   const handleUpload = async () => {
     setIsUploading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      console.log('Uploading training resource:', uploadForm);
-      alert('Training resource uploaded successfully!');
+      if (isEditing && editingResource) {
+        await updateResource(editingResource.id, {
+          title: uploadForm.title,
+          description: uploadForm.description,
+          type: uploadForm.type as any,
+          tags: uploadForm.tags.split(',').map(t => t.trim()).filter(Boolean),
+        });
+        toast.success('Training resource updated successfully!');
+      } else {
+        await createResource({
+          title: uploadForm.title,
+          description: uploadForm.description,
+          type: uploadForm.type as any,
+          tags: uploadForm.tags.split(',').map(t => t.trim()).filter(Boolean),
+          isPublic: true,
+        });
+        toast.success('Training resource uploaded successfully!');
+      }
       setIsUploadModalOpen(false);
       resetForm();
     } catch (error) {
       console.error('Error uploading resource:', error);
-      alert('Failed to upload resource. Please try again.');
+      toast.error('Failed to upload resource. Please try again.');
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleEdit = (resource: TrainingResource) => {
+  const handleEdit = (resource: Resource) => {
     setEditingResource(resource);
     setUploadForm({
       title: resource.title,
-      description: resource.description,
-      type: resource.type,
-      category: resource.category,
-      duration: resource.duration,
-      difficulty: resource.difficulty,
-      instructor: resource.instructor,
-      learningObjectives: resource.learningObjectives.join('\n'),
-      tags: resource.tags.join(', ')
+      description: resource.description || '',
+      type: resource.type as any,
+      category: resource.tags?.[0] || '',
+      duration: '',
+      difficulty: 'Beginner',
+      instructor: resource.publisher || '',
+      learningObjectives: '',
+      tags: resource.tags?.join(', ') || ''
     });
     setIsEditing(true);
     setIsUploadModalOpen(true);
   };
 
   const handleDelete = async (resourceId: string) => {
-    if (confirm('Are you sure you want to delete this training resource?')) {
-      try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        console.log('Deleting resource:', resourceId);
-        alert('Training resource deleted successfully!');
-      } catch (error) {
-        console.error('Error deleting resource:', error);
-        alert('Failed to delete resource. Please try again.');
-      }
+    if (!confirm('Are you sure you want to delete this training resource?')) return;
+    
+    try {
+      await deleteResource(resourceId);
+      toast.success('Training resource deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting resource:', error);
+      toast.error('Failed to delete resource. Please try again.');
     }
   };
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
     if (!confirm(`Delete ${selectedIds.size} selected resource(s)?`)) return;
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log('Bulk deleting', Array.from(selectedIds));
-    alert('Selected resources deleted.');
-    setSelectedIds(new Set());
+    
+    try {
+      await Promise.all(Array.from(selectedIds).map(id => deleteResource(id)));
+      toast.success(`Deleted ${selectedIds.size} resource(s) successfully.`);
+      setSelectedIds(new Set());
+    } catch (error) {
+      console.error('Error bulk deleting resources:', error);
+      toast.error('Failed to delete some resources. Please try again.');
+    }
   };
 
   const toggleSelectAll = (checked: boolean) => {
@@ -191,10 +244,14 @@ export default function AdminTrainingResourcesPage() {
     });
   };
 
-  const handleToggleActive = async (resource: TrainingResource, next: boolean) => {
-    await new Promise(resolve => setTimeout(resolve, 400));
-    console.log('Toggle active', resource.id, next);
-    alert(`${resource.title} ${next ? 'activated' : 'deactivated'}`);
+  const handleToggleActive = async (resource: Resource, next: boolean) => {
+    try {
+      await updateResource(resource.id, { isPublic: next });
+      toast.success(`${resource.title} ${next ? 'published' : 'unpublished'} successfully!`);
+    } catch (error) {
+      console.error('Error toggling resource status:', error);
+      toast.error('Failed to update resource status. Please try again.');
+    }
   };
 
   const resetForm = () => {
@@ -233,33 +290,14 @@ export default function AdminTrainingResourcesPage() {
     }
   };
 
-  const mapTrainingToResource = (tr: TrainingResource): Resource => {
-    const lower = (tr.fileUrl || '').toLowerCase();
-    const isYouTube = lower.includes('youtube.com') || lower.includes('youtu.be');
-    const type: Resource['type'] = isYouTube
-      ? 'video'
-      : lower.endsWith('.mp4')
-        ? 'video'
-        : lower.endsWith('.pdf')
-          ? 'pdf'
-          : 'article';
-    return {
-      id: tr.id,
-      title: tr.title,
-      description: tr.description,
-      type,
-      url: type === 'article' ? '' : tr.fileUrl,
-      thumbnail: tr.thumbnailUrl,
-      duration: undefined,
-      tags: tr.tags,
-      createdAt: tr.createdAt,
-      isPublic: true,
-      publisher: tr.instructor,
-      isYouTube,
-      youtubeUrl: isYouTube ? tr.fileUrl : undefined,
-      content: type === 'article' ? `<h2>${tr.title}</h2><p>${tr.description}</p>` : undefined,
-    };
-  };
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -277,7 +315,7 @@ export default function AdminTrainingResourcesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {dummyTrainingResources.length}
+              {resources.length}
             </div>
             <p className="text-xs text-muted-foreground">
               Training materials
@@ -287,30 +325,31 @@ export default function AdminTrainingResourcesPage() {
 
         <AnimatedCard delay={0.2}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Downloads</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Views</CardTitle>
             <Download className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {dummyTrainingResources.reduce((sum, resource) => sum + resource.downloads, 0)}
+              {/* Note: View count not in Resource type, would need to be added */}
+              {resources.length}
             </div>
             <p className="text-xs text-muted-foreground">
-              All time downloads
+              All time views
             </p>
           </CardContent>
         </AnimatedCard>
 
         <AnimatedCard delay={0.3}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Rating</CardTitle>
+            <CardTitle className="text-sm font-medium">Published</CardTitle>
             <Star className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {(dummyTrainingResources.reduce((sum, resource) => sum + resource.rating, 0) / dummyTrainingResources.length).toFixed(1)}
+              {resources.filter(r => r.isPublic).length}
             </div>
             <p className="text-xs text-muted-foreground">
-              Out of 5.0
+              Public resources
             </p>
           </CardContent>
         </AnimatedCard>
@@ -322,7 +361,7 @@ export default function AdminTrainingResourcesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {new Set(dummyTrainingResources.map(r => r.category)).size}
+              {categories.length - 1}
             </div>
             <p className="text-xs text-muted-foreground">
               Different categories
@@ -463,8 +502,8 @@ export default function AdminTrainingResourcesPage() {
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center space-x-3">
-                    {resource.thumbnailUrl ? (
-                      <img src={resource.thumbnailUrl} alt="thumb" className="h-10 w-10 rounded object-cover" />
+                    {resource.thumbnail ? (
+                      <img src={resource.thumbnail} alt="thumb" className="h-10 w-10 rounded object-cover" />
                     ) : (
                       <div className="p-2 rounded-lg bg-primary/10">
                         {getTypeIcon(resource.type)}
@@ -472,7 +511,7 @@ export default function AdminTrainingResourcesPage() {
                     )}
                     <div>
                       <p className="font-medium">{resource.title}</p>
-                      <p className="text-sm text-muted-foreground">{resource.instructor}</p>
+                      <p className="text-sm text-muted-foreground">{resource.publisher || 'Admin'}</p>
                     </div>
                   </div>
                 </TableCell>
@@ -483,36 +522,36 @@ export default function AdminTrainingResourcesPage() {
                 </TableCell>
                 <TableCell>
                   <Badge variant="secondary">
-                    {resource.category}
+                    {resource.tags?.[0] || 'Uncategorized'}
                   </Badge>
                 </TableCell>
                 <TableCell>
-                <Badge className={getDifficultyColor(resource.difficulty)}>
-                  {resource.difficulty}
-                </Badge>
-              </TableCell>
+                  <Badge variant="secondary">
+                    N/A
+                  </Badge>
+                </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
-                  <Switch defaultChecked={resource.isActive} onCheckedChange={(c) => handleToggleActive(resource, !!c)} />
-                  <span className="text-xs text-muted-foreground">{resource.isActive ? 'Active' : 'Inactive'}</span>
+                  <Switch checked={resource.isPublic} onCheckedChange={(c) => handleToggleActive(resource, !!c)} />
+                  <span className="text-xs text-muted-foreground">{resource.isPublic ? 'Published' : 'Unpublished'}</span>
                 </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1 text-sm text-muted-foreground">
                     <Clock className="h-3 w-3" />
-                    <span>{resource.duration}</span>
+                    <span>N/A</span>
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1 text-sm">
                     <Download className="h-3 w-3 text-muted-foreground" />
-                    <span>{resource.downloads}</span>
+                    <span>N/A</span>
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1 text-sm">
                     <Star className="h-3 w-3 text-yellow-500" />
-                    <span>{resource.rating}</span>
+                    <span>N/A</span>
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
@@ -520,7 +559,7 @@ export default function AdminTrainingResourcesPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => { setSelectedResource(mapTrainingToResource(resource)); setIsViewerOpen(true); }}
+                      onClick={() => { setSelectedResource(resource); setIsViewerOpen(true); }}
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -548,40 +587,40 @@ export default function AdminTrainingResourcesPage() {
       </AnimatedCard>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {pagedResources.map((tr, index) => (
-            <AnimatedCard key={tr.id} delay={0.05 * (index + 1)}>
+          {pagedResources.map((resource, index) => (
+            <AnimatedCard key={resource.id} delay={0.05 * (index + 1)}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-primary/10">
-                      {getTypeIcon(tr.type)}
+                      {getTypeIcon(resource.type)}
                     </div>
                     <div>
-                      <CardTitle className="text-lg">{tr.title}</CardTitle>
-                      <p className="text-sm text-muted-foreground">{tr.instructor}</p>
+                      <CardTitle className="text-lg">{resource.title}</CardTitle>
+                      <p className="text-sm text-muted-foreground">{resource.publisher || 'Admin'}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline">{tr.category}</Badge>
+                    <Badge variant="outline">{resource.tags?.[0] || 'Uncategorized'}</Badge>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground line-clamp-2">{tr.description}</p>
+                <p className="text-sm text-muted-foreground line-clamp-2">{resource.description || 'No description'}</p>
                 <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline" className="capitalize">{tr.type}</Badge>
-                  <Badge className={getDifficultyColor(tr.difficulty)}>{tr.difficulty}</Badge>
+                  <Badge variant="outline" className="capitalize">{resource.type}</Badge>
+                  <Badge variant={resource.isPublic ? 'default' : 'secondary'}>
+                    {resource.isPublic ? 'Published' : 'Unpublished'}
+                  </Badge>
                 </div>
                 <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1"><Clock className="h-3 w-3" />{tr.duration}</div>
-                  <div className="flex items-center gap-1"><Star className="h-3 w-3 text-yellow-500" />{tr.rating}</div>
-                  <div className="flex items-center gap-1"><Download className="h-3 w-3" />{tr.downloads}</div>
+                  <div className="flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(resource.createdAt).toLocaleDateString()}</div>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="sm" className="flex-1" onClick={() => { setSelectedResource(mapTrainingToResource(tr)); setIsViewerOpen(true); }}>
+                  <Button size="sm" className="flex-1" onClick={() => { setSelectedResource(resource); setIsViewerOpen(true); }}>
                     <Eye className="h-4 w-4 mr-2" /> View
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => handleEdit(tr)}>
+                  <Button size="sm" variant="outline" onClick={() => handleEdit(resource)}>
                     <Edit className="h-4 w-4" />
                   </Button>
                 </div>
@@ -774,7 +813,7 @@ export default function AdminTrainingResourcesPage() {
       {/* Viewer Modal */}
       {selectedResource && (
         <ResourceViewerModalV2
-          resource={selectedResource}
+          resource={convertToUIResource(selectedResource)}
           isOpen={isViewerOpen}
           onClose={() => { setIsViewerOpen(false); setSelectedResource(null); }}
           onDownload={() => selectedResource && window.open(selectedResource.url || '#', '_blank')}

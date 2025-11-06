@@ -14,8 +14,8 @@ import {
   XCircle,
   AlertCircle
 } from 'lucide-react';
-import { Session } from '../../../lib/types';
 import { format } from 'date-fns';
+import type { Session } from '@/lib/api/sessions';
 
 interface SessionCardProps {
   session: Session;
@@ -40,7 +40,7 @@ export function SessionCard({
   onCancel,
   showActions = true
 }: SessionCardProps) {
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: Session['status']) => {
     switch (status) {
       case 'scheduled':
         return <Calendar className="h-4 w-4 text-blue-500" />;
@@ -55,7 +55,7 @@ export function SessionCard({
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: Session['status']) => {
     switch (status) {
       case 'scheduled':
         return 'bg-blue-100 text-blue-800';
@@ -70,8 +70,16 @@ export function SessionCard({
     }
   };
 
+  // Parse date - handle both string and Date objects
+  const sessionDate = typeof session.date === 'string' ? new Date(session.date) : session.date;
+  const sessionTime = session.time || '';
+  
+  // Format date and time for display
+  const displayDate = format(sessionDate, 'MMM dd, yyyy');
+  const displayTime = sessionTime || format(sessionDate, 'h:mm a');
+
   const isUpcoming = session.status === 'scheduled' && 
-    new Date(session.date) > new Date();
+    sessionDate > new Date();
 
   return (
     <Card className="relative overflow-hidden h-full bg-gradient-to-br from-primary/5 via-background to-primary/10 dark:from-primary/10 dark:via-background dark:to-primary/15 rounded-3xl border-primary/20 dark:border-primary/30 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/30 dark:hover:shadow-primary/40 hover:border-primary/40 dark:hover:border-primary/50 hover:from-primary/10 hover:to-primary/15 dark:hover:from-primary/15 dark:hover:to-primary/20 group">
@@ -128,11 +136,11 @@ export function SessionCard({
         <div className="space-y-2 text-sm">
           <div className="flex items-center space-x-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span>{format(new Date(session.date), 'MMM dd, yyyy')}</span>
+            <span>{displayDate}</span>
           </div>
           <div className="flex items-center space-x-2">
             <Clock className="h-4 w-4 text-muted-foreground" />
-            <span>{format(new Date(session.date), 'h:mm a')}</span>
+            <span>{displayTime}</span>
           </div>
           <div className="flex items-center space-x-2">
             <Clock className="h-4 w-4 text-muted-foreground" />

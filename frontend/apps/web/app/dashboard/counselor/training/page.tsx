@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { AnimatedGrid } from '@workspace/ui/components/animated-grid';
@@ -46,8 +46,9 @@ import {
   Bookmark,
   Share2
 } from 'lucide-react';
-import { dummyTrainingResources } from '../../../../lib/dummy-data';
-import { TrainingResource, Resource } from '../../../../lib/types';
+import { useResources } from '../../../../hooks/useResources';
+import { ResourcesApi, type Resource as ResourceType } from '../../../../lib/api/resources';
+import { toast } from 'sonner';
 
 export default function CounselorTrainingPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -56,84 +57,56 @@ export default function CounselorTrainingPage() {
   const [selectedDifficulty, setSelectedDifficulty] = useState<'all' | string>('all');
   const [sortBy, setSortBy] = useState<'relevance' | 'title' | 'downloads' | 'rating' | 'createdAt'>('relevance');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [selectedTraining, setSelectedTraining] = useState<TrainingResource | null>(null);
-  const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
+  const [selectedResource, setSelectedResource] = useState<ResourceType | null>(null);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [isArticleViewerOpen, setIsArticleViewerOpen] = useState(false);
   const [viewingArticle, setViewingArticle] = useState<any>(null);
   const [completedResources, setCompletedResources] = useState<Set<string>>(() => new Set<string>(JSON.parse(localStorage.getItem('completedTraining') || '[]')));
   const [bookmarkedResources, setBookmarkedResources] = useState<Set<string>>(() => new Set<string>(JSON.parse(localStorage.getItem('bookmarkedTraining') || '[]')));
 
-  const categories = ['all', 'Psychology', 'Counseling', 'Trauma Care', 'Cultural Competency', 'Self-Care'];
-  const types = ['all', 'course', 'workshop', 'video', 'document', 'presentation'];
-  const difficulties = ['all', 'Beginner', 'Intermediate', 'Advanced'];
+  // Load training resources (public resources)
+  const { resources, loading } = useResources({ isPublic: true });
 
-  const filteredResources = dummyTrainingResources.filter(resource => {
-    const matchesSearch = resource.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         resource.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         resource.instructor.toLowerCase().includes(searchTerm.toLowerCase());
+  // Convert API Resource to UI Resource type
+  const convertToUIResource = (apiResource: ResourceType): any => {
+    return {
+      ...apiResource,
+      createdAt: new Date(apiResource.createdAt),
+      url: apiResource.url || '',
+      views: 0,
+      downloads: (apiResource as any).downloadCount || 0,
+      updatedAt: new Date(apiResource.createdAt),
+    };
+  };
+
+  // Get unique categories, types from resources
+  const categories = ['all', ...new Set(resources.map(r => r.category).filter(Boolean))];
+  const types = ['all', ...new Set(resources.map(r => r.type).filter(Boolean))];
+  const difficulties = ['all', 'Beginner', 'Intermediate', 'Advanced']; // Note: difficulty not in Resource type
+
+  const filteredResources = resources.filter(resource => {
+    const matchesSearch = (resource.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (resource.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         ((resource as any).instructor || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || resource.category === selectedCategory;
     const matchesType = selectedType === 'all' || resource.type === selectedType;
-    const matchesDifficulty = selectedDifficulty === 'all' || resource.difficulty === selectedDifficulty;
+    const matchesDifficulty = selectedDifficulty === 'all'; // Note: difficulty not in Resource type
     
     return matchesSearch && matchesCategory && matchesType && matchesDifficulty;
   }).sort((a, b) => {
     const dir = sortDir === 'asc' ? 1 : -1;
     switch (sortBy) {
-      case 'title': return a.title.localeCompare(b.title) * dir;
-      case 'downloads': return (a.downloads - b.downloads) * dir;
-      case 'rating': return (a.rating - b.rating) * dir;
-      case 'createdAt': return ((a.createdAt as any) - (b.createdAt as any)) * dir;
+      case 'title': return (a.title || '').localeCompare(b.title || '') * dir;
+      case 'downloads': return (((a as any).downloadCount || 0) - ((b as any).downloadCount || 0)) * dir;
+      case 'rating': return (((a as any).rating || 0) - ((b as any).rating || 0)) * dir;
+      case 'createdAt': return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dir;
       case 'relevance':
       default: return 0;
     }
   });
 
-  const mapTrainingToResource = (tr: TrainingResource): Resource => {
-    const lower = tr.fileUrl.toLowerCase();
-    const isYouTube = lower.includes('youtube.com') || lower.includes('youtu.be');
-    const isVideo = lower.endsWith('.mp4') || isYouTube;
-    const isPdf = lower.endsWith('.pdf');
-    const isHtml = lower.endsWith('.html');
-    let type: Resource['type'] = 'article';
-    if (isVideo) type = 'video';
-    else if (isPdf) type = 'pdf';
-    else if (isHtml) type = 'article';
-
-    // Build article content when appropriate so it renders inline like patient resources
-    const articleContent = type === 'article'
-      ? `
-        <h2>${tr.title}</h2>
-        <p>${tr.description}</p>
-        ${tr.learningObjectives && tr.learningObjectives.length ? `
-          <h3>Learning Objectives</h3>
-          <ul>
-            ${tr.learningObjectives.map(o => `<li>${o}</li>`).join('')}
-          </ul>
-        ` : ''}
-      `
-      : undefined;
-    return {
-      id: tr.id,
-      title: tr.title,
-      description: tr.description,
-      type,
-      url: type === 'article' ? '' : tr.fileUrl,
-      thumbnail: tr.thumbnailUrl,
-      duration: undefined,
-      tags: tr.tags,
-      createdAt: tr.createdAt,
-      isPublic: true,
-      publisher: tr.instructor,
-      isYouTube,
-      youtubeUrl: isYouTube ? tr.fileUrl : undefined,
-      content: articleContent,
-    };
-  };
-
-  const handleViewDetails = (training: TrainingResource) => {
-    setSelectedTraining(training);
-    setSelectedResource(mapTrainingToResource(training));
+  const handleViewDetails = (resource: ResourceType) => {
+    setSelectedResource(resource);
     setIsViewerOpen(true);
   };
 
@@ -142,14 +115,19 @@ export default function CounselorTrainingPage() {
     setSelectedResource(null);
   };
 
-  const handleDownload = async (resource: TrainingResource) => {
+  const handleDownload = async (resource: ResourceType) => {
     try {
-      // Simulate download
-      console.log('Downloading resource:', resource.title);
-      alert(`Downloading ${resource.title}...`);
+      // Track download and get signed URL
+      await ResourcesApi.trackView(resource.id);
+      if (resource.url) {
+        window.open(resource.url, '_blank');
+        toast.success('Download started');
+      } else {
+        toast.error('Download URL not available');
+      }
     } catch (error) {
       console.error('Error downloading resource:', error);
-      alert('Failed to download resource. Please try again.');
+      toast.error('Failed to download resource. Please try again.');
     }
   };
 
@@ -200,8 +178,8 @@ export default function CounselorTrainingPage() {
   };
 
   const completedCount = completedResources.size;
-  const totalResources = dummyTrainingResources.length;
-  const progressPercentage = Math.round((completedCount / totalResources) * 100);
+  const totalResources = resources.length;
+  const progressPercentage = totalResources > 0 ? Math.round((completedCount / totalResources) * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -283,8 +261,8 @@ export default function CounselorTrainingPage() {
           </SelectTrigger>
           <SelectContent>
             {categories.map((category) => (
-              <SelectItem key={category} value={category}>
-                {category === 'all' ? 'All Categories' : category}
+              <SelectItem key={category || 'all'} value={category || 'all'}>
+                {category === 'all' ? 'All Categories' : category || 'All'}
               </SelectItem>
             ))}
           </SelectContent>
@@ -340,15 +318,25 @@ export default function CounselorTrainingPage() {
 
       {/* Resources */}
       <AnimatedGrid className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" staggerDelay={0.1}>
-        {filteredResources.map((tr) => (
-          <ResourceCard
-            key={tr.id}
-            resource={mapTrainingToResource(tr)}
-            onView={(res) => handleViewDetails(tr)}
-            onDownload={() => handleDownload(tr)}
-            delay={0}
-          />
-        ))}
+        {loading ? (
+          <div className="col-span-full flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        ) : filteredResources.length > 0 ? (
+          filteredResources.map((resource) => (
+            <ResourceCard
+              key={resource.id}
+              resource={convertToUIResource(resource)}
+              onView={(res: any) => handleViewDetails(resource)}
+              onDownload={() => handleDownload(resource)}
+              delay={0}
+            />
+          ))
+        ) : (
+          <div className="col-span-full text-center py-12">
+            <p className="text-muted-foreground">No training resources found</p>
+          </div>
+        )}
       </AnimatedGrid>
 
       {/* Results Summary */}
@@ -367,22 +355,23 @@ export default function CounselorTrainingPage() {
       {/* Resource Viewer Modal (shared) */}
       {selectedResource && (
         <ResourceViewerModalV2
-          resource={selectedResource}
+          resource={convertToUIResource(selectedResource)}
           isOpen={isViewerOpen}
-          onClose={() => { setIsViewerOpen(false); setSelectedResource(null); setSelectedTraining(null); }}
-          onDownload={() => selectedTraining && handleDownload(selectedTraining)}
-          onShare={(res) => alert(`Share: ${res.title}`)}
-          onBookmark={(res) => handleToggleBookmark(res.id)}
-          onViewArticle={(res) => {
+          onClose={() => { setIsViewerOpen(false); setSelectedResource(null); }}
+          onDownload={(r: any) => selectedResource && handleDownload(selectedResource)}
+          onShare={(r: any) => alert(`Share: ${selectedResource?.title || 'Resource'}`)}
+          onBookmark={(r: any) => selectedResource && handleToggleBookmark(selectedResource.id)}
+          onViewArticle={(r: any) => {
+            if (!selectedResource) return;
             setViewingArticle({
-              id: res.id,
-              title: res.title,
-              content: res.content || res.description || '',
-              description: res.description,
-              publisher: res.publisher,
-              createdAt: res.createdAt,
-              thumbnail: res.thumbnail,
-              tags: res.tags || []
+              id: selectedResource.id,
+              title: selectedResource.title,
+              content: selectedResource.content || selectedResource.description || '',
+              description: selectedResource.description,
+              publisher: selectedResource.publisher,
+              createdAt: selectedResource.createdAt,
+              thumbnail: selectedResource.thumbnail,
+              tags: selectedResource.tags || []
             });
             setIsViewerOpen(false);
             setIsArticleViewerOpen(true);
@@ -397,7 +386,7 @@ export default function CounselorTrainingPage() {
         onClose={() => setIsArticleViewerOpen(false)}
         onShare={(article) => alert(`Share article: ${article?.title}`)}
         onBookmark={() => viewingArticle && handleToggleBookmark(viewingArticle.id)}
-        onDownload={() => selectedTraining && handleDownload(selectedTraining)}
+        onDownload={() => selectedResource && handleDownload(selectedResource)}
       />
     </div>
   );

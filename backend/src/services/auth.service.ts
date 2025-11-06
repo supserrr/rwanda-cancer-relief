@@ -109,7 +109,12 @@ export async function signUp(
       role: (authData.user.user_metadata?.role as UserRole) || role,
       fullName: fullName || authData.user.user_metadata?.full_name,
       phoneNumber: phoneNumber || authData.user.user_metadata?.phone_number,
-      metadata: authData.user.user_metadata,
+      metadata: {
+        ...authData.user.user_metadata,
+        isVerified: authData.user.email_confirmed_at !== null,
+        createdAt: authData.user.created_at,
+        updatedAt: authData.user.updated_at || authData.user.created_at,
+      },
     };
 
     logInfo('User signed up successfully', { userId: user.id, email: user.email });

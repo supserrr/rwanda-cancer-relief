@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Plus, Search, Pencil, MessageSquare, Clock, Archive, MoreVertical } from 'lucide-react';
 import { cn } from '@workspace/ui/lib/utils';
 import { Button } from '@workspace/ui/components/button';
@@ -12,76 +12,63 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@workspace/ui/components/dropdown-menu';
-
-interface ChatThread {
-  id: string;
-  title: string;
-  lastMessage: string;
-  timestamp: Date;
-  unreadCount?: number;
-  archived?: boolean;
-}
+import { useChat } from '../../../hooks/useChat';
+import { useAuth } from '../../auth/AuthProvider';
 
 interface ChatThreadsSidebarProps {
-  threads?: ChatThread[];
   activeThreadId?: string;
   onThreadSelect?: (threadId: string) => void;
   onNewThread?: () => void;
   className?: string;
 }
 
-// Mock threads data - replace with real data later
-const mockThreads: ChatThread[] = [
-  {
-    id: '1',
-    title: 'Cancer Treatment Questions',
-    lastMessage: 'Thank you for the information about treatment options.',
-    timestamp: new Date('2024-01-15T10:30:00'),
-    unreadCount: 2,
-  },
-  {
-    id: '2',
-    title: 'Support Resources',
-    lastMessage: 'Are there any local support groups available?',
-    timestamp: new Date('2024-01-14T14:20:00'),
-  },
-  {
-    id: '3',
-    title: 'Appointment Scheduling',
-    lastMessage: 'I would like to schedule a consultation.',
-    timestamp: new Date('2024-01-13T09:15:00'),
-    unreadCount: 1,
-  },
-  {
-    id: '4',
-    title: 'Financial Assistance',
-    lastMessage: 'How can I apply for financial aid?',
-    timestamp: new Date('2024-01-12T16:45:00'),
-  },
-  {
-    id: '5',
-    title: 'Family Support',
-    lastMessage: 'Resources for my family members',
-    timestamp: new Date('2024-01-10T11:30:00'),
-  },
-  {
-    id: '6',
-    title: 'Old Consultation',
-    lastMessage: 'Previous consultation notes',
-    timestamp: new Date('2024-01-05T09:00:00'),
-    archived: true,
-  },
-];
-
 export function ChatThreadsSidebar({
-  threads = mockThreads,
   activeThreadId,
   onThreadSelect,
   onNewThread,
   className,
 }: ChatThreadsSidebarProps) {
+  const { user } = useAuth();
+  
+  // Load chats using the useChat hook
+  const { chats, messages, loading } = useChat({
+    participantId: user?.id,
+  });
+
+  // Convert chats to threads format
+  const threads = useMemo(() => {
+    return chats.map(chat => {
+      // Get the last message for this chat
+      const chatMessages = messages.filter(msg => msg.chatId === chat.id);
+      const lastMessage = chatMessages.length > 0 
+        ? chatMessages[chatMessages.length - 1] 
+        : null;
+      
+      // Get participant name (other participant)
+      const otherParticipantId = chat.participants.find(id => id !== user?.id);
+      const title = `Chat with ${otherParticipantId?.slice(0, 8)}...`; // Simplified for now
+      
+      return {
+        id: chat.id,
+        title,
+        lastMessage: lastMessage?.content || 'No messages yet',
+        timestamp: lastMessage ? new Date(lastMessage.createdAt) : new Date(chat.createdAt),
+        unreadCount: chat.unreadCount || 0,
+        archived: false, // Note: archived status not in Chat type
+      };
+    });
+  }, [chats, messages, user?.id]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'recent' | 'archived'>('all');
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className={cn("flex items-center justify-center h-64", className)}>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   // Filter threads based on active tab
   const filteredByTab = threads.filter((thread) => {

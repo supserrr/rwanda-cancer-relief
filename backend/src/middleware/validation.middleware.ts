@@ -31,9 +31,12 @@ export function validate(schema: {
       }
 
       // Validate query
+      // Note: req.query is read-only in Express, so we validate but don't overwrite
+      // The validated query is available in the controller via req.query (already validated)
       if (schema.query) {
         const validatedQuery = await schema.query.parseAsync(req.query);
-        req.query = validatedQuery as typeof req.query;
+        // Store validated query in a custom property for access in controllers if needed
+        (req as any).validatedQuery = validatedQuery;
       }
 
       next();

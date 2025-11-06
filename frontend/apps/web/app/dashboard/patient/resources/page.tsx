@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedGrid } from '@workspace/ui/components/animated-grid';
 import { ResourceCard } from '../../../../components/dashboard/shared/ResourceCard';
@@ -18,33 +18,77 @@ import {
 } from '@workspace/ui/components/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@workspace/ui/components/tabs';
 import { Search, Filter, Play, FileText, Video, BookOpen, Download, SortAsc, SortDesc, Grid3X3, List, RefreshCw } from 'lucide-react';
-import { dummyResources } from '../../../../lib/dummy-data';
-import { Resource } from '../../../../lib/types';
+import { useResources } from '../../../../hooks/useResources';
+import { ResourcesApi, type Resource } from '../../../../lib/api/resources';
+import { toast } from 'sonner';
 
 export default function PatientResourcesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('all');
-  const [selectedResource, setSelectedResource] = useState<any>(null);
+  const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [isArticleViewerOpen, setIsArticleViewerOpen] = useState(false);
-  const [viewingArticle, setViewingArticle] = useState<any>(null);
+  const [viewingArticle, setViewingArticle] = useState<Resource | null>(null);
   const [activeTab, setActiveTab] = useState('all');
   const [savedResources, setSavedResources] = useState<string[]>([]); // Track saved resource IDs
-  const [sortBy, setSortBy] = useState('date');
+  const [sortBy, setSortBy] = useState<'title' | 'created_at' | 'views' | 'downloads'>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const resourceTypes = ['all', 'audio', 'pdf', 'video', 'article'];
+  const resourceTypes = ['all', 'audio', 'pdf', 'video', 'article'] as const;
 
-  const filteredResources = dummyResources.filter(resource => {
-    const matchesSearch = resource.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         resource.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         resource.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesType = selectedType === 'all' || resource.type === selectedType;
-    
-    return matchesSearch && matchesType;
-  });
+  // Build query parameters based on filters
+  const queryParams = useMemo(() => {
+    const params: {
+      type?: 'audio' | 'pdf' | 'video' | 'article';
+      search?: string;
+      isPublic?: boolean;
+      sortBy?: 'title' | 'created_at' | 'views' | 'downloads';
+      sortOrder?: 'asc' | 'desc';
+    } = {
+      isPublic: true, // Only show public resources for patients
+      sortBy,
+      sortOrder,
+    };
+
+    if (selectedType !== 'all') {
+      params.type = selectedType as 'audio' | 'pdf' | 'video' | 'article';
+    }
+
+    if (searchTerm.trim()) {
+      params.search = searchTerm.trim();
+    }
+
+    return params;
+  }, [selectedType, searchTerm, sortBy, sortOrder]);
+
+  // Load resources using the hook
+  const {
+    resources,
+    loading: resourcesLoading,
+    error: resourcesError,
+    refreshResources,
+  } = useResources(queryParams);
+
+  // Convert API Resource to UI Resource type
+  const convertToUIResource = (apiResource: Resource): any => {
+    return {
+      ...apiResource,
+      createdAt: new Date(apiResource.createdAt),
+      url: apiResource.url || '',
+      views: 0,
+      downloads: 0,
+      updatedAt: new Date(apiResource.createdAt),
+    };
+  };
+
+  // Filter resources based on active tab
+  const filteredResources = useMemo(() => {
+    if (activeTab === 'saved') {
+      return resources.filter(resource => savedResources.includes(resource.id));
+    }
+    return resources;
+  }, [resources, activeTab, savedResources]);
 
   const getResourcesByType = (type: string) => {
     if (type === 'all') return filteredResources;
@@ -52,18 +96,9 @@ export default function PatientResourcesPage() {
   };
 
   const getSavedResources = () => {
-    return dummyResources.filter(resource => savedResources.includes(resource.id));
+    return resources.filter(resource => savedResources.includes(resource.id));
   };
 
-  const handleViewResource = (resource: Resource) => {
-    if (resource.type === 'article') {
-      setViewingArticle(resource);
-      setIsArticleViewerOpen(true);
-    } else {
-      setSelectedResource(resource);
-      setIsViewerOpen(true);
-    }
-  };
 
   const handleCloseArticleViewer = () => {
     setIsArticleViewerOpen(false);
@@ -75,24 +110,72 @@ export default function PatientResourcesPage() {
     setSelectedResource(null);
   };
 
-  const handleDownloadResource = (resource: Resource | any) => {
-    console.log('Download resource:', resource.title);
-    // Implement download logic
+  const handleDownloadResource = async (resource: Resource) => {
+    try {
+      const downloadUrl = await ResourcesApi.getDownloadUrl(resource.id);
+      // Track download
+      await ResourcesApi.trackView(resource.id);
+      
+      // Open download URL in new tab
+      window.open(downloadUrl.downloadUrl, '_blank');
+      toast.success('Download started');
+    } catch (error) {
+      console.error('Error downloading resource:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to download resource');
+    }
   };
 
-  const handleShareResource = (resource: Resource | any) => {
-    console.log('Share resource:', resource.title);
-    // Implement share logic
+  const handleShareResource = (resource: Resource) => {
+    // Share functionality - can be implemented with Web Share API or copy link
+    if (navigator.share) {
+      navigator.share({
+        title: resource.title,
+        text: resource.description,
+        url: window.location.href,
+      }).catch((error) => {
+        console.error('Error sharing:', error);
+      });
+    } else {
+      // Fallback: copy to clipboard
+      navigator.clipboard.writeText(window.location.href);
+      toast.success('Link copied to clipboard');
+    }
   };
 
-  const handleBookmarkResource = (resource: Resource | any) => {
-    console.log('Bookmark resource:', resource.title);
+  const handleBookmarkResource = (resource: Resource) => {
     // Toggle saved state
     setSavedResources(prev => 
       prev.includes(resource.id) 
         ? prev.filter(id => id !== resource.id)
         : [...prev, resource.id]
     );
+    toast.success(
+      savedResources.includes(resource.id) 
+        ? 'Resource removed from saved' 
+        : 'Resource saved'
+    );
+  };
+
+  const handleViewResource = async (resource: Resource) => {
+    // Track view
+    try {
+      await ResourcesApi.trackView(resource.id);
+    } catch (error) {
+      console.error('Error tracking view:', error);
+    }
+
+    if (resource.type === 'article') {
+      setViewingArticle(resource);
+      setIsArticleViewerOpen(true);
+    } else {
+      setSelectedResource(resource);
+      setIsViewerOpen(true);
+    }
+  };
+
+  const handleRefresh = async () => {
+    await refreshResources();
+    toast.success('Resources refreshed');
   };
 
   const getTypeIcon = (type: string) => {
@@ -109,6 +192,18 @@ export default function PatientResourcesPage() {
         return <FileText className="h-4 w-4" />;
     }
   };
+
+  if (resourcesError) {
+    return (
+      <div className="text-center py-12 text-red-500">
+        <h3 className="text-lg font-semibold mb-2">Error loading resources</h3>
+        <p className="text-muted-foreground">Please try again later.</p>
+        <Button onClick={handleRefresh} className="mt-4">
+          Try Again
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -165,10 +260,10 @@ export default function PatientResourcesPage() {
             variant="outline"
             size="sm"
             className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-            onClick={() => setIsRefreshing(true)}
-            disabled={isRefreshing}
+            onClick={handleRefresh}
+            disabled={resourcesLoading}
           >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${resourcesLoading ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </div>
@@ -217,14 +312,18 @@ export default function PatientResourcesPage() {
             </div>
 
             {/* Resources Grid */}
-            {getResourcesByType('all').length > 0 ? (
+            {resourcesLoading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              </div>
+            ) : getResourcesByType('all').length > 0 ? (
               <AnimatedGrid className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" staggerDelay={0.1}>
                 {getResourcesByType('all').map((resource, index) => (
                   <ResourceCard
                     key={resource.id}
-                    resource={resource}
-                    onView={handleViewResource}
-                    onDownload={handleDownloadResource}
+                    resource={convertToUIResource(resource)}
+                    onView={(r: any) => handleViewResource(resource)}
+                    onDownload={(r: any) => handleDownloadResource(resource)}
                     delay={index * 0.1}
                   />
                 ))}
@@ -263,9 +362,9 @@ export default function PatientResourcesPage() {
                 {getSavedResources().map((resource, index) => (
                   <ResourceCard
                     key={resource.id}
-                    resource={resource}
-                    onView={handleViewResource}
-                    onDownload={handleDownloadResource}
+                    resource={convertToUIResource(resource)}
+                    onView={(r: any) => handleViewResource(resource)}
+                    onDownload={(r: any) => handleDownloadResource(resource)}
                     delay={index * 0.1}
                   />
                 ))}
@@ -307,14 +406,18 @@ export default function PatientResourcesPage() {
               </div>
 
               {/* Resources Grid */}
-              {getResourcesByType(type).length > 0 ? (
+              {resourcesLoading ? (
+                <div className="flex justify-center items-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                </div>
+              ) : getResourcesByType(type).length > 0 ? (
                 <AnimatedGrid className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" staggerDelay={0.1}>
                   {getResourcesByType(type).map((resource, index) => (
                     <ResourceCard
                       key={resource.id}
-                      resource={resource}
-                      onView={handleViewResource}
-                      onDownload={handleDownloadResource}
+                      resource={convertToUIResource(resource)}
+                      onView={(r: any) => handleViewResource(resource)}
+                      onDownload={(r: any) => handleDownloadResource(resource)}
                       delay={index * 0.1}
                     />
                   ))}
@@ -343,38 +446,31 @@ export default function PatientResourcesPage() {
           {/* Resource Viewer Modal */}
           {selectedResource && (
             <ResourceViewerModalV2
-              resource={selectedResource}
-              isOpen={isViewerOpen}
-              onClose={handleCloseViewer}
-              onDownload={handleDownloadResource}
-              onShare={handleShareResource}
-              onBookmark={handleBookmarkResource}
-              onViewArticle={(resource) => {
-                setViewingArticle({
-                  id: resource.id,
-                  title: resource.title,
-                  content: resource.description || '',
-                  description: resource.description,
-                  publisher: resource.publisher,
-                  createdAt: resource.createdAt,
-                  thumbnail: resource.thumbnail,
-                  tags: resource.tags || []
-                });
-                setIsViewerOpen(false);
-                setIsArticleViewerOpen(true);
-              }}
+          resource={convertToUIResource(selectedResource)}
+          isOpen={isViewerOpen}
+          onClose={handleCloseViewer}
+          onDownload={(r: any) => handleDownloadResource(selectedResource)}
+          onShare={(r: any) => handleShareResource(selectedResource)}
+          onBookmark={(r: any) => handleBookmarkResource(selectedResource)}
+          onViewArticle={(r: any) => {
+            setViewingArticle(selectedResource);
+            setIsViewerOpen(false);
+            setIsArticleViewerOpen(true);
+          }}
             />
           )}
 
           {/* Article Viewer */}
+      {viewingArticle && (
           <ArticleViewerV2
-            article={viewingArticle}
+          article={convertToUIResource(viewingArticle)}
             isOpen={isArticleViewerOpen}
             onClose={handleCloseArticleViewer}
-            onShare={handleShareResource}
-            onBookmark={handleBookmarkResource}
-            onDownload={handleDownloadResource}
+            onShare={(a: any) => handleShareResource(viewingArticle)}
+            onBookmark={(a: any) => handleBookmarkResource(viewingArticle)}
+            onDownload={(a: any) => handleDownloadResource(viewingArticle)}
           />
+      )}
         </div>
       );
     }

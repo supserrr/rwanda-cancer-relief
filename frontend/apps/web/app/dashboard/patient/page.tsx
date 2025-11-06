@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatedStatCard } from '@workspace/ui/components/animated-stat-card';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
@@ -24,30 +24,108 @@ import {
   Target,
   Users
 } from 'lucide-react';
-import { dummyPatients, dummySessions, dummyResources, dummyMessages, dummyCounselors, dummyChats } from '../../../lib/dummy-data';
+import { useAuth } from '../../../components/auth/AuthProvider';
+import { useSessions } from '../../../hooks/useSessions';
+import { useChat } from '../../../hooks/useChat';
+import { useResources } from '../../../hooks/useResources';
+import { AdminApi, type AdminUser } from '../../../lib/api/admin';
 import { QuickBookingModal } from '@workspace/ui/components/quick-booking-modal';
+import { toast } from 'sonner';
 
 export default function PatientDashboard() {
   const router = useRouter();
+  const { user, isLoading: authLoading } = useAuth();
   const [isQuickBookingOpen, setIsQuickBookingOpen] = useState(false);
-  const currentPatient = dummyPatients[0]; // Jean Baptiste
-  const upcomingSessions = dummySessions.filter(session => 
-    session.patientId === currentPatient?.id && 
-    session.status === 'scheduled' &&
-    new Date(session.date) > new Date()
-  );
-  const recentMessages = dummyMessages.filter(msg => 
-    msg.senderId === currentPatient?.id || msg.receiverId === currentPatient?.id
-  ).slice(0, 3);
-  const recommendedResources = dummyResources.slice(0, 3);
+  const [counselors, setCounselors] = useState<AdminUser[]>([]);
+  const [counselorsLoading, setCounselorsLoading] = useState(true);
+
+  // Load upcoming sessions
+  const {
+    sessions,
+    loading: sessionsLoading,
+    error: sessionsError,
+  } = useSessions({
+    patientId: user?.id,
+    status: 'scheduled',
+  });
+
+  // Load chats for recent messages
+  const {
+    chats,
+    messages,
+    loading: chatsLoading,
+    error: chatsError,
+  } = useChat({
+    participantId: user?.id,
+  });
+
+  // Load recommended resources (public resources, limited)
+  const {
+    resources,
+    loading: resourcesLoading,
+    error: resourcesError,
+  } = useResources({
+    isPublic: true,
+    limit: 3,
+    sortBy: 'views',
+    sortOrder: 'desc',
+  });
+
+  // Load counselors for quick booking
+  useEffect(() => {
+    const fetchCounselors = async () => {
+      try {
+        setCounselorsLoading(true);
+        const response = await AdminApi.listUsers({ role: 'counselor' });
+        setCounselors(response.users);
+      } catch (error) {
+        console.error('Error fetching counselors:', error);
+        toast.error('Failed to load counselors');
+      } finally {
+        setCounselorsLoading(false);
+      }
+    };
+
+    if (user?.id) {
+      fetchCounselors();
+    }
+  }, [user?.id]);
+
+  // Filter upcoming sessions
+  const upcomingSessions = useMemo(() => {
+    return sessions.filter(session => 
+      session.status === 'scheduled' &&
+      new Date(session.date) > new Date()
+    ).slice(0, 3); // Show only next 3
+  }, [sessions]);
+
+  // Get recent messages from all chats
+  const recentMessages = useMemo(() => {
+    // Get messages from all chats, sorted by most recent
+    const allMessages = chats.flatMap(chat => {
+      // Find messages for this chat
+      const chatMessages = messages.filter(msg => msg.chatId === chat.id);
+      return chatMessages;
+    }).sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    ).slice(0, 3); // Show only 3 most recent
+
+    return allMessages;
+  }, [chats, messages]);
+
+  // Get recommended resources
+  const recommendedResources = useMemo(() => {
+    return resources.slice(0, 3);
+  }, [resources]);
 
   const handleQuickBooking = () => {
     setIsQuickBookingOpen(true);
   };
 
   const handleConfirmQuickBooking = (bookingData: any) => {
-    console.log('Quick booking confirmed:', bookingData);
-    // Here you would typically send the booking data to your backend
+    // Quick booking is handled by the QuickBookingModal component
+    setIsQuickBookingOpen(false);
+    toast.success('Session booking initiated!');
   };
 
   const handleCloseQuickBooking = () => {
@@ -55,25 +133,43 @@ export default function PatientDashboard() {
   };
 
   const handleMessageClick = (message: any) => {
-    // Find the chat that includes this message
-    // For patient, the message should be from/to the patient
-    const chatId = dummyChats.find(chat => 
-      chat.participants.includes(currentPatient?.id || '') &&
-      (message.senderId === currentPatient?.id || message.receiverId === currentPatient?.id)
-    )?.id;
-    
-    if (chatId) {
-      router.push(`/dashboard/patient/chat?chatId=${chatId}`);
+    // Navigate to chat page with the chat ID
+    if (message.chatId) {
+      router.push(`/dashboard/patient/chat?chatId=${message.chatId}`);
     } else {
       // Fallback: just navigate to chat page
       router.push('/dashboard/patient/chat');
     }
   };
 
+  // Get counselor name from message
+  const getCounselorName = (message: any) => {
+    // Try to find counselor from chat
+    const chat = chats.find(c => c.id === message.chatId);
+    if (chat) {
+      const counselorId = chat.participants.find(id => id !== user?.id);
+      const counselor = counselors.find(c => c.id === counselorId);
+      return counselor?.fullName || counselor?.email || 'Counselor';
+    }
+    return 'Counselor';
+  };
+
+  // Calculate module progress (placeholder - would come from patient metadata)
+  const moduleProgress = 75; // This would come from user metadata or a separate API
+
+  // Loading state
+  if (authLoading || sessionsLoading || chatsLoading || resourcesLoading || counselorsLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <AnimatedPageHeader
-        title="Welcome back, Jean"
+        title={`Welcome back, ${user?.name?.split(' ')[0] || 'there'}`}
         description="Here's an overview of your progress and upcoming activities"
       />
 
@@ -81,8 +177,8 @@ export default function PatientDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <AnimatedStatCard
           title="Module Progress"
-          value={Math.round(Object.values(currentPatient?.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(currentPatient?.moduleProgress || {}).length || 0)}
-          description="Coping with Anxiety"
+          value={moduleProgress}
+          description="Your overall progress"
           icon={TrendingUp}
           trend={{ value: 15, isPositive: true }}
           delay={0.1}
@@ -96,15 +192,15 @@ export default function PatientDashboard() {
         />
         <AnimatedStatCard
           title="Messages"
-          value={recentMessages.length}
-          description="Unread messages"
+          value={chats.filter(chat => chat.unreadCount > 0).length}
+          description={`${chats.reduce((sum, chat) => sum + chat.unreadCount, 0)} unread`}
           icon={MessageCircle}
           delay={0.3}
         />
         <AnimatedStatCard
-          title="Resources Completed"
-          value={8}
-          description="This month"
+          title="Resources"
+          value={resources.length}
+          description="Available resources"
           icon={BookOpen}
           trend={{ value: 25, isPositive: true }}
           delay={0.4}
@@ -123,16 +219,16 @@ export default function PatientDashboard() {
           <CardContent className="space-y-4">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">Coping with Anxiety</span>
+                <span className="text-sm font-medium">Your Progress</span>
                 <span className="text-sm text-muted-foreground">
                   <SlidingNumber 
-                    number={Math.round(Object.values(currentPatient?.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(currentPatient?.moduleProgress || {}).length || 0)}
+                    number={moduleProgress}
                     fromNumber={0}
                     transition={{ stiffness: 200, damping: 20, mass: 0.4 }}
                   />%
                 </span>
               </div>
-              <Progress value={Math.round(Object.values(currentPatient?.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(currentPatient?.moduleProgress || {}).length || 0)} className="h-2" />
+              <Progress value={moduleProgress} className="h-2" />
             </div>
             
             <div className="space-y-3">
@@ -190,27 +286,30 @@ export default function PatientDashboard() {
           <CardContent>
             {upcomingSessions.length > 0 ? (
               <div className="space-y-4">
-                {upcomingSessions.map((session) => (
-                  <div key={session.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <p className="font-medium">Session with Dr. Marie Claire</p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(session.date).toLocaleDateString()} at{' '}
-                        {new Date(session.date).toLocaleTimeString([], { 
-                          hour: '2-digit', 
-                          minute: '2-digit' 
-                        })}
-                      </p>
+                {upcomingSessions.map((session) => {
+                  // Get counselor name
+                  const counselorId = session.counselorId;
+                  const counselor = counselors.find(c => c.id === counselorId);
+                  const counselorName = counselor?.fullName || counselor?.email || 'Counselor';
+
+                  return (
+                    <div key={session.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <p className="font-medium">Session with {counselorName}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(session.date).toLocaleDateString()} at {session.time}
+                        </p>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => router.push(`/dashboard/patient/sessions/session/${session.id}`)}
+                      >
+                        Join
+                      </Button>
                     </div>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => router.push(`/dashboard/patient/sessions/session/${session.id}`)}
-                    >
-                      Join
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-6">
@@ -247,12 +346,12 @@ export default function PatientDashboard() {
                       <MessageCircle className="h-4 w-4 text-blue-600" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-medium">Dr. Marie Claire</p>
+                      <p className="text-sm font-medium">{getCounselorName(message)}</p>
                       <p className="text-sm text-muted-foreground line-clamp-2">
                         {message.content}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(message.timestamp).toLocaleDateString()}
+                        {new Date(message.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                     {!message.isRead && (
@@ -280,34 +379,45 @@ export default function PatientDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {recommendedResources.map((resource) => (
-                <div 
-                  key={resource.id} 
-                  onClick={() => router.push(`/dashboard/patient/resources?resourceId=${resource.id}`)}
-                  className="flex items-center gap-3 p-3 border rounded-lg hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/20 dark:hover:border-primary/30 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-primary/20 transition-all duration-200 cursor-pointer group"
-                >
-                  <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center group-hover:bg-purple-200 dark:group-hover:bg-purple-800/50 transition-colors duration-200">
-                    <Play className="h-5 w-5 text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors duration-200" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm group-hover:text-primary dark:group-hover:text-primary transition-colors duration-200">{resource.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {resource.type.toUpperCase()} • {resource.duration ? `${resource.duration} min` : 'Article'}
-                    </p>
-                  </div>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/dashboard/patient/resources?resourceId=${resource.id}`);
-                    }}
-                    className="group-hover:bg-primary/10 dark:group-hover:bg-primary/20 group-hover:text-primary dark:group-hover:text-primary transition-all duration-200"
+              {recommendedResources.length > 0 ? (
+                recommendedResources.map((resource) => (
+                  <div 
+                    key={resource.id} 
+                    onClick={() => router.push(`/dashboard/patient/resources?resourceId=${resource.id}`)}
+                    className="flex items-center gap-3 p-3 border rounded-lg hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/20 dark:hover:border-primary/30 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-primary/20 transition-all duration-200 cursor-pointer group"
                   >
-                    <Play className="h-4 w-4" />
-                  </Button>
+                    <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center group-hover:bg-purple-200 dark:group-hover:bg-purple-800/50 transition-colors duration-200">
+                      {resource.type === 'audio' || resource.type === 'video' ? (
+                        <Play className="h-5 w-5 text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors duration-200" />
+                      ) : (
+                        <BookOpen className="h-5 w-5 text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors duration-200" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm group-hover:text-primary dark:group-hover:text-primary transition-colors duration-200">{resource.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {resource.type.toUpperCase()} • {resource.views} views
+                      </p>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/dashboard/patient/resources?resourceId=${resource.id}`);
+                      }}
+                      className="group-hover:bg-primary/10 dark:group-hover:bg-primary/20 group-hover:text-primary dark:group-hover:text-primary transition-all duration-200"
+                    >
+                      <Play className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-6">
+                  <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-muted-foreground">No resources available</p>
                 </div>
-              ))}
+              )}
             </div>
           </CardContent>
         </AnimatedCard>
@@ -318,7 +428,13 @@ export default function PatientDashboard() {
         isOpen={isQuickBookingOpen}
         onClose={handleCloseQuickBooking}
         onConfirmBooking={handleConfirmQuickBooking}
-        counselors={dummyCounselors}
+        counselors={counselors.map(counselor => ({
+          id: counselor.id,
+          name: counselor.fullName || counselor.email || 'Counselor',
+          avatar: undefined,
+          specialty: (counselor as any).specialty || 'General Counseling',
+          availability: (counselor as any).availability || 'available',
+        }))}
       />
     </div>
   );

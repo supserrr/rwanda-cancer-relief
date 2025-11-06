@@ -18,8 +18,9 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../../../../../../components/auth/AuthProvider';
-import { dummySessions, dummyPatients, dummyCounselors } from '../../../../../../lib/dummy-data';
-import { Session } from '../../../../../../lib/types';
+import { SessionsApi, type Session } from '../../../../../../lib/api/sessions';
+import { AdminApi, type AdminUser } from '../../../../../../lib/api/admin';
+import { toast } from 'sonner';
 
 /**
  * Session room page for video/audio counseling sessions.
@@ -35,16 +36,51 @@ export default function SessionRoomPage() {
   const sessionId = params.sessionId as string;
 
   const [session, setSession] = useState<Session | null>(null);
+  const [otherParticipant, setOtherParticipant] = useState<AdminUser | null>(null);
   const [isInMeeting, setIsInMeeting] = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Find the session
-    const foundSession = dummySessions.find(s => s.id === sessionId);
-    if (foundSession) {
-      setSession(foundSession);
+    const loadSession = async () => {
+      try {
+        setLoading(true);
+        const sessionData = await SessionsApi.getSession(sessionId);
+        setSession(sessionData);
+
+        // Load other participant (counselor for patient, patient for counselor)
+        const participantId = user?.role === 'patient' 
+          ? sessionData.counselorId 
+          : sessionData.patientId;
+        
+        if (participantId) {
+          try {
+            const participant = await AdminApi.getUser(participantId);
+            setOtherParticipant(participant);
+          } catch (error) {
+            console.error('Error loading participant:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading session:', error);
+        toast.error('Failed to load session');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (sessionId && user?.id) {
+      loadSession();
     }
-  }, [sessionId]);
+  }, [sessionId, user?.id]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   if (!session) {
     return (
@@ -62,10 +98,6 @@ export default function SessionRoomPage() {
       </div>
     );
   }
-
-  const otherParticipant = user?.role === 'patient' 
-    ? dummyCounselors.find(c => c.id === session.counselorId)
-    : dummyPatients.find(p => p.id === session.patientId);
 
   const handleJoinMeeting = () => {
     setIsInMeeting(true);
@@ -123,7 +155,7 @@ export default function SessionRoomPage() {
             </div>
             <h2 className="text-2xl font-bold mb-2">Session Completed</h2>
             <p className="text-muted-foreground">
-              Thank you for attending the session with {otherParticipant?.name}
+              Thank you for attending the session with {otherParticipant?.fullName || otherParticipant?.email || 'your counselor'}
             </p>
           </div>
 
@@ -139,7 +171,7 @@ export default function SessionRoomPage() {
                 <p className="text-xs text-muted-foreground">session type</p>
               </div>
               <div>
-                <p className="text-2xl font-bold">{session.date.toLocaleDateString()}</p>
+                <p className="text-2xl font-bold">{new Date(session.date).toLocaleDateString()}</p>
                 <p className="text-xs text-muted-foreground">date</p>
               </div>
             </div>
@@ -159,7 +191,7 @@ export default function SessionRoomPage() {
     <div className="space-y-6">
       <AnimatedPageHeader
         title="Join Session"
-        description={`Your ${session.type} session with ${otherParticipant?.name}`}
+        description={`Your ${session.type} session with ${otherParticipant?.fullName || otherParticipant?.email || 'your counselor'}`}
       />
 
       <div className="max-w-4xl mx-auto space-y-6">
@@ -197,7 +229,7 @@ export default function SessionRoomPage() {
                 <p className="text-sm text-muted-foreground">
                   {user?.role === 'patient' ? 'Counselor' : 'Patient'}
                 </p>
-                <p className="font-semibold">{otherParticipant?.name}</p>
+                <p className="font-semibold">{otherParticipant?.fullName || otherParticipant?.email || 'Unknown'}</p>
               </div>
             </div>
 
@@ -208,7 +240,7 @@ export default function SessionRoomPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Date & Time</p>
                 <p className="font-semibold">
-                  {session.date.toLocaleDateString()} at {session.time}
+                  {new Date(session.date).toLocaleDateString()} at {session.time}
                 </p>
               </div>
             </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { ResourceCard } from '../../../../components/dashboard/shared/ResourceCard';
@@ -58,15 +58,16 @@ import {
   ExternalLink,
   ArrowLeft
 } from 'lucide-react';
-import { dummyResources } from '../../../../lib/dummy-data';
-import { Resource } from '../../../../lib/types';
 import { useAuth } from '../../../../components/auth/AuthProvider';
+import { useResources } from '../../../../hooks/useResources';
+import { ResourcesApi, type Resource } from '../../../../lib/api/resources';
+import { toast } from 'sonner';
 
 export default function CounselorResourcesPage() {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('all');
-  const [selectedResource, setSelectedResource] = useState<any>(null);
+  const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isArticleEditorOpen, setIsArticleEditorOpen] = useState(false);
@@ -76,81 +77,87 @@ export default function CounselorResourcesPage() {
   const [viewingArticle, setViewingArticle] = useState<Resource | null>(null);
   const [activeTab, setActiveTab] = useState('view');
   const [savedResources, setSavedResources] = useState<string[]>([]);
-  const [resources, setResources] = useState<Resource[]>(dummyResources);
   
   // Enhanced state for better management
-  const [sortBy, setSortBy] = useState('date');
+  const [sortBy, setSortBy] = useState<'title' | 'created_at' | 'views' | 'downloads'>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [dateRange, setDateRange] = useState('all');
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const resourceTypes = ['all', 'audio', 'pdf', 'video', 'article'];
-  const sortOptions = [
-    { value: 'date', label: 'Date Created' },
-    { value: 'title', label: 'Title' },
-    { value: 'type', label: 'Type' },
-    { value: 'publisher', label: 'Publisher' },
-    { value: 'popularity', label: 'Popularity' }
-  ];
+  const resourceTypes = ['all', 'audio', 'pdf', 'video', 'article'] as const;
+
   const statusOptions = [
     { value: 'all', label: 'All Status' },
     { value: 'public', label: 'Public' },
     { value: 'private', label: 'Private' },
-    { value: 'featured', label: 'Featured' }
   ];
-  const dateRangeOptions = [
-    { value: 'all', label: 'All Time' },
-    { value: 'today', label: 'Today' },
-    { value: 'week', label: 'This Week' },
-    { value: 'month', label: 'This Month' },
-    { value: 'year', label: 'This Year' }
+
+  const sortOptions = [
+    { value: 'title', label: 'Title' },
+    { value: 'created_at', label: 'Date Created' },
+    { value: 'views', label: 'Views' },
+    { value: 'downloads', label: 'Downloads' },
   ];
+
+  // Build query parameters based on filters
+  const queryParams = useMemo(() => {
+    const params: {
+      type?: 'audio' | 'pdf' | 'video' | 'article';
+      search?: string;
+      isPublic?: boolean;
+      publisher?: string;
+      sortBy?: 'title' | 'created_at' | 'views' | 'downloads';
+      sortOrder?: 'asc' | 'desc';
+    } = {
+      publisher: user?.id, // Show counselor's own resources
+      sortBy,
+      sortOrder,
+    };
+
+    if (selectedType !== 'all') {
+      params.type = selectedType as 'audio' | 'pdf' | 'video' | 'article';
+    }
+
+    if (searchTerm.trim()) {
+      params.search = searchTerm.trim();
+    }
+
+    if (statusFilter === 'public') {
+      params.isPublic = true;
+    } else if (statusFilter === 'private') {
+      params.isPublic = false;
+    }
+
+    return params;
+  }, [selectedType, searchTerm, sortBy, sortOrder, statusFilter, user?.id]);
+
+  // Load resources using the hook
+  const {
+    resources,
+    loading: resourcesLoading,
+    error: resourcesError,
+    createResource,
+    updateResource,
+    deleteResource,
+    refreshResources,
+  } = useResources(queryParams);
+
+  // Filter resources based on active tab (client-side for saved resources)
+  const filteredResources = useMemo(() => {
+    if (activeTab === 'saved') {
+    return resources.filter(resource => savedResources.includes(resource.id));
+    }
+    return resources;
+  }, [resources, activeTab, savedResources]);
 
   // Get all unique tags from resources
-  const allTags = Array.from(new Set(resources.flatMap(r => r.tags)));
-
-  // Enhanced filtering and sorting
-  const filteredResources = resources.filter(resource => {
-    const matchesSearch = resource.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         resource.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         resource.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesType = selectedType === 'all' || resource.type === selectedType;
-    const matchesStatus = statusFilter === 'all' || 
-                         (statusFilter === 'public' && resource.isPublic) ||
-                         (statusFilter === 'private' && !resource.isPublic);
-    
-    return matchesSearch && matchesType && matchesStatus;
-  }).sort((a, b) => {
-    let comparison = 0;
-    switch (sortBy) {
-      case 'date':
-        comparison = a.createdAt.getTime() - b.createdAt.getTime();
-        break;
-      case 'title':
-        comparison = a.title.localeCompare(b.title);
-        break;
-      case 'type':
-        comparison = a.type.localeCompare(b.type);
-        break;
-      case 'publisher':
-        comparison = a.publisher.localeCompare(b.publisher);
-        break;
-      case 'popularity':
-        // Mock popularity based on saved count
-        comparison = (savedResources.includes(a.id) ? 1 : 0) - (savedResources.includes(b.id) ? 1 : 0);
-        break;
-    }
-    return sortOrder === 'asc' ? comparison : -comparison;
-  });
-
-  const getSavedResources = () => {
-    return resources.filter(resource => savedResources.includes(resource.id));
-  };
+  const allTags = useMemo(() => 
+    Array.from(new Set(resources.flatMap(r => r.tags))),
+    [resources]
+  );
 
   // Statistics
-  const stats = {
+  const stats = useMemo(() => ({
     total: resources.length,
     public: resources.filter(r => r.isPublic).length,
     private: resources.filter(r => !r.isPublic).length,
@@ -163,45 +170,85 @@ export default function CounselorResourcesPage() {
     recent: resources.filter(r => {
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
-      return r.createdAt > weekAgo;
+      return new Date(r.createdAt) > weekAgo;
     }).length
+  }), [resources]);
+
+  const getSavedResources = () => {
+    return resources.filter(resource => savedResources.includes(resource.id));
   };
 
   // Enhanced handlers
   const handleRefresh = async () => {
-    setIsRefreshing(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsRefreshing(false);
+    try {
+      await refreshResources();
+      toast.success('Resources refreshed');
+    } catch (error) {
+      console.error('Error refreshing resources:', error);
+      toast.error('Failed to refresh resources');
+    }
   };
 
-  const handleBulkAction = (action: string) => {
-    console.log(`Bulk ${action} on:`, selectedResource);
-    // Implement bulk actions
-    setIsRefreshing(false);
+  const handleBulkAction = async (action: string) => {
+    try {
+      // Implement bulk actions based on action type
+      toast.info(`Bulk ${action} functionality coming soon`);
+    } catch (error) {
+      console.error(`Error performing bulk ${action}:`, error);
+      toast.error(`Failed to perform bulk ${action}`);
+    }
   };
 
-  const handleDuplicateResource = (resource: Resource) => {
-    const duplicated = {
-      ...resource,
-      id: Date.now().toString(),
+  const handleDuplicateResource = async (resource: Resource) => {
+    try {
+      await createResource({
       title: `${resource.title} (Copy)`,
-      createdAt: new Date()
-    };
-    setResources(prev => [...prev, duplicated]);
+        description: resource.description,
+        type: resource.type,
+        url: resource.url,
+        thumbnail: resource.thumbnail,
+        tags: resource.tags,
+        isPublic: resource.isPublic,
+        youtubeUrl: resource.youtubeUrl,
+        content: resource.content,
+        category: resource.category,
+      });
+      toast.success('Resource duplicated successfully');
+    } catch (error) {
+      console.error('Error duplicating resource:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to duplicate resource');
+    }
   };
 
-  const handleArchiveResource = (resourceId: string) => {
-    // Implement archive functionality
-    console.log('Archive resource:', resourceId);
+  const handleArchiveResource = async (resourceId: string) => {
+    // Archive functionality can be implemented as a status update
+    try {
+      // For now, we can delete or update resource
+      toast.info('Archive functionality coming soon');
+    } catch (error) {
+      console.error('Error archiving resource:', error);
+      toast.error('Failed to archive resource');
+    }
   };
 
-  const handleFeatureResource = (resourceId: string) => {
-    // Implement feature functionality
-    console.log('Feature resource:', resourceId);
+  const handleFeatureResource = async (resourceId: string) => {
+    // Feature functionality can be implemented as a metadata update
+    try {
+      toast.info('Feature functionality coming soon');
+    } catch (error) {
+      console.error('Error featuring resource:', error);
+      toast.error('Failed to feature resource');
+    }
   };
 
-  const handleViewResource = (resource: Resource) => {
+  const handleViewResource = async (resource: Resource) => {
+    // Track view
+    try {
+      await ResourcesApi.trackView(resource.id);
+    } catch (error) {
+      console.error('Error tracking view:', error);
+    }
+
     if (resource.type === 'article') {
       setViewingArticle(resource);
       setIsArticleViewerOpen(true);
@@ -221,28 +268,55 @@ export default function CounselorResourcesPage() {
     setViewingArticle(null);
   };
 
-  const handleDownloadResource = (resource: Resource | any) => {
-    console.log('Download resource:', resource.title);
-    // Implement download logic
+  const handleDownloadResource = async (resource: Resource) => {
+    try {
+      const downloadUrl = await ResourcesApi.getDownloadUrl(resource.id);
+      // Track download
+      await ResourcesApi.trackView(resource.id);
+      
+      // Open download URL in new tab
+      window.open(downloadUrl.downloadUrl, '_blank');
+      toast.success('Download started');
+    } catch (error) {
+      console.error('Error downloading resource:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to download resource');
+    }
   };
 
-  const handleShareResource = (resource: Resource | any) => {
-    console.log('Share resource:', resource.title);
-    // Implement share logic
+  const handleShareResource = (resource: Resource) => {
+    // Share functionality - can be implemented with Web Share API or copy link
+    if (navigator.share) {
+      navigator.share({
+        title: resource.title,
+        text: resource.description,
+        url: window.location.href,
+      }).catch((error) => {
+        console.error('Error sharing:', error);
+      });
+    } else {
+      // Fallback: copy to clipboard
+      navigator.clipboard.writeText(window.location.href);
+      toast.success('Link copied to clipboard');
+    }
   };
 
-  const handleBookmarkResource = (resource: Resource | any) => {
-    console.log('Bookmark resource:', resource.title);
+  const handleBookmarkResource = (resource: Resource) => {
     // Toggle saved state
     setSavedResources(prev => 
       prev.includes(resource.id) 
         ? prev.filter(id => id !== resource.id)
         : [...prev, resource.id]
     );
+    toast.success(
+      savedResources.includes(resource.id) 
+        ? 'Resource removed from saved' 
+        : 'Resource saved'
+    );
   };
 
   const handleUnsaveResource = (resourceId: string) => {
     setSavedResources(prev => prev.filter(id => id !== resourceId));
+    toast.success('Resource removed from saved');
   };
 
   const handleEditResource = (resource: Resource) => {
@@ -265,44 +339,108 @@ export default function CounselorResourcesPage() {
     setIsArticleViewerOpen(true);
   };
 
-  const handleSaveArticle = (article: Resource) => {
-    setResources(prev => {
-      const existingIndex = prev.findIndex(r => r.id === article.id);
-      if (existingIndex >= 0) {
+  const handleSaveArticle = async (article: Resource) => {
+    try {
+      if (article.id && editingArticle) {
         // Update existing article
-        const updated = [...prev];
-        updated[existingIndex] = article;
-        return updated;
+        await updateResource(article.id, {
+          title: article.title,
+          description: article.description,
+          type: article.type,
+          content: article.content,
+          tags: article.tags,
+          isPublic: article.isPublic,
+          category: article.category,
+        });
+        toast.success('Article updated successfully');
       } else {
-        // Add new article
-        return [...prev, article];
+        // Create new article
+        await createResource({
+          title: article.title,
+          description: article.description,
+          type: article.type,
+          content: article.content,
+          tags: article.tags,
+          isPublic: article.isPublic,
+          category: article.category,
+        });
+        toast.success('Article created successfully');
       }
-    });
-    console.log('Article saved:', article.title);
+      setIsArticleEditorOpen(false);
+      setEditingArticle(null);
+    } catch (error) {
+      console.error('Error saving article:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to save article');
+    }
   };
 
-  const handleSaveResource = (updatedResource: Resource) => {
-    setResources(prev => prev.map(r => r.id === updatedResource.id ? updatedResource : r));
-    console.log('Resource updated:', updatedResource.title);
+  // Convert API Resource to UI Resource type
+  const convertToUIResource = (apiResource: Resource): any => {
+    return {
+      ...apiResource,
+      createdAt: new Date(apiResource.createdAt),
+      url: apiResource.url || '',
+      views: 0,
+      downloads: 0,
+      updatedAt: new Date(apiResource.createdAt),
+    };
   };
 
-  const handleDeleteResource = (resourceId: string) => {
-    setResources(prev => prev.filter(r => r.id !== resourceId));
-    console.log('Resource deleted:', resourceId);
+  const handleSaveResource = async (updatedResource: any) => {
+    try {
+      await updateResource(updatedResource.id, {
+        title: updatedResource.title,
+        description: updatedResource.description,
+        type: updatedResource.type,
+        url: updatedResource.url,
+        thumbnail: updatedResource.thumbnail,
+        tags: updatedResource.tags,
+        isPublic: updatedResource.isPublic,
+        youtubeUrl: updatedResource.youtubeUrl,
+        content: updatedResource.content,
+        category: updatedResource.category,
+      });
+      toast.success('Resource updated successfully');
+      setIsEditOpen(false);
+      setEditingResource(null);
+    } catch (error) {
+      console.error('Error updating resource:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update resource');
+    }
   };
 
-  const handlePublishResource = (resourceId: string) => {
-    setResources(prev => prev.map(r => 
-      r.id === resourceId ? { ...r, isPublic: true } : r
-    ));
-    console.log('Resource published:', resourceId);
+  const handleDeleteResource = async (resourceId: string) => {
+    if (!confirm('Are you sure you want to delete this resource? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await deleteResource(resourceId);
+      toast.success('Resource deleted successfully');
+    } catch (error) {
+      console.error('Error deleting resource:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to delete resource');
+    }
   };
 
-  const handleUnpublishResource = (resourceId: string) => {
-    setResources(prev => prev.map(r => 
-      r.id === resourceId ? { ...r, isPublic: false } : r
-    ));
-    console.log('Resource unpublished:', resourceId);
+  const handlePublishResource = async (resourceId: string) => {
+    try {
+      await updateResource(resourceId, { isPublic: true });
+      toast.success('Resource published successfully');
+    } catch (error) {
+      console.error('Error publishing resource:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to publish resource');
+    }
+  };
+
+  const handleUnpublishResource = async (resourceId: string) => {
+    try {
+      await updateResource(resourceId, { isPublic: false });
+      toast.success('Resource unpublished successfully');
+    } catch (error) {
+      console.error('Error unpublishing resource:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to unpublish resource');
+    }
   };
 
   const handleCloseEditModal = () => {
@@ -316,8 +454,22 @@ export default function CounselorResourcesPage() {
   };
 
   const handleUploadResource = () => {
-    console.log('Upload new resource');
+    // Open upload modal or create new resource
+    setIsEditOpen(true);
+    setEditingResource(null);
   };
+
+  if (resourcesError && !resourcesLoading) {
+    return (
+      <div className="text-center py-12 text-red-500">
+        <h3 className="text-lg font-semibold mb-2">Error loading resources</h3>
+        <p className="text-muted-foreground">Please try again later.</p>
+        <Button onClick={handleRefresh} className="mt-4">
+          Try Again
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -385,7 +537,7 @@ export default function CounselorResourcesPage() {
                   </SelectContent>
                 </Select>
 
-                <Select value={sortBy} onValueChange={setSortBy}>
+                <Select value={sortBy} onValueChange={(value) => setSortBy(value as 'title' | 'created_at' | 'views' | 'downloads')}>
                   <SelectTrigger className="w-36 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
@@ -421,9 +573,9 @@ export default function CounselorResourcesPage() {
                   size="sm"
                   className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
                   onClick={handleRefresh}
-                  disabled={isRefreshing}
+                  disabled={resourcesLoading}
                 >
-                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`h-4 w-4 ${resourcesLoading ? 'animate-spin' : ''}`} />
                 </Button>
               </div>
             </div>
@@ -437,19 +589,23 @@ export default function CounselorResourcesPage() {
           </div>
 
           {/* Resources Display */}
-          {filteredResources.length > 0 ? (
+          {resourcesLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          ) : filteredResources.length > 0 ? (
             viewMode === 'grid' ? (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-8">
                 {filteredResources.map((resource, index) => (
                   <div key={resource.id} className="relative">
                     <ResourceCard
-                      resource={resource}
-                      onView={handleViewResource}
-                      onDownload={handleDownloadResource}
-                      onEdit={handleEditResource}
-                      onDelete={(resource) => handleDeleteResource(resource.id)}
-                      onPublish={(resource) => handlePublishResource(resource.id)}
-                      onUnpublish={(resource) => handleUnpublishResource(resource.id)}
+                      resource={convertToUIResource(resource)}
+                      onView={(r: any) => handleViewResource(resource)}
+                      onDownload={(r: any) => handleDownloadResource(resource)}
+                      onEdit={(r: any) => handleEditResource(resource)}
+                      onDelete={(r: any) => handleDeleteResource(resource.id)}
+                      onPublish={(r: any) => handlePublishResource(resource.id)}
+                      onUnpublish={(r: any) => handleUnpublishResource(resource.id)}
                       showEditActions={true}
                       delay={index * 0.1}
                     />
@@ -478,7 +634,7 @@ export default function CounselorResourcesPage() {
                             {resource.isPublic ? "Public" : "Private"}
                           </Badge>
                           <span className="text-xs text-muted-foreground">
-                            {resource.createdAt.toLocaleDateString()}
+                            {new Date(resource.createdAt).toLocaleDateString()}
                           </span>
                           <span className="text-xs text-muted-foreground">
                             by {resource.publisher}
@@ -592,12 +748,12 @@ export default function CounselorResourcesPage() {
                 {getSavedResources().map((resource, index) => (
                   <ResourceCard
                     key={resource.id}
-                    resource={resource}
-                    onView={handleViewResource}
-                    onDownload={handleDownloadResource}
-                    onEdit={handleEditResource}
-                    onDelete={(resource) => handleDeleteResource(resource.id)}
-                     onUnsave={(resource) => handleUnsaveResource(resource.id)}
+                    resource={convertToUIResource(resource)}
+                    onView={(r: any) => handleViewResource(resource)}
+                    onDownload={(r: any) => handleDownloadResource(resource)}
+                    onEdit={(r: any) => handleEditResource(resource)}
+                    onDelete={(r: any) => handleDeleteResource(resource.id)}
+                    onUnsave={(r: any) => handleUnsaveResource(resource.id)}
                     showEditActions={true}
                     delay={index * 0.1}
                   />
@@ -1610,24 +1766,24 @@ Remember to:
       {/* Resource Viewer Modal */}
       {selectedResource && (
         <ResourceViewerModalV2
-          resource={selectedResource}
+          resource={convertToUIResource(selectedResource)}
           isOpen={isViewerOpen}
           onClose={handleCloseViewer}
-          onDownload={handleDownloadResource}
-          onShare={handleShareResource}
-          onBookmark={handleBookmarkResource}
-          onViewArticle={handleViewArticle}
+          onDownload={(r: any) => handleDownloadResource(selectedResource)}
+          onShare={(r: any) => handleShareResource(selectedResource)}
+          onBookmark={(r: any) => handleBookmarkResource(selectedResource)}
+          onViewArticle={(r: any) => handleViewArticle(selectedResource)}
         />
       )}
 
       {/* Resource Edit Modal */}
       {editingResource && (
         <ResourceEditModal
-          resource={editingResource}
+          resource={convertToUIResource(editingResource)}
           isOpen={isEditOpen}
           onClose={handleCloseEditModal}
           onSave={handleSaveResource}
-          onDelete={handleDeleteResource}
+          onDelete={(resourceId: string) => handleDeleteResource(resourceId)}
           onCreateArticle={handleCreateArticle}
         />
       )}
@@ -1635,22 +1791,31 @@ Remember to:
       {/* Article Editor */}
       {editingArticle && (
         <ArticleEditor
-          article={editingArticle}
+          article={editingArticle ? convertToUIResource(editingArticle) : null}
           isOpen={isArticleEditorOpen}
           onClose={handleCloseArticleEditor}
-          onSave={handleSaveArticle}
+          onSave={handleSaveArticle as any}
         />
       )}
 
       {/* Article Viewer */}
       {viewingArticle && (
         <ArticleViewerV2
-          article={viewingArticle}
+          article={{
+            id: viewingArticle.id,
+            title: viewingArticle.title,
+            content: viewingArticle.content,
+            description: viewingArticle.description,
+            publisher: viewingArticle.publisher,
+            createdAt: new Date(viewingArticle.createdAt),
+            thumbnail: viewingArticle.thumbnail,
+            tags: viewingArticle.tags,
+          }}
           isOpen={isArticleViewerOpen}
           onClose={handleCloseArticleViewer}
-          onShare={handleShareResource}
-          onBookmark={handleBookmarkResource}
-          onDownload={handleDownloadResource}
+          onShare={(a: any) => handleShareResource(viewingArticle)}
+          onBookmark={(a: any) => handleBookmarkResource(viewingArticle)}
+          onDownload={(a: any) => handleDownloadResource(viewingArticle)}
         />
       )}
     </div>

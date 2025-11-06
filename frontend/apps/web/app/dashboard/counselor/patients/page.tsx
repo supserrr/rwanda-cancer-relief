@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { Input } from '@workspace/ui/components/input';
@@ -26,51 +26,81 @@ import {
   Users,
   Filter
 } from 'lucide-react';
-import { dummyPatients, dummyCounselors } from '../../../../lib/dummy-data';
+import { AdminApi, type AdminUser } from '../../../../lib/api/admin';
 import { useRouter } from 'next/navigation';
 import { ProfileViewModal } from '@workspace/ui/components/profile-view-modal';
 import { ScheduleSessionModal } from '../../../../components/session/ScheduleSessionModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@workspace/ui/components/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@workspace/ui/components/select';
+import { useAuth } from '../../../../components/auth/AuthProvider';
+import { useSessions } from '../../../../hooks/useSessions';
+import { toast } from 'sonner';
 
 export default function CounselorPatientsPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const [patients, setPatients] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all'|'active'|'inprogress'>('all');
   const [moduleFilter, setModuleFilter] = useState<string>('all');
-  const [viewingPatient, setViewingPatient] = useState<any | null>(null);
+  const [viewingPatient, setViewingPatient] = useState<AdminUser | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
-  const [schedulePatient, setSchedulePatient] = useState<any | null>(null);
-  const currentCounselor = dummyCounselors[0]; // Dr. Marie Claire
-  const assignedPatients = dummyPatients.filter(patient => 
-    currentCounselor?.patients?.includes(patient.id)
-  );
+  const [schedulePatient, setSchedulePatient] = useState<AdminUser | null>(null);
 
-  const filteredPatients = assignedPatients.filter(patient => {
+  // Load sessions to get assigned patients
+  const { sessions } = useSessions({
+    counselorId: user?.id,
+  });
+
+  // Load assigned patients
+  useEffect(() => {
+    const loadPatients = async () => {
+      try {
+        setLoading(true);
+        // Get unique patient IDs from sessions
+        const patientIds = new Set(
+          sessions.map(session => session.patientId)
+        );
+        
+        // Fetch all patients
+        const response = await AdminApi.listUsers({ role: 'patient' });
+        const assignedPatientsList = response.users.filter(p => patientIds.has(p.id));
+        setPatients(assignedPatientsList);
+      } catch (error) {
+        console.error('Error loading patients:', error);
+        toast.error('Failed to load patients');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user?.id && sessions.length > 0) {
+      loadPatients();
+    } else if (user?.id) {
+      setLoading(false);
+    }
+  }, [user?.id, sessions]);
+
+  const filteredPatients = patients.filter(patient => {
     const matchesSearch =
-      patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.currentModule?.toLowerCase().includes(searchTerm.toLowerCase());
+      (patient.fullName || patient.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ((patient as any).currentModule || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-    const avgProgress = (Object.values(patient.moduleProgress || {}).reduce((sum, p) => sum + p, 0) / (Object.keys(patient.moduleProgress || {}).length || 1)) || 0;
+    // Note: Progress tracking would need to be added to backend
+    const avgProgress = (patient as any).avgProgress || 0;
     const isActive = avgProgress >= 80;
     const matchesStatus = statusFilter === 'all' || (statusFilter === 'active' ? isActive : !isActive);
-    const matchesModule = moduleFilter === 'all' || (patient.currentModule || '').toLowerCase() === moduleFilter.toLowerCase();
+    const matchesModule = moduleFilter === 'all' || ((patient as any).currentModule || '').toLowerCase() === moduleFilter.toLowerCase();
     return matchesSearch && matchesStatus && matchesModule;
   });
 
   const handleViewPatient = (patientId: string) => {
-    const patient = assignedPatients.find(p => p.id === patientId);
+    const patient = patients.find(p => p.id === patientId);
     if (!patient) return;
-    setViewingPatient({
-      id: patient.id,
-      name: patient.name,
-      email: patient.email,
-      avatar: patient.avatar,
-      role: 'patient'
-    });
+    setViewingPatient(patient);
     setIsProfileOpen(true);
   };
 
@@ -79,7 +109,7 @@ export default function CounselorPatientsPage() {
   };
 
   const handleScheduleSession = (patientId: string) => {
-    const patient = assignedPatients.find(p => p.id === patientId);
+    const patient = patients.find(p => p.id === patientId);
     if (!patient) return;
     setSchedulePatient(patient);
     setIsScheduleOpen(true);
@@ -100,7 +130,7 @@ export default function CounselorPatientsPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{assignedPatients.length}</div>
+            <div className="text-2xl font-bold">{patients.length}</div>
             <p className="text-xs text-muted-foreground">
               Currently assigned
             </p>
@@ -114,10 +144,12 @@ export default function CounselorPatientsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {Math.round(assignedPatients.reduce((acc, p) => {
-                const avgProgress = Object.values(p.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(p.moduleProgress || {}).length || 0;
-                return acc + avgProgress;
-              }, 0) / assignedPatients.length)}%
+              {patients.length > 0 
+                ? Math.round(patients.reduce((acc, p) => {
+                    const avgProgress = (p as any).avgProgress || 0;
+                    return acc + avgProgress;
+                  }, 0) / patients.length)
+                : 0}%
             </div>
             <p className="text-xs text-muted-foreground">
               Average progress
@@ -132,8 +164,8 @@ export default function CounselorPatientsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {assignedPatients.filter(p => {
-                const avgProgress = Object.values(p.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(p.moduleProgress || {}).length || 0;
+              {patients.filter(p => {
+                const avgProgress = (p as any).avgProgress || 0;
                 return avgProgress >= 100;
               }).length}
             </div>
@@ -153,31 +185,34 @@ export default function CounselorPatientsPage() {
             <CardTitle>Module Progress Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {assignedPatients.map((patient) => (
-              <div key={patient.id} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Avatar className="h-6 w-6">
-                      <AvatarImage src={patient.avatar} alt={patient.name} />
-                      <AvatarFallback>
-                        {patient.name.split(' ').map(n => n[0]).join('')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm font-medium">{patient.name}</span>
+            {patients.map((patient) => {
+              const avgProgress = (patient as any).avgProgress || 0;
+              return (
+                <div key={patient.id} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={undefined} alt={patient.fullName || patient.email} />
+                        <AvatarFallback>
+                          {(patient.fullName || patient.email || 'P').split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-medium">{patient.fullName || patient.email}</span>
+                    </div>
+                    <Badge variant="outline">
+                      {Math.round(avgProgress)}%
+                    </Badge>
                   </div>
-                  <Badge variant="outline">
-                    {Math.round(Object.values(patient.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(patient.moduleProgress || {}).length || 0)}%
-                  </Badge>
+                  <Progress 
+                    value={avgProgress} 
+                    className="h-2" 
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {(patient as any).currentModule || 'No module'}
+                  </p>
                 </div>
-                <Progress 
-                  value={Object.values(patient.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(patient.moduleProgress || {}).length || 0} 
-                  className="h-2" 
-                />
-                <p className="text-xs text-muted-foreground">
-                  {patient.currentModule}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </AnimatedCard>
 
@@ -186,22 +221,22 @@ export default function CounselorPatientsPage() {
             <CardTitle>Recent Activity</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {assignedPatients.slice(0, 3).map((patient) => (
+            {patients.slice(0, 3).map((patient) => (
               <div key={patient.id} className="flex items-center space-x-3 p-3 border rounded-lg">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={patient.avatar} alt={patient.name} />
+                  <AvatarImage src={undefined} alt={patient.fullName || patient.email} />
                   <AvatarFallback>
-                    {patient.name.split(' ').map(n => n[0]).join('')}
+                    {(patient.fullName || patient.email || 'P').split(' ').map(n => n[0]).join('').slice(0, 2)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
-                  <p className="text-sm font-medium">{patient.name}</p>
+                  <p className="text-sm font-medium">{patient.fullName || patient.email}</p>
                   <p className="text-xs text-muted-foreground">
-                    Completed lesson in {patient.currentModule}
+                    {(patient as any).currentModule ? `Current module: ${(patient as any).currentModule}` : 'No module'}
                   </p>
                 </div>
                 <Badge variant="secondary" className="text-xs">
-                  2h ago
+                  Active
                 </Badge>
               </div>
             ))}
@@ -249,22 +284,22 @@ export default function CounselorPatientsPage() {
                 <TableCell>
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src={patient.avatar} alt={patient.name} />
+                      <AvatarImage src={undefined} alt={patient.fullName || patient.email} />
                       <AvatarFallback>
-                        {patient.name.split(' ').map(n => n[0]).join('')}
+                        {(patient.fullName || patient.email || 'P').split(' ').map(n => n[0]).join('').slice(0, 2)}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium">{patient.name}</p>
+                      <p className="font-medium">{patient.fullName || patient.email}</p>
                       <p className="text-sm text-muted-foreground">{patient.email}</p>
                     </div>
                   </div>
                 </TableCell>
                 <TableCell>
                   <div>
-                    <p className="font-medium text-sm">{patient.currentModule}</p>
+                    <p className="font-medium text-sm">{(patient as any).currentModule || 'No module'}</p>
                     <p className="text-xs text-muted-foreground">
-                      Started {patient.createdAt.toLocaleDateString()}
+                      Started {new Date(patient.createdAt).toLocaleDateString()}
                     </p>
                   </div>
                 </TableCell>
@@ -272,28 +307,28 @@ export default function CounselorPatientsPage() {
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-sm">
-                        {Math.round(Object.values(patient.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(patient.moduleProgress || {}).length || 0)}%
+                        {Math.round((patient as any).avgProgress || 0)}%
                       </span>
                     </div>
                     <Progress 
-                      value={Object.values(patient.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(patient.moduleProgress || {}).length || 0} 
+                      value={(patient as any).avgProgress || 0} 
                       className="h-2" 
                     />
                   </div>
                 </TableCell>
                 <TableCell>
                   <div>
-                    <p className="text-sm">2 days ago</p>
-                    <p className="text-xs text-muted-foreground">Individual session</p>
+                    <p className="text-sm">Recent</p>
+                    <p className="text-xs text-muted-foreground">Active</p>
                   </div>
                 </TableCell>
                 <TableCell>
                   <Badge variant={
-                    (Object.values(patient.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(patient.moduleProgress || {}).length || 0) >= 80 
+                    ((patient as any).avgProgress || 0) >= 80 
                       ? "default" 
                       : "secondary"
                   }>
-                    {(Object.values(patient.moduleProgress || {}).reduce((sum, progress) => sum + progress, 0) / Object.keys(patient.moduleProgress || {}).length || 0) >= 80 
+                    {((patient as any).avgProgress || 0) >= 80 
                       ? "Active" 
                       : "In Progress"}
                   </Badge>
@@ -330,21 +365,34 @@ export default function CounselorPatientsPage() {
       </CardContent>
     </AnimatedCard>
     {/* Profile modal */}
-    <ProfileViewModal
-      isOpen={isProfileOpen}
-      onClose={() => setIsProfileOpen(false)}
-      user={viewingPatient}
-      userType="patient"
-      currentUserRole="counselor"
-    />
+    {viewingPatient && (
+      <ProfileViewModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        user={{
+          id: viewingPatient.id,
+          name: viewingPatient.fullName || viewingPatient.email || 'Patient',
+          email: viewingPatient.email,
+          role: 'patient' as const,
+          avatar: undefined,
+          createdAt: new Date(viewingPatient.createdAt),
+          diagnosis: undefined,
+          treatmentStage: undefined,
+          assignedCounselor: undefined,
+          moduleProgress: undefined,
+        }}
+        userType="patient"
+        currentUserRole="counselor"
+      />
+    )}
 
     {/* Schedule session modal */}
     <ScheduleSessionModal
       isOpen={isScheduleOpen}
       onClose={() => setIsScheduleOpen(false)}
-      counselorId={currentCounselor?.id || ''}
-      counselorName={currentCounselor?.name || 'Counselor'}
-      patients={assignedPatients.map(p => ({ id: p.id, name: p.name, avatar: p.avatar }))}
+      counselorId={user?.id || ''}
+      counselorName={user?.name || 'Counselor'}
+      patients={patients.map(p => ({ id: p.id, name: p.fullName || p.email || 'Patient', avatar: undefined }))}
       preselectedPatientId={schedulePatient?.id}
       onSchedule={() => {
         alert('Session scheduled');
@@ -381,7 +429,7 @@ export default function CounselorPatientsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All</SelectItem>
-                  {[...new Set(assignedPatients.map(p => p.currentModule).filter(Boolean))].map((m) => (
+                  {[...new Set(patients.map(p => (p as any).currentModule).filter(Boolean))].map((m) => (
                     <SelectItem key={m as string} value={String(m)}>{String(m)}</SelectItem>
                   ))}
                 </SelectContent>

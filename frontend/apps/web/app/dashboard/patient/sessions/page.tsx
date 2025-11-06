@@ -21,14 +21,20 @@ import {
   MessageCircle,
   Plus,
   Filter,
-  Search
+  Search,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
-import { dummySessions, dummyCounselors } from '../../../../lib/dummy-data';
-import { Session } from '../../../../lib/types';
+import { useAuth } from '../../../../components/auth/AuthProvider';
+import { useSessions } from '../../../../hooks/useSessions';
+import type { Session, RescheduleSessionInput } from '@/lib/api/sessions';
+import { toast } from 'sonner';
 
 export default function PatientSessionsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user, isLoading: authLoading } = useAuth();
+  
   const [activeTab, setActiveTab] = useState('upcoming');
   const [isCounselorSelectionOpen, setIsCounselorSelectionOpen] = useState(false);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
@@ -36,85 +42,45 @@ export default function PatientSessionsPage() {
   const [isCancelOpen, setIsCancelOpen] = useState(false);
   const [selectedCounselor, setSelectedCounselor] = useState<any>(null);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
-  const currentPatientId = '1'; // Jean Baptiste
+
+  // Load sessions using the hook
+  const { 
+    sessions, 
+    loading: sessionsLoading, 
+    error: sessionsError,
+    createSession,
+    rescheduleSession,
+    cancelSession,
+    refreshSessions
+  } = useSessions({
+    patientId: user?.id,
+  });
+
+  // Filter sessions based on tab
+  const upcomingSessions = sessions.filter(session => 
+    session.status === 'scheduled' &&
+    new Date(session.date) > new Date()
+  );
+
+  const pastSessions = sessions.filter(session => 
+    session.status === 'completed' || session.status === 'cancelled'
+  );
+
+  const allSessions = sessions;
 
   // Check for counselorId in URL query params on mount
   useEffect(() => {
     const counselorId = searchParams.get('counselorId');
     if (counselorId) {
-      // Map counselors page IDs to dummy data counselors
-      // The counselors page uses IDs 1-4, but we need to map to actual counselor data
-      const counselorMapping: Record<string, string> = {
-        '1': '2', // Dr. Marie Uwimana -> Dr. Marie Claire
-        '2': '6', // Jean-Baptiste Nkurunziza -> Dr. Jean Paul (or find by name)
-        '3': '7', // Dr. Grace Mukamana -> Dr. Immaculee (or find by name)
-        '4': '6', // Paul Nsengimana -> Use Dr. Jean Paul as fallback
-      };
-      
-      // Try to find by mapped ID first
-      const mappedId = counselorMapping[counselorId];
-      let counselor = mappedId ? dummyCounselors.find(c => c.id === mappedId) : null;
-      
-      // If not found, try finding by original ID
-      if (!counselor) {
-        counselor = dummyCounselors.find(c => c.id === counselorId);
-      }
-      
-      // Map counselors page names to dummy data names as fallback
-      const nameMapping: Record<string, string[]> = {
-        '1': ['Dr. Marie Uwimana', 'Dr. Marie Claire'],
-        '2': ['Jean-Baptiste Nkurunziza'],
-        '3': ['Dr. Grace Mukamana', 'Dr. Immaculee'],
-        '4': ['Paul Nsengimana'],
-      };
-      
-      // If still not found, try to find by name (for future compatibility)
-      if (!counselor) {
-        const namesToFind = nameMapping[counselorId];
-        if (namesToFind) {
-          counselor = dummyCounselors.find(c => 
-            namesToFind.some(name => c.name.toLowerCase().includes(name.toLowerCase().replace('Dr. ', '')))
-          );
-        }
-      }
-      
-      // If counselor found, pre-select and open booking modal
-      if (counselor) {
-        setSelectedCounselor(counselor);
-        setIsBookingOpen(true);
-        // Clean up the URL query parameter
-        router.replace('/dashboard/patient/sessions', { scroll: false });
-      }
+      // TODO: Load counselor from API
+      // For now, we'll need to fetch counselor data
+      // setSelectedCounselor(counselor);
+      setIsBookingOpen(true);
+      router.replace('/dashboard/patient/sessions', { scroll: false });
     }
   }, [searchParams, router]);
 
-  const upcomingSessions = dummySessions.filter(session => 
-    session.patientId === currentPatientId && 
-    session.status === 'scheduled' &&
-    new Date(session.date) > new Date()
-  );
-
-  const pastSessions = dummySessions.filter(session => 
-    session.patientId === currentPatientId && 
-    (session.status === 'completed' || session.status === 'cancelled')
-  );
-
-  const allSessions = dummySessions.filter(session => 
-    session.patientId === currentPatientId
-  );
-
-  const getCounselorName = (counselorId: string) => {
-    const counselor = dummyCounselors.find(c => c.id === counselorId);
-    return counselor?.name || 'Unknown Counselor';
-  };
-
-  const getCounselorAvatar = (counselorId: string) => {
-    const counselor = dummyCounselors.find(c => c.id === counselorId);
-    return counselor?.avatar;
-  };
-
   const handleJoinSession = (session: Session) => {
-    // Navigate to the session room
     router.push(`/dashboard/patient/sessions/session/${session.id}`);
   };
 
@@ -123,33 +89,31 @@ export default function PatientSessionsPage() {
     setIsRescheduleOpen(true);
   };
 
-  const handleConfirmReschedule = async (sessionId: string, newDate: Date, newTime: string, newDuration: number) => {
+  const handleConfirmReschedule = async (
+    sessionId: string | undefined, 
+    newDate: Date, 
+    newTime: string, 
+    newDuration: number
+  ) => {
+    if (!sessionId) return;
+    
+    // Type guard: after the check above, sessionId is definitely a string
+    // TypeScript doesn't narrow after return, so we use a type assertion
+    const id = sessionId as string;
+    
     try {
-      // In a real app, this would make an API call to update the session
-      console.log('Rescheduling session:', {
-        sessionId,
-        newDate,
-        newTime,
-        newDuration
-      });
-      
-      // Update the session in dummy data (for demo purposes)
-      const sessionIndex = dummySessions.findIndex(s => s.id === sessionId);
-      if (sessionIndex !== -1) {
-        dummySessions[sessionIndex] = {
-          ...dummySessions[sessionIndex],
-          date: newDate,
-          time: newTime,
-          duration: newDuration
-        } as Session;
-      }
-      
-      // Show success message (in a real app, you'd use a toast notification)
-      alert('Session rescheduled successfully!');
-      
+      const rescheduleData = {
+        date: newDate.toISOString().split('T')[0],
+        time: newTime,
+      } as RescheduleSessionInput;
+      await rescheduleSession(id as string, rescheduleData);
+      toast.success('Session rescheduled successfully!');
+      setIsRescheduleOpen(false);
+      setSelectedSession(null);
+      await refreshSessions();
     } catch (error) {
       console.error('Error rescheduling session:', error);
-      alert('Failed to reschedule session. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to reschedule session. Please try again.');
     }
   };
 
@@ -160,34 +124,18 @@ export default function PatientSessionsPage() {
 
   const handleConfirmCancel = async (sessionId: string, reason: string, notes?: string) => {
     try {
-      // In a real app, this would make an API call to cancel the session
-      console.log('Cancelling session:', {
-        sessionId,
-        reason,
-        notes
-      });
-      
-      // Update the session in dummy data (for demo purposes)
-      const sessionIndex = dummySessions.findIndex(s => s.id === sessionId);
-      if (sessionIndex !== -1 && dummySessions[sessionIndex]) {
-        dummySessions[sessionIndex] = {
-          ...dummySessions[sessionIndex],
-          status: 'cancelled',
-          notes: `${dummySessions[sessionIndex]?.notes || ''}\n\nCancellation: ${reason}${notes ? ` - ${notes}` : ''}`
-        } as Session;
-      }
-      
-      // Show success message (in a real app, you'd use a toast notification)
-      alert('Session cancelled successfully! Your counselor has been notified.');
-      
+      await cancelSession(sessionId, { reason });
+      toast.success('Session cancelled successfully! Your counselor has been notified.');
+      setIsCancelOpen(false);
+      setSelectedSession(null);
+      await refreshSessions();
     } catch (error) {
       console.error('Error cancelling session:', error);
-      alert('Failed to cancel session. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to cancel session. Please try again.');
     }
   };
 
   const handleQuickBooking = () => {
-    // Open counselor selection modal
     setIsCounselorSelectionOpen(true);
   };
 
@@ -197,12 +145,58 @@ export default function PatientSessionsPage() {
     setIsBookingOpen(true);
   };
 
-  const handleConfirmBooking = (bookingData: any) => {
-    console.log('Booking confirmed:', bookingData);
-    // Here you would typically send the booking data to your backend
-    setIsBookingOpen(false);
-    setSelectedCounselor(null);
+  const handleConfirmBooking = async (bookingData: any) => {
+    try {
+      if (!user?.id || !selectedCounselor?.id) {
+        toast.error('Missing user or counselor information');
+        return;
+      }
+
+      await createSession({
+        patientId: user.id,
+        counselorId: selectedCounselor.id,
+        date: bookingData.date,
+        time: bookingData.time,
+        duration: bookingData.duration,
+        type: bookingData.sessionType || 'video',
+        notes: bookingData.notes,
+      });
+      
+      toast.success('Session booked successfully!');
+      setIsBookingOpen(false);
+      setSelectedCounselor(null);
+      await refreshSessions();
+    } catch (error) {
+      console.error('Error booking session:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to book session. Please try again.');
+    }
   };
+
+  // Show loading state
+  if (authLoading || sessionsLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading sessions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (sessionsError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 max-w-md text-center">
+          <AlertCircle className="h-12 w-12 text-destructive" />
+          <h2 className="text-xl font-semibold">Error Loading Sessions</h2>
+          <p className="text-muted-foreground">{sessionsError}</p>
+          <Button onClick={() => refreshSessions()}>Try Again</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -221,7 +215,10 @@ export default function PatientSessionsPage() {
           <CardContent>
             <div className="text-2xl font-bold">{upcomingSessions.length}</div>
             <p className="text-xs text-muted-foreground">
-              Next session in 2 days
+              {upcomingSessions.length > 0 && upcomingSessions[0]
+                ? `Next session ${new Date(upcomingSessions[0].date).toLocaleDateString()}`
+                : 'No upcoming sessions'
+              }
             </p>
           </CardContent>
         </AnimatedCard>
@@ -289,9 +286,8 @@ export default function PatientSessionsPage() {
                   <SessionCard
                     key={session.id}
                     session={session}
-                    patientName="Jean Baptiste"
-                    counselorName={getCounselorName(session.counselorId)}
-                    counselorAvatar={getCounselorAvatar(session.counselorId)}
+                    patientName={user?.name || 'Patient'}
+                    counselorName="Loading..."
                     onJoin={handleJoinSession}
                     onReschedule={handleRescheduleSession}
                     onCancel={handleCancelSession}
@@ -324,9 +320,8 @@ export default function PatientSessionsPage() {
                   <SessionCard
                     key={session.id}
                     session={session}
-                    patientName="Jean Baptiste"
-                    counselorName={getCounselorName(session.counselorId)}
-                    counselorAvatar={getCounselorAvatar(session.counselorId)}
+                    patientName={user?.name || 'Patient'}
+                    counselorName="Loading..."
                   />
                 ))}
               </div>
@@ -359,9 +354,8 @@ export default function PatientSessionsPage() {
                     <SessionCard
                       key={session.id}
                       session={session}
-                      patientName="Jean Baptiste"
-                      counselorName={getCounselorName(session.counselorId)}
-                      counselorAvatar={getCounselorAvatar(session.counselorId)}
+                      patientName={user?.name || 'Patient'}
+                      counselorName="Loading..."
                       onJoin={session.status === 'scheduled' ? handleJoinSession : undefined}
                       onReschedule={session.status === 'scheduled' ? handleRescheduleSession : undefined}
                       onCancel={session.status === 'scheduled' ? handleCancelSession : undefined}
@@ -392,7 +386,7 @@ export default function PatientSessionsPage() {
       <CounselorSelectionModal
         isOpen={isCounselorSelectionOpen}
         onClose={() => setIsCounselorSelectionOpen(false)}
-        counselors={dummyCounselors}
+        counselors={[]} // TODO: Load from API
         onSelectCounselor={handleSelectCounselor}
       />
 
@@ -416,8 +410,8 @@ export default function PatientSessionsPage() {
           setIsRescheduleOpen(false);
           setSelectedSession(null);
         }}
-        session={selectedSession}
-        onReschedule={handleConfirmReschedule}
+        session={selectedSession as any}
+        onReschedule={handleConfirmReschedule as any}
       />
 
       {/* Cancel Session Modal */}
@@ -427,9 +421,9 @@ export default function PatientSessionsPage() {
           setIsCancelOpen(false);
           setSelectedSession(null);
         }}
-        session={selectedSession}
+        session={selectedSession as any}
         userRole="patient"
-        onCancel={handleConfirmCancel}
+        onCancel={handleConfirmCancel as any}
       />
     </div>
   );

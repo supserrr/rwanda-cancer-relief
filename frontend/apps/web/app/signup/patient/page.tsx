@@ -102,6 +102,13 @@ export default function PatientSignUpPage() {
       // Create user account
       const result = await AuthService.signUp(data);
       
+      // Check if email confirmation is required
+      if (!result.token || result.token === '') {
+        // Email confirmation required
+        setError('Account created! Please check your email to confirm your account before signing in.');
+        return;
+      }
+      
       // Store auth data in localStorage
       localStorage.setItem('auth-token', result.token);
       localStorage.setItem('user-data', JSON.stringify(result.user));
@@ -110,7 +117,16 @@ export default function PatientSignUpPage() {
       // Redirect to onboarding
       router.push('/onboarding/patient');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Account creation failed. Please try again.');
+      // Extract error message from API error
+      let errorMessage = 'Account creation failed. Please try again.';
+      
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'object' && err !== null && 'message' in err) {
+        errorMessage = String(err.message);
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

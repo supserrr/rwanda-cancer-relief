@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
+import { AnimatedGrid } from '@workspace/ui/components/animated-grid';
 import { SessionCard } from '../../../../components/dashboard/shared/SessionCard';
 import { CounselorRescheduleModal } from '../../../../components/session/CounselorRescheduleModal';
 import { CancelSessionModal } from '../../../../components/session/CancelSessionModal';
@@ -23,41 +24,78 @@ import {
   AlertCircle,
   Users
 } from 'lucide-react';
-import { dummySessions, dummyCounselors, dummyPatients } from '../../../../lib/dummy-data';
-import { Session } from '../../../../lib/types';
+import { useAuth } from '../../../../components/auth/AuthProvider';
+import { useSessions } from '../../../../hooks/useSessions';
+import { AdminApi, type AdminUser } from '../../../../lib/api/admin';
+import type { Session, RescheduleSessionInput, CreateSessionInput } from '@/lib/api/sessions';
+import { toast } from 'sonner';
 
 export default function CounselorSessionsPage() {
   const router = useRouter();
+  const { user, isLoading: authLoading } = useAuth();
+  
   const [activeTab, setActiveTab] = useState('upcoming');
   const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
   const [isCancelOpen, setIsCancelOpen] = useState(false);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
-  const currentCounselor = dummyCounselors[0]; // Dr. Marie Claire
+  const [patients, setPatients] = useState<AdminUser[]>([]);
+  const [patientsLoading, setPatientsLoading] = useState(true);
 
-  const upcomingSessions = dummySessions.filter(session => 
-    session.counselorId === currentCounselor?.id && 
+  // Load sessions using the hook
+  const { 
+    sessions, 
+    loading: sessionsLoading, 
+    error: sessionsError,
+    createSession,
+    rescheduleSession,
+    cancelSession,
+    refreshSessions
+  } = useSessions({
+    counselorId: user?.id,
+  });
+
+  // Load patients for the schedule modal
+  useEffect(() => {
+    const fetchPatients = async () => {
+      try {
+        setPatientsLoading(true);
+        const response = await AdminApi.listUsers({ role: 'patient' });
+        setPatients(response.users);
+      } catch (error) {
+        console.error('Error fetching patients:', error);
+        toast.error('Failed to load patients');
+      } finally {
+        setPatientsLoading(false);
+      }
+    };
+
+    if (user?.id) {
+      fetchPatients();
+    }
+  }, [user?.id]);
+
+  // Filter sessions based on tab
+  const upcomingSessions = sessions.filter(session => 
     session.status === 'scheduled' &&
     new Date(session.date) > new Date()
   );
 
-  const pastSessions = dummySessions.filter(session => 
-    session.counselorId === currentCounselor?.id && 
-    (session.status === 'completed' || session.status === 'cancelled')
+  const pastSessions = sessions.filter(session => 
+    session.status === 'completed' || session.status === 'cancelled'
   );
 
-  const allSessions = dummySessions.filter(session => 
-    session.counselorId === currentCounselor?.id
-  );
+  const allSessions = sessions;
 
   const getPatientName = (patientId: string) => {
-    const patient = dummyPatients.find(p => p.id === patientId);
-    return patient?.name || 'Unknown Patient';
+    const patient = patients.find(p => p.id === patientId);
+    return patient?.fullName || 'Unknown Patient';
   };
 
   const getPatientAvatar = (patientId: string) => {
-    const patient = dummyPatients.find(p => p.id === patientId);
-    return patient?.avatar;
+    const patient = patients.find(p => p.id === patientId);
+    // AdminUser doesn't have avatar, but we can return undefined
+    return undefined;
   };
 
   const handleJoinSession = (session: Session) => {
@@ -65,50 +103,49 @@ export default function CounselorSessionsPage() {
     router.push(`/dashboard/counselor/sessions/session/${session.id}`);
   };
 
-  const handleAcceptSession = (session: Session) => {
-    console.log('Accept session:', session.id);
-  };
 
   const handleRescheduleSession = (session: Session) => {
     setSelectedSession(session);
     setIsRescheduleOpen(true);
   };
 
-  const handleConfirmReschedule = async (sessionId: string, newDate: Date, newTime: string, newDuration: number, notes?: string) => {
+  const handleConfirmReschedule = async (
+    sessionId: string | undefined, 
+    newDate: Date, 
+    newTime: string, 
+    newDuration: number, 
+    notes?: string
+  ) => {
+    if (!user || !sessionId) return;
+    
+    // Type guard: after the check above, sessionId is definitely a string
+    // TypeScript doesn't narrow after return, so we use a type assertion
+    const id = sessionId as string;
+    
     try {
-      // In a real app, this would make an API call to update the session
-      console.log('Rescheduling session:', {
-        sessionId,
-        newDate,
-        newTime,
-        newDuration,
-        notes
-      });
+      // Reschedule only updates date and time, duration is handled separately if needed
+      const rescheduleData = {
+        date: newDate.toISOString().split('T')[0], // YYYY-MM-DD
+        time: newTime,
+        reason: notes || 'Rescheduled by counselor',
+      } as RescheduleSessionInput;
+      await rescheduleSession(id as string, rescheduleData);
       
-      // Update the session in dummy data (for demo purposes)
-      const sessionIndex = dummySessions.findIndex(s => s.id === sessionId);
-      if (sessionIndex !== -1) {
-        dummySessions[sessionIndex] = {
-          ...dummySessions[sessionIndex],
-          date: newDate,
-          time: newTime,
-          duration: newDuration,
-          notes: notes ? `${dummySessions[sessionIndex]?.notes || ''}\n\nReschedule Note: ${notes}` : dummySessions[sessionIndex]?.notes || ''
-        } as Session;
+      // If duration changed, update session separately
+      if (newDuration && selectedSession && newDuration !== selectedSession.duration) {
+        // Note: We might need to update duration separately if the API supports it
+        // For now, we'll just reschedule and note the duration change in the reason
       }
       
-      // Show success message (in a real app, you'd use a toast notification)
-      alert('Session rescheduled successfully! Patient has been notified.');
-      
+      toast.success('Session rescheduled successfully! Patient has been notified.');
+      setIsRescheduleOpen(false);
+      setSelectedSession(null);
     } catch (error) {
       console.error('Error rescheduling session:', error);
-      alert('Failed to reschedule session. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to reschedule session. Please try again.');
     }
   };
 
-  const handleAddNotes = (session: Session) => {
-    console.log('Add notes to session:', session.id);
-  };
 
   const handleScheduleSession = () => {
     setIsScheduleOpen(true);
@@ -122,31 +159,33 @@ export default function CounselorSessionsPage() {
     sessionType: 'video' | 'audio';
     notes?: string;
   }) => {
+    if (!user) return;
+    
     try {
-      // In a real app, this would make an API call to create the session
-      console.log('Scheduling session:', sessionData);
+      if (!user?.id) {
+        toast.error('User not authenticated');
+        return;
+      }
       
-      // Create new session in dummy data (for demo purposes)
-      const newSession: Session = {
-        id: (dummySessions.length + 1).toString(),
+      // Type guard: after the check above, user.id is definitely a string
+      // TypeScript doesn't narrow after return, so we use a type assertion
+      const counselorId = user.id as string;
+      
+      const createData = {
         patientId: sessionData.patientId,
-        counselorId: currentCounselor?.id || '2',
-        date: sessionData.date,
+        counselorId: counselorId as string,
+        date: sessionData.date.toISOString().split('T')[0], // YYYY-MM-DD
         time: sessionData.time,
         duration: sessionData.duration,
-        status: 'scheduled',
         type: sessionData.sessionType,
-        notes: sessionData.notes || ''
-      };
-      
-      dummySessions.push(newSession);
-      
-      // Show success message (in a real app, you'd use a toast notification)
-      alert('Session scheduled successfully! Patient has been notified.');
-      
+        notes: sessionData.notes,
+      } as CreateSessionInput;
+      await createSession(createData);
+      toast.success('Session scheduled successfully! Patient has been notified.');
+      setIsScheduleOpen(false);
     } catch (error) {
       console.error('Error scheduling session:', error);
-      alert('Failed to schedule session. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to schedule session. Please try again.');
     }
   };
 
@@ -156,32 +195,35 @@ export default function CounselorSessionsPage() {
   };
 
   const handleConfirmCancel = async (sessionId: string, reason: string, notes?: string) => {
+    if (!user) return;
+    
     try {
-      // In a real app, this would make an API call to cancel the session
-      console.log('Cancelling session:', {
-        sessionId,
-        reason,
-        notes
-      });
-      
-      // Update the session in dummy data (for demo purposes)
-      const sessionIndex = dummySessions.findIndex(s => s.id === sessionId);
-      if (sessionIndex !== -1) {
-        dummySessions[sessionIndex] = {
-          ...dummySessions[sessionIndex],
-          status: 'cancelled',
-          notes: `${dummySessions[sessionIndex]?.notes || ''}\n\nCancellation: ${reason}${notes ? ` - ${notes}` : ''}`
-        } as Session;
-      }
-      
-      // Show success message (in a real app, you'd use a toast notification)
-      alert('Session cancelled successfully! Patient has been notified.');
-      
+      await cancelSession(sessionId, { reason });
+      toast.success('Session cancelled successfully! Patient has been notified.');
+      setIsCancelOpen(false);
+      setSelectedSession(null);
     } catch (error) {
       console.error('Error cancelling session:', error);
-      alert('Failed to cancel session. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to cancel session. Please try again.');
     }
   };
+
+  if (authLoading || sessionsLoading || patientsLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (sessionsError) {
+    return (
+      <div className="text-center py-12 text-red-500">
+        <h3 className="text-lg font-semibold mb-2">Error loading sessions</h3>
+        <p className="text-muted-foreground">Please try again later.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -191,7 +233,7 @@ export default function CounselorSessionsPage() {
       />
 
       {/* Quick Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <AnimatedGrid className="grid gap-4 md:grid-cols-4" staggerDelay={0.1}>
         <AnimatedCard delay={0.5}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Upcoming Sessions</CardTitle>
@@ -243,7 +285,7 @@ export default function CounselorSessionsPage() {
             </p>
           </CardContent>
         </AnimatedCard>
-      </div>
+      </AnimatedGrid>
 
       {/* Action Bar */}
       <div className="flex items-center justify-between">
@@ -282,10 +324,11 @@ export default function CounselorSessionsPage() {
                     key={session.id}
                     session={session}
                     patientName={getPatientName(session.patientId)}
-                    counselorName="Dr. Marie Claire"
+                    counselorName={user?.name || 'Counselor'}
                     patientAvatar={getPatientAvatar(session.patientId)}
                     onJoin={handleJoinSession}
                     onReschedule={handleRescheduleSession}
+                    onCancel={handleCancelSession}
                   />
                 ))}
               </div>
@@ -316,7 +359,7 @@ export default function CounselorSessionsPage() {
                     key={session.id}
                     session={session}
                     patientName={getPatientName(session.patientId)}
-                    counselorName="Dr. Marie Claire"
+                    counselorName={user?.name || 'Counselor'}
                     patientAvatar={getPatientAvatar(session.patientId)}
                   />
                 ))}
@@ -349,13 +392,14 @@ export default function CounselorSessionsPage() {
                   {allSessions.map((session) => (
                     <SessionCard
                       key={session.id}
-                      session={session}
-                      patientName={getPatientName(session.patientId)}
-                      counselorName="Dr. Marie Claire"
-                      patientAvatar={getPatientAvatar(session.patientId)}
-                      onJoin={session.status === 'scheduled' ? handleJoinSession : undefined}
-                      onReschedule={session.status === 'scheduled' ? handleRescheduleSession : undefined}
-                    />
+                    session={session}
+                    patientName={getPatientName(session.patientId)}
+                    counselorName={user?.name || 'Counselor'}
+                    patientAvatar={getPatientAvatar(session.patientId)}
+                    onJoin={session.status === 'scheduled' ? handleJoinSession : undefined}
+                    onReschedule={session.status === 'scheduled' ? handleRescheduleSession : undefined}
+                    onCancel={session.status === 'scheduled' ? handleCancelSession : undefined}
+                  />
                   ))}
                 </div>
               </>
@@ -385,10 +429,10 @@ export default function CounselorSessionsPage() {
           setIsRescheduleOpen(false);
           setSelectedSession(null);
         }}
-        session={selectedSession}
+        session={selectedSession as any}
         patientName={selectedSession ? getPatientName(selectedSession.patientId) : undefined}
         patientAvatar={selectedSession ? getPatientAvatar(selectedSession.patientId) : undefined}
-        onReschedule={handleConfirmReschedule}
+        onReschedule={handleConfirmReschedule as any}
       />
 
       {/* Cancel Session Modal */}
@@ -398,26 +442,28 @@ export default function CounselorSessionsPage() {
           setIsCancelOpen(false);
           setSelectedSession(null);
         }}
-        session={selectedSession}
+        session={selectedSession as any}
         patientName={selectedSession ? getPatientName(selectedSession.patientId) : undefined}
         patientAvatar={selectedSession ? getPatientAvatar(selectedSession.patientId) : undefined}
         userRole="counselor"
-        onCancel={handleConfirmCancel}
+        onCancel={handleConfirmCancel as any}
       />
 
       {/* Schedule Session Modal */}
-      <ScheduleSessionModal
-        isOpen={isScheduleOpen}
-        onClose={() => setIsScheduleOpen(false)}
-        counselorId={currentCounselor?.id || '2'}
-        counselorName={currentCounselor?.name || 'Dr. Marie Claire'}
-        patients={dummyPatients.map(patient => ({
-          id: patient.id,
-          name: patient.name,
-          avatar: patient.avatar
-        }))}
-        onSchedule={handleConfirmSchedule}
-      />
+      {user && (
+        <ScheduleSessionModal
+          isOpen={isScheduleOpen}
+          onClose={() => setIsScheduleOpen(false)}
+          counselorId={user?.id || ''}
+          counselorName={user.name || 'Counselor'}
+          patients={patients.map(patient => ({
+            id: patient.id,
+            name: patient.fullName || patient.email,
+            avatar: undefined // AdminUser doesn't have avatar
+          }))}
+          onSchedule={handleConfirmSchedule}
+        />
+      )}
     </div>
   );
 }

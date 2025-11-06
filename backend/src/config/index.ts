@@ -70,7 +70,7 @@ export function getConfig(): Config {
   }
 
   return {
-    port: parseInt(process.env.PORT || '5000', 10),
+    port: parseInt(process.env.PORT || '10000', 10),
     nodeEnv: process.env.NODE_ENV || 'development',
     supabase: {
       url: process.env.SUPABASE_URL || '',

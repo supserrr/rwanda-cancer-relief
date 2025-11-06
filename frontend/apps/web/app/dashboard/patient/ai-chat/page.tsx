@@ -11,21 +11,61 @@ import { Response } from '@/components/ui/response';
 import { Button } from '@workspace/ui/components/button';
 import { Sheet, SheetContent, SheetTitle } from '@workspace/ui/components/sheet';
 import { Menu } from 'lucide-react';
-
-interface Message {
-  id: string;
-  content: string;
-  sender: 'user' | 'ai';
-  timestamp: Date;
-}
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
+import { toast } from 'sonner';
 
 export default function PatientAIChatPage() {
   const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
   const [activeThreadId, setActiveThreadId] = useState<string | undefined>();
-  const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
   const [showSidebar, setShowSidebar] = useState(false); // Control sidebar visibility on mobile
+
+  const [input, setInput] = useState('');
+
+  // Use the AI SDK's useChat hook
+  const {
+    messages,
+    sendMessage,
+    status,
+    error,
+    setMessages,
+  } = useChat({
+    transport: new DefaultChatTransport({
+      api: '/api/chat',
+      body: {
+        model: 'gpt-4',
+        webSearch: false,
+      },
+    }),
+    onError: (error) => {
+      console.error('AI Chat error:', error);
+      toast.error('Failed to get AI response. Please try again.');
+    },
+  });
+
+  const isLoading = status === 'streaming' || status === 'submitted';
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+  };
+
+  const handleChatSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!input.trim() || isLoading) return;
+    
+    const messageText = input.trim();
+    setInput('');
+    sendMessage({ text: messageText });
+  };
+
+  const append = (message: { role: 'user' | 'assistant'; content: string }) => {
+    if (message.role === 'user') {
+      setInput(message.content);
+      sendMessage({ text: message.content });
+    } else {
+      setMessages(prev => [...prev, message as any]);
+    }
+  };
 
   useEffect(() => {
     // Scroll to bottom when messages change
@@ -50,59 +90,12 @@ export default function PatientAIChatPage() {
   const greeting = `Good ${getTimeGreeting()} ${user.name || 'User'}!`;
   const assistantMessage = 'How can I assist you today?';
 
-  const handleSend = (messageText: string, files?: File[]) => {
-    console.log('Message:', messageText);
-    console.log('Files:', files);
-    
-    // Add user message
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: messageText,
-      sender: 'user',
-      timestamp: new Date()
-    };
-    setMessages(prev => [...prev, userMessage]);
-    
-    // Simulate streaming AI response
-    const responseText = 'This is a **sample AI response** with some formatting. Your actual AI integration will go here. It can include `code snippets` and *emphasized text*.';
-    const words = responseText.split(' ');
-    let currentContent = '';
-    let wordIndex = 0;
-    
-    const aiMessageId = (Date.now() + 1).toString();
-    
-    // Add empty AI message first
-    const initialAiMessage: Message = {
-      id: aiMessageId,
-      content: '',
-      sender: 'ai',
-      timestamp: new Date()
-    };
-    setMessages(prev => [...prev, initialAiMessage]);
-    
-    const streamInterval = setInterval(() => {
-      if (wordIndex < words.length) {
-        currentContent += (wordIndex > 0 ? ' ' : '') + words[wordIndex];
-        wordIndex++;
-        
-        // Update the AI message content
-        setMessages(prev => prev.map(msg => 
-          msg.id === aiMessageId 
-            ? { ...msg, content: currentContent }
-            : msg
-        ));
-      } else {
-        clearInterval(streamInterval);
-        setIsLoading(false);
-      }
-    }, 50); // Stream one word every 50ms
-  };
-
-  const handleSubmit = () => {
-    if (message.trim()) {
-      const messageToSend = message;
-      setMessage('');
-      handleSend(messageToSend);
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
+    if (input.trim()) {
+      handleChatSubmit(e as any);
     }
   };
 
@@ -166,33 +159,50 @@ export default function PatientAIChatPage() {
                 {messages.map((msg) => (
                   <div
                     key={msg.id}
-                    className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
+                    className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
                   >
                     <div
                       className={`max-w-[85%] sm:max-w-[75%] md:max-w-[70%] rounded-lg p-2.5 sm:p-3 ${
-                        msg.sender === 'user'
+                        msg.role === 'user'
                           ? 'bg-primary text-primary-foreground'
                           : 'bg-primary/10 text-primary border border-primary/20'
                       }`}
                     >
-                      {msg.sender === 'ai' ? (
+                      {msg.role === 'assistant' ? (
                         <Response className="text-sm sm:text-base prose prose-sm max-w-none dark:prose-invert [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                          {msg.content}
+                          {msg.parts.map((part: any, idx: number) => 
+                            part.type === 'text' ? part.text : 
+                            part.type === 'reasoning' ? part.text :
+                            JSON.stringify(part)
+                          ).join('')}
                         </Response>
                       ) : (
-                        <p className="text-sm sm:text-base whitespace-pre-wrap break-words">{msg.content}</p>
+                        <p className="text-sm sm:text-base whitespace-pre-wrap break-words">
+                          {msg.parts.map((part: any, idx: number) => 
+                            part.type === 'text' ? part.text : 
+                            part.type === 'reasoning' ? part.text :
+                            JSON.stringify(part)
+                          ).join('')}
+                        </p>
                       )}
                     </div>
                     <p className={`text-xs mt-1 mx-2 ${
-                      msg.sender === 'user' ? 'text-muted-foreground' : 'text-muted-foreground'
+                      msg.role === 'user' ? 'text-muted-foreground' : 'text-muted-foreground'
                     }`}>
-                      {msg.timestamp.toLocaleTimeString([], { 
+                      {new Date().toLocaleTimeString([], { 
                         hour: '2-digit', 
                         minute: '2-digit' 
                       })}
                     </p>
                   </div>
                 ))}
+                {isLoading && (
+                  <div className="flex items-start">
+                    <div className="max-w-[85%] sm:max-w-[75%] md:max-w-[70%] rounded-lg p-2.5 sm:p-3 bg-primary/10 text-primary border border-primary/20">
+                      <MessageLoading />
+                    </div>
+                  </div>
+                )}
               </div>
             </ScrollArea>
           </div>
@@ -231,21 +241,21 @@ export default function PatientAIChatPage() {
             {messages.length === 0 && (
             <div className="flex flex-wrap gap-2 sm:gap-3 justify-center mb-3 sm:mb-4 px-2">
               <button
-                onClick={() => setMessage('What support resources are available for cancer patients?')}
+                onClick={() => append({ role: 'user', content: 'What support resources are available for cancer patients?' })}
                 className="px-3 sm:px-4 py-2 rounded-full bg-primary/10 hover:bg-primary/20 active:bg-primary/30 text-primary border border-primary/20 hover:border-primary/40 transition-all duration-200 text-xs sm:text-sm font-medium shadow-sm hover:shadow-md touch-manipulation"
                 disabled={isLoading}
               >
                 What support resources are available?
               </button>
               <button
-                onClick={() => setMessage('How can I find a counselor near me?')}
+                onClick={() => append({ role: 'user', content: 'How can I find a counselor near me?' })}
                 className="px-3 sm:px-4 py-2 rounded-full bg-primary/10 hover:bg-primary/20 active:bg-primary/30 text-primary border border-primary/20 hover:border-primary/40 transition-all duration-200 text-xs sm:text-sm font-medium shadow-sm hover:shadow-md touch-manipulation"
                 disabled={isLoading}
               >
                 How can I find a counselor?
               </button>
               <button
-                onClick={() => setMessage('Tell me about financial assistance programs')}
+                onClick={() => append({ role: 'user', content: 'Tell me about financial assistance programs' })}
                 className="px-3 sm:px-4 py-2 rounded-full bg-primary/10 hover:bg-primary/20 active:bg-primary/30 text-primary border border-primary/20 hover:border-primary/40 transition-all duration-200 text-xs sm:text-sm font-medium shadow-sm hover:shadow-md touch-manipulation"
                 disabled={isLoading}
               >
@@ -254,13 +264,10 @@ export default function PatientAIChatPage() {
             </div>
             )}
             
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              handleSubmit();
-            }} className="w-full">
+            <form onSubmit={handleSubmit} className="w-full">
               <PromptBox 
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                value={input}
+                onChange={(e) => handleInputChange(e)}
                 onSubmit={handleSubmit}
                 placeholder="Type your message here..."
                 disabled={isLoading}

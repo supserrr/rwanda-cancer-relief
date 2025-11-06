@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AnimatedStatCard } from '@workspace/ui/components/animated-stat-card';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
@@ -21,10 +21,60 @@ import {
   Target,
   Shield
 } from 'lucide-react';
-import { dummyDashboardStats } from '../../../lib/dummy-data';
+import { useAuth } from '../../../components/auth/AuthProvider';
+import { AdminApi, type Analytics } from '../../../lib/api/admin';
+import { toast } from 'sonner';
 
 export default function AdminDashboard() {
-  const stats = dummyDashboardStats;
+  const { user, isLoading: authLoading } = useAuth();
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load analytics data
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await AdminApi.getAnalytics();
+        setAnalytics(data);
+      } catch (err) {
+        console.error('Error fetching analytics:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load analytics');
+        toast.error('Failed to load analytics data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user?.id) {
+      fetchAnalytics();
+    }
+  }, [user?.id]);
+
+  if (authLoading || loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error || !analytics) {
+    return (
+      <div className="text-center py-12 text-red-500">
+        <h3 className="text-lg font-semibold mb-2">Error loading analytics</h3>
+        <p className="text-muted-foreground">Please try again later.</p>
+        <Button 
+          onClick={() => window.location.reload()} 
+          className="mt-4"
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -37,32 +87,32 @@ export default function AdminDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <AnimatedStatCard
           title="Total Users"
-          value={stats.totalUsers}
+          value={analytics.users.total}
           description="Registered users"
           icon={Users}
-          trend={{ value: 8, isPositive: true }}
+          trend={{ value: analytics.users.newThisMonth, isPositive: true }}
           delay={0.1}
         />
         <AnimatedStatCard
           title="Active Sessions"
-          value={stats.activeSessions}
-          description="Currently in progress"
+          value={analytics.sessions.scheduled}
+          description="Currently scheduled"
           icon={Calendar}
-          trend={{ value: 15, isPositive: true }}
+          trend={{ value: analytics.sessions.thisMonth, isPositive: true }}
           delay={0.2}
         />
         <AnimatedStatCard
-          title="Module Completions"
-          value={stats.moduleCompletions}
-          description="This month"
+          title="Completed Sessions"
+          value={analytics.sessions.completed}
+          description={`This month: ${analytics.sessions.thisMonth}`}
           icon={TrendingUp}
-          trend={{ value: 23, isPositive: true }}
+          trend={{ value: analytics.sessions.thisMonth, isPositive: true }}
           delay={0.3}
         />
         <AnimatedStatCard
-          title="Support Tickets"
-          value={stats.supportTickets}
-          description="Open tickets"
+          title="Messages"
+          value={analytics.chats.messages}
+          description={`${analytics.chats.unread} unread`}
           icon={MessageCircle}
           delay={0.4}
         />
@@ -76,7 +126,7 @@ export default function AdminDashboard() {
             <UserCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.patientCount}</div>
+            <div className="text-2xl font-bold">{analytics.users.patients}</div>
             <p className="text-xs text-muted-foreground">
               Active patients
             </p>
@@ -89,7 +139,7 @@ export default function AdminDashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.counselorCount}</div>
+            <div className="text-2xl font-bold">{analytics.users.counselors}</div>
             <p className="text-xs text-muted-foreground">
               Active counselors
             </p>
@@ -98,13 +148,13 @@ export default function AdminDashboard() {
 
         <AnimatedCard delay={0.5}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Upcoming Sessions</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Resources</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.upcomingSessions}</div>
+            <div className="text-2xl font-bold">{analytics.resources.total}</div>
             <p className="text-xs text-muted-foreground">
-              Next 7 days
+              {analytics.resources.views} total views
             </p>
           </CardContent>
         </AnimatedCard>

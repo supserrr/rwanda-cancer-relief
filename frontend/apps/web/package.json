@@ -9,7 +9,8 @@
     "start": "next start -p 3000",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:integration": "tsx scripts/test-integration.ts"
   },
   "dependencies": {
     "@ai-sdk/react": "^2.0.76",
@@ -36,6 +37,8 @@
     "@react-jvectormap/world": "^1.1.2",
     "@react-three/drei": "^10.7.6",
     "@react-three/fiber": "^9.4.0",
+    "@supabase/ssr": "^0.7.0",
+    "@supabase/supabase-js": "^2.80.0",
     "@tabler/icons-react": "^3.35.0",
     "@tailwindcss/forms": "^0.5.10",
     "@tailwindcss/postcss": "^4.1.11",
@@ -67,6 +70,7 @@
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
     "shiki": "^3.14.0",
+    "socket.io-client": "^4.8.1",
     "sonner": "^2.0.7",
     "streamdown": "^1.4.0",
     "swiper": "^12.0.3",
@@ -83,6 +87,7 @@
     "@workspace/eslint-config": "workspace:^",
     "@workspace/typescript-config": "workspace:*",
     "shadcn": "^3.5.0",
+    "tsx": "^4.20.6",
     "typescript": "^5.9.2"
   },
   "pnpm": {

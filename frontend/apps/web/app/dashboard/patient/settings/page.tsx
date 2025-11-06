@@ -49,11 +49,14 @@ import {
   HelpCircle,
   Ticket
 } from 'lucide-react';
-import { dummyPatients, dummySupportTickets } from '../../../../lib/dummy-data';
+import { useAuth } from '../../../../components/auth/AuthProvider';
+import { AuthApi } from '../../../../lib/api/auth';
+import { toast } from 'sonner';
 import { Textarea } from '@workspace/ui/components/textarea';
+import { useEffect } from 'react';
 
 export default function PatientSettingsPage() {
-  const currentPatient = dummyPatients[0]; // Jean Baptiste
+  const { user, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -69,7 +72,8 @@ export default function PatientSettingsPage() {
     description: ''
   });
 
-  const myTickets = dummySupportTickets.filter(ticket => ticket.userId === currentPatient?.id);
+  // Support tickets - placeholder for now (no API endpoint yet)
+  const myTickets: any[] = [];
 
   const [notifications, setNotifications] = useState({
     email: true,
@@ -82,37 +86,134 @@ export default function PatientSettingsPage() {
   });
 
   const [profile, setProfile] = useState({
-    name: currentPatient?.name || '',
-    email: currentPatient?.email || '',
-    phoneNumber: currentPatient?.phoneNumber || '',
-    emergencyContact: currentPatient?.emergencyContact || '',
-    dateOfBirth: currentPatient?.dateOfBirth || new Date(),
-    medicalHistory: currentPatient?.medicalHistory || '',
-    currentModule: currentPatient?.currentModule || '',
+    name: user?.name || '',
+    email: user?.email || '',
+    phoneNumber: '',
+    emergencyContact: '',
+    dateOfBirth: new Date(),
+    medicalHistory: '',
+    currentModule: '',
     language: 'en',
     timezone: 'Africa/Kigali',
     languages: ['English', 'Kinyarwanda']
   });
 
+  // Load user profile data
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user?.id) return;
+
+      try {
+        const currentUser = await AuthApi.getCurrentUser();
+        setProfile(prev => ({
+          ...prev,
+          name: currentUser.name,
+          email: currentUser.email,
+          phoneNumber: (currentUser as any).phoneNumber || '',
+          emergencyContact: (currentUser as any).emergencyContact || '',
+          dateOfBirth: (currentUser as any).dateOfBirth ? new Date((currentUser as any).dateOfBirth) : new Date(),
+          medicalHistory: (currentUser as any).medicalHistory || '',
+          currentModule: (currentUser as any).currentModule || '',
+          language: (currentUser as any).language || 'en',
+          timezone: (currentUser as any).timezone || 'Africa/Kigali',
+          languages: (currentUser as any).languages || ['English', 'Kinyarwanda']
+        }));
+      } catch (error) {
+        console.error('Error loading profile:', error);
+        // Use auth user data as fallback
+        setProfile(prev => ({
+          ...prev,
+          name: user.name || '',
+          email: user.email || '',
+        }));
+      }
+    };
+
+    loadProfile();
+  }, [user]);
+
   const handleSaveProfile = async () => {
+    if (!user?.id) {
+      toast.error('User not authenticated');
+      return;
+    }
+
     setIsSaving(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log('Saving profile:', profile);
+      // Update basic profile fields
+      await AuthApi.updateProfile({
+        fullName: profile.name,
+        phoneNumber: profile.phoneNumber,
+        // Note: Additional fields like emergencyContact, medicalHistory, etc.
+        // are stored in user_metadata on the backend. The backend API should
+        // be updated to accept these fields in the updateProfile endpoint.
+      });
+      
       setHasUnsavedChanges(false);
-      // Show success message
+      toast.success('Profile updated successfully');
     } catch (error) {
       console.error('Error saving profile:', error);
-      // Show error message
+      toast.error(error instanceof Error ? error.message : 'Failed to update profile');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleLogout = () => {
-    console.log('Logging out...');
-    // Implement logout logic
+  const [passwordChangeData, setPasswordChangeData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [showPasswordChangeModal, setShowPasswordChangeModal] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (!passwordChangeData.currentPassword || !passwordChangeData.newPassword) {
+      toast.error('Please fill in all password fields');
+      return;
+    }
+
+    if (passwordChangeData.newPassword !== passwordChangeData.confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
+
+    if (passwordChangeData.newPassword.length < 8) {
+      toast.error('New password must be at least 8 characters long');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await AuthApi.changePassword({
+        currentPassword: passwordChangeData.currentPassword,
+        newPassword: passwordChangeData.newPassword,
+      });
+      
+      toast.success('Password changed successfully');
+      setShowPasswordChangeModal(false);
+      setPasswordChangeData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+    } catch (error) {
+      console.error('Error changing password:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to change password');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await AuthApi.signOut();
+      toast.success('Logged out successfully');
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Error logging out:', error);
+      toast.error('Failed to logout');
+    }
   };
 
   const handleNotificationChange = (key: string, value: boolean) => {
@@ -237,6 +338,24 @@ export default function PatientSettingsPage() {
     { id: 'support', label: 'Support', icon: MessageCircle }
   ];
 
+  // Loading state
+  if (authLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="text-center py-12">
+        <h3 className="text-lg font-semibold mb-2">Not authenticated</h3>
+        <p className="text-muted-foreground">Please log in to access settings.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <AnimatedPageHeader
@@ -288,9 +407,9 @@ export default function PatientSettingsPage() {
                 <div className="flex items-center gap-6">
                   <div className="relative">
                     <Avatar className="h-24 w-24 ring-4 ring-primary/20 shadow-lg">
-                      <AvatarImage src={currentPatient?.avatar} alt={currentPatient?.name} />
+                      <AvatarImage src={undefined} alt={user?.name || 'Patient'} />
                       <AvatarFallback className="text-xl bg-primary/10 text-primary">
-                        {currentPatient?.name?.split(' ').map(n => n[0]).join('')}
+                        {user?.name?.split(' ').map((n: string) => n[0]).join('') || 'P'}
                       </AvatarFallback>
                     </Avatar>
                     <Button
@@ -302,16 +421,16 @@ export default function PatientSettingsPage() {
                     </Button>
                   </div>
                   <div className="flex-1">
-                    <h2 className="text-2xl font-bold text-foreground">{currentPatient?.name}</h2>
+                    <h2 className="text-2xl font-bold text-foreground">{user?.name || 'Patient'}</h2>
                     <p className="text-primary font-medium">Patient</p>
                     <div className="flex items-center gap-4 mt-2">
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
                         <Calendar className="h-4 w-4" />
-                        <span>Patient since {currentPatient?.createdAt?.toLocaleDateString()}</span>
+                        <span>Patient since {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</span>
                       </div>
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
                         <Award className="h-4 w-4" />
-                        <span>{currentPatient?.currentModule || 'No module assigned'}</span>
+                        <span>{(profile as any).currentModule || 'No module assigned'}</span>
                       </div>
                     </div>
                     <Badge variant="secondary" className="mt-2 bg-primary/10 text-primary border-primary/20">
@@ -622,7 +741,11 @@ export default function PatientSettingsPage() {
                         <Label className="text-base font-medium text-foreground">Change Password</Label>
                         <p className="text-sm text-muted-foreground">Update your account password</p>
                       </div>
-                      <Button variant="outline" className="border-primary/20 hover:bg-primary/10">
+                      <Button 
+                        variant="outline" 
+                        className="border-primary/20 hover:bg-primary/10"
+                        onClick={() => setShowPasswordChangeModal(true)}
+                      >
                         <Eye className="h-4 w-4 mr-2" />
                         Change
                       </Button>
@@ -951,6 +1074,89 @@ export default function PatientSettingsPage() {
             )}
           </div>
         </div>
+
+      {/* Password Change Modal */}
+      <Dialog open={showPasswordChangeModal} onOpenChange={setShowPasswordChangeModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Change Password
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Enter your current password and choose a new one.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="current-password">Current Password</Label>
+              <Input
+                id="current-password"
+                type="password"
+                value={passwordChangeData.currentPassword}
+                onChange={(e) => setPasswordChangeData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                placeholder="Enter current password"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={passwordChangeData.newPassword}
+                onChange={(e) => setPasswordChangeData(prev => ({ ...prev, newPassword: e.target.value }))}
+                placeholder="Enter new password (min 8 characters)"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm New Password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={passwordChangeData.confirmPassword}
+                onChange={(e) => setPasswordChangeData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                placeholder="Confirm new password"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowPasswordChangeModal(false);
+                setPasswordChangeData({
+                  currentPassword: '',
+                  newPassword: '',
+                  confirmPassword: '',
+                });
+              }}
+              disabled={isChangingPassword}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleChangePassword}
+              disabled={isChangingPassword || !passwordChangeData.currentPassword || !passwordChangeData.newPassword || !passwordChangeData.confirmPassword}
+            >
+              {isChangingPassword ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Changing...
+                </>
+              ) : (
+                <>
+                  <Shield className="h-4 w-4 mr-2" />
+                  Change Password
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Account Confirmation Modal */}
       <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>

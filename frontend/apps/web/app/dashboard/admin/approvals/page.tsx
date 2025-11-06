@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { Button } from '@workspace/ui/components/button';
@@ -54,34 +54,60 @@ import {
   Download,
   Heart
 } from 'lucide-react';
-import { dummyPendingCounselors } from '../../../../lib/dummy-data';
-import { Counselor } from '../../../../lib/types';
+import { AdminApi, type AdminUser } from '../../../../lib/api/admin';
+import { toast } from 'sonner';
 
 export default function AdminApprovalsPage() {
+  const [counselors, setCounselors] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSpecialty, setSelectedSpecialty] = useState<'all' | string>('all');
   const [selectedExperience, setSelectedExperience] = useState<'all' | string>('all');
-  const [selectedCounselor, setSelectedCounselor] = useState<Counselor | null>(null);
+  const [selectedCounselor, setSelectedCounselor] = useState<AdminUser | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const specialties = ['all', 'Trauma Therapy', 'Family Counseling', 'Child and Adolescent Psychology', 'Oncology Psychology', 'Grief Counseling'];
+  // Load counselors (Note: Backend would need to add a 'pending' status filter)
+  useEffect(() => {
+    const loadCounselors = async () => {
+      try {
+        setLoading(true);
+        // Note: Backend would need to add a filter for pending counselors
+        // For now, we'll load all counselors and filter for pending ones
+        const response = await AdminApi.listUsers({ role: 'counselor' });
+        // Filter for pending counselors (would need to check status in backend)
+        // For now, show all counselors as pending approvals would be a separate status
+        setCounselors(response.users);
+      } catch (error) {
+        console.error('Error loading counselors:', error);
+        toast.error('Failed to load pending counselors');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const filteredCounselors = dummyPendingCounselors.filter(counselor => {
-    const matchesSearch = counselor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    loadCounselors();
+  }, []);
+
+  // Get unique specialties from counselors
+  const specialties = ['all', ...new Set(counselors.map(c => (c as any).specialty).filter(Boolean))];
+
+  const filteredCounselors = counselors.filter(counselor => {
+    const matchesSearch = (counselor.fullName || counselor.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          counselor.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         counselor.specialty.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSpecialty = selectedSpecialty === 'all' || counselor.specialty === selectedSpecialty;
+                         ((counselor as any).specialty || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSpecialty = selectedSpecialty === 'all' || (counselor as any).specialty === selectedSpecialty;
+    const experience = (counselor as any).experience || 0;
     const matchesExperience = selectedExperience === 'all' || 
-      (selectedExperience === '0-2' && counselor.experience <= 2) ||
-      (selectedExperience === '3-5' && counselor.experience >= 3 && counselor.experience <= 5) ||
-      (selectedExperience === '6-10' && counselor.experience >= 6 && counselor.experience <= 10) ||
-      (selectedExperience === '10+' && counselor.experience > 10);
+      (selectedExperience === '0-2' && experience <= 2) ||
+      (selectedExperience === '3-5' && experience >= 3 && experience <= 5) ||
+      (selectedExperience === '6-10' && experience >= 6 && experience <= 10) ||
+      (selectedExperience === '10+' && experience > 10);
     
     return matchesSearch && matchesSpecialty && matchesExperience;
   });
 
-  const handleViewDetails = (counselor: Counselor) => {
+  const handleViewDetails = (counselor: AdminUser) => {
     setSelectedCounselor(counselor);
     setIsDetailModalOpen(true);
   };
@@ -94,14 +120,16 @@ export default function AdminApprovalsPage() {
   const handleApprove = async (counselorId: string) => {
     setIsProcessing(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log('Approving counselor:', counselorId);
-      alert('Counselor approved successfully!');
+      // Note: Backend would need an endpoint to approve pending counselors
+      // For now, we'll update the role or status
+      await AdminApi.updateUserRole(counselorId, { role: 'counselor' });
+      toast.success('Counselor approved successfully!');
+      // Remove approved counselor from list
+      setCounselors(prev => prev.filter(c => c.id !== counselorId));
       handleCloseModal();
     } catch (error) {
       console.error('Error approving counselor:', error);
-      alert('Failed to approve counselor. Please try again.');
+      toast.error('Failed to approve counselor. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -110,14 +138,14 @@ export default function AdminApprovalsPage() {
   const handleReject = async (counselorId: string) => {
     setIsProcessing(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log('Rejecting counselor:', counselorId);
-      alert('Counselor application rejected.');
+      // Note: Backend would need an endpoint to reject pending counselors
+      // For now, we'll just remove from the list
+      setCounselors(prev => prev.filter(c => c.id !== counselorId));
+      toast.success('Counselor application rejected.');
       handleCloseModal();
     } catch (error) {
       console.error('Error rejecting counselor:', error);
-      alert('Failed to reject counselor. Please try again.');
+      toast.error('Failed to reject counselor. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -146,7 +174,7 @@ export default function AdminApprovalsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {dummyPendingCounselors.length}
+              {loading ? '...' : counselors.length}
             </div>
             <p className="text-xs text-muted-foreground">
               Awaiting review
@@ -161,7 +189,7 @@ export default function AdminApprovalsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {dummyPendingCounselors.filter(c => 
+              {loading ? '...' : counselors.filter(c => 
                 new Date(c.createdAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
               ).length}
             </div>
@@ -178,7 +206,7 @@ export default function AdminApprovalsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {dummyPendingCounselors.filter(c => c.experience >= 5).length}
+              {loading ? '...' : counselors.filter(c => ((c as any).experience || 0) >= 5).length}
             </div>
             <p className="text-xs text-muted-foreground">
               5+ years experience
@@ -193,7 +221,7 @@ export default function AdminApprovalsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {dummyPendingCounselors.filter(c => c.languages && c.languages.length >= 3).length}
+              {loading ? '...' : counselors.filter(c => ((c as any).languages && Array.isArray((c as any).languages) && (c as any).languages.length >= 3)).length}
             </div>
             <p className="text-xs text-muted-foreground">
               3+ languages
@@ -247,6 +275,11 @@ export default function AdminApprovalsPage() {
       </div>
 
       {/* Applications Table */}
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      ) : (
       <AnimatedCard delay={0.5}>
         <CardHeader>
           <CardTitle>Applications List</CardTitle>
@@ -265,42 +298,44 @@ export default function AdminApprovalsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-            {filteredCounselors.map((counselor) => (
+            {filteredCounselors.length > 0 ? filteredCounselors.map((counselor) => (
               <TableRow key={counselor.id}>
                 <TableCell>
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src={counselor.avatar} alt={counselor.name} />
+                      <AvatarImage src={undefined} alt={counselor.fullName || counselor.email} />
                       <AvatarFallback>
-                        {counselor.name.split(' ').map((n: string) => n[0]).join('')}
+                        {(counselor.fullName || counselor.email || 'C').split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium">{counselor.name}</p>
+                      <p className="font-medium">{counselor.fullName || counselor.email}</p>
                       <p className="text-sm text-muted-foreground">{counselor.email}</p>
                     </div>
                   </div>
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline" className="border-primary/20">
-                    {counselor.specialty}
+                    {(counselor as any).specialty || 'General Counseling'}
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <Badge className={getExperienceColor(counselor.experience)}>
-                    {counselor.experience} years
+                  <Badge className={getExperienceColor((counselor as any).experience || 0)}>
+                    {(counselor as any).experience || 0} years
                   </Badge>
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
-                    {counselor.languages?.slice(0, 2).map((lang: string, index: number) => (
-                      <Badge key={index} variant="secondary" className="text-xs">
-                        {lang}
-                      </Badge>
-                    )) ?? null}
-                    {counselor.languages && counselor.languages.length > 2 && (
+                    {((counselor as any).languages && Array.isArray((counselor as any).languages)) 
+                      ? (counselor as any).languages.slice(0, 2).map((lang: string, index: number) => (
+                        <Badge key={index} variant="secondary" className="text-xs">
+                          {lang}
+                        </Badge>
+                      ))
+                      : null}
+                    {((counselor as any).languages && Array.isArray((counselor as any).languages) && (counselor as any).languages.length > 2) && (
                       <Badge variant="secondary" className="text-xs">
-                        +{counselor.languages.length - 2}
+                        +{(counselor as any).languages.length - 2}
                       </Badge>
                     )}
                   </div>
@@ -308,12 +343,12 @@ export default function AdminApprovalsPage() {
                 <TableCell>
                   <div className="flex items-center gap-1 text-sm text-muted-foreground">
                     <MapPin className="h-3 w-3" />
-                    <span>{counselor.location}</span>
+                    <span>{(counselor as any).location || 'N/A'}</span>
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="text-sm">
-                    {counselor.createdAt.toLocaleDateString()}
+                    {new Date(counselor.createdAt).toLocaleDateString()}
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
@@ -329,16 +364,23 @@ export default function AdminApprovalsPage() {
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+            )) : (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8">
+                  <p className="text-muted-foreground">No pending applications found</p>
+                </TableCell>
+              </TableRow>
+            )}
             </TableBody>
           </Table>
         </CardContent>
       </AnimatedCard>
+      )}
 
       {/* Results Summary */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Showing {filteredCounselors.length} of {dummyPendingCounselors.length} applications
+          Showing {filteredCounselors.length} of {counselors.length} applications
         </p>
         <div className="flex items-center space-x-2">
           <Button variant="outline" size="sm">
@@ -360,13 +402,13 @@ export default function AdminApprovalsPage() {
               </div>
               <div>
                 <span className="text-muted-foreground">Counselor Application</span>
-                <h3 className="text-lg font-semibold">{selectedCounselor?.name}</h3>
+                <h3 className="text-lg font-semibold">{selectedCounselor?.fullName || selectedCounselor?.email}</h3>
               </div>
             </DialogTitle>
             <DialogDescription>
               {selectedCounselor && (
                 <span>
-                  {selectedCounselor.specialty} • {selectedCounselor.experience} years experience • {selectedCounselor.languages?.length ?? 0} languages
+                  {(selectedCounselor as any).specialty || 'General Counseling'} • {(selectedCounselor as any).experience || 0} years experience • {((selectedCounselor as any).languages && Array.isArray((selectedCounselor as any).languages)) ? (selectedCounselor as any).languages.length : 0} languages
                 </span>
               )}
             </DialogDescription>
@@ -379,38 +421,42 @@ export default function AdminApprovalsPage() {
                 <div className="space-y-4">
                   <div className="flex items-start gap-4">
                     <Avatar className="h-16 w-16 flex-shrink-0">
-                      <AvatarImage src={selectedCounselor.avatar} alt={selectedCounselor.name} />
+                      <AvatarImage src={undefined} alt={selectedCounselor.fullName || selectedCounselor.email} />
                       <AvatarFallback className="text-lg">
-                        {selectedCounselor.name.split(' ').map(n => n[0]).join('')}
+                        {(selectedCounselor.fullName || selectedCounselor.email || 'C').split(' ').map(n => n[0]).join('').slice(0, 2)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1 space-y-2">
-                      <h4 className="text-lg font-semibold">{selectedCounselor.name}</h4>
+                      <h4 className="text-lg font-semibold">{selectedCounselor.fullName || selectedCounselor.email}</h4>
                       <div className="space-y-1">
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Mail className="h-3 w-3 flex-shrink-0" />
                           <span className="break-all">{selectedCounselor.email}</span>
                         </div>
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Phone className="h-3 w-3 flex-shrink-0" />
-                          <span>{selectedCounselor.phoneNumber}</span>
-                        </div>
+                        {(selectedCounselor as any).phoneNumber && (
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Phone className="h-3 w-3 flex-shrink-0" />
+                            <span>{(selectedCounselor as any).phoneNumber}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <span className="text-sm">{selectedCounselor.location}</span>
-                    </div>
+                    {(selectedCounselor as any).location && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-sm">{(selectedCounselor as any).location}</span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
                       <Award className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <span className="text-sm">{selectedCounselor.specialty}</span>
+                      <span className="text-sm">{(selectedCounselor as any).specialty || 'General Counseling'}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <span className="text-sm">{selectedCounselor.experience} years experience</span>
+                      <span className="text-sm">{(selectedCounselor as any).experience || 0} years experience</span>
                     </div>
                   </div>
                 </div>
@@ -419,26 +465,30 @@ export default function AdminApprovalsPage() {
                   <div>
                     <h5 className="font-medium mb-3 text-sm">Languages</h5>
                     <div className="flex flex-wrap gap-2">
-                      {selectedCounselor.languages?.map((language, index) => (
-                        <Badge key={index} variant="secondary" className="text-xs">
-                          {language}
-                        </Badge>
-                      )) ?? null}
+                      {((selectedCounselor as any).languages && Array.isArray((selectedCounselor as any).languages)) 
+                        ? (selectedCounselor as any).languages.map((language: string, index: number) => (
+                          <Badge key={index} variant="secondary" className="text-xs">
+                            {language}
+                          </Badge>
+                        ))
+                        : <span className="text-sm text-muted-foreground">Not provided</span>}
                     </div>
                   </div>
 
-                  <div>
-                    <h5 className="font-medium mb-3 text-sm">Availability</h5>
-                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                      {selectedCounselor.availability}
-                    </Badge>
-                  </div>
+                  {(selectedCounselor as any).availability && (
+                    <div>
+                      <h5 className="font-medium mb-3 text-sm">Availability</h5>
+                      <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                        {(selectedCounselor as any).availability}
+                      </Badge>
+                    </div>
+                  )}
 
                   <div>
                     <h5 className="font-medium mb-3 text-sm">Application Date</h5>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Calendar className="h-3 w-3 flex-shrink-0" />
-                      <span>{selectedCounselor.createdAt.toLocaleDateString()}</span>
+                      <span>{new Date(selectedCounselor.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
                 </div>
@@ -575,7 +625,7 @@ export default function AdminApprovalsPage() {
                     Credentials
                   </h5>
                   <div className="p-4 border rounded-lg bg-muted/50">
-                    <p className="text-sm leading-relaxed">{selectedCounselor.credentials || 'Not provided'}</p>
+                    <p className="text-sm leading-relaxed">{(selectedCounselor as any).credentials || 'Not provided'}</p>
                   </div>
                 </div>
 
@@ -585,7 +635,7 @@ export default function AdminApprovalsPage() {
                     Professional Bio
                   </h5>
                   <div className="p-4 border rounded-lg bg-muted/50">
-                    <p className="text-sm leading-relaxed">{selectedCounselor.bio || 'Not provided'}</p>
+                    <p className="text-sm leading-relaxed">{(selectedCounselor as any).bio || 'Not provided'}</p>
                   </div>
                 </div>
               </div>

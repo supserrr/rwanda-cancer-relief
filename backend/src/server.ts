@@ -10,12 +10,18 @@ import { config } from './config';
 import { logInfo, logError } from './utils/logger';
 import { testSupabaseConnection } from './config/supabase';
 import { initializeSocket } from './socket';
+import { killProcessOnPort } from './utils/port-killer';
 
 /**
  * Start the server
  */
 async function startServer(): Promise<void> {
   try {
+    // Kill any process using the port (development only)
+    if (config.nodeEnv === 'development') {
+      await killProcessOnPort(config.port);
+    }
+
     // Create Express app
     const app = createApp();
 
@@ -45,6 +51,20 @@ async function startServer(): Promise<void> {
         port: config.port,
         frontendUrl: config.frontend.url,
       });
+    });
+
+    // Handle port already in use error
+    httpServer.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        logError(`Port ${config.port} is still in use after attempting to kill process.`);
+        logError('This may be a system process (like macOS AirPlay) that cannot be killed.');
+        logError('Please disable AirPlay Receiver in System Preferences > General > AirDrop & Handoff');
+        logError('Or use a different port by setting PORT environment variable.');
+        process.exit(1);
+      } else {
+        logError('Server error:', error);
+        process.exit(1);
+      }
     });
 
     const server = httpServer;

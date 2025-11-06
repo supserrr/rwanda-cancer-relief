@@ -8,6 +8,8 @@
  * - Session management helpers
  */
 
+import { AuthApi } from './api/auth';
+
 export type UserRole = 'patient' | 'counselor' | 'admin' | 'guest'
 
 export interface User {
@@ -172,86 +174,81 @@ export class AuthSession {
 }
 
 /**
- * Mock authentication service
- * In a real app, this would make API calls to your backend
+ * Authentication service
+ * 
+ * Uses real backend API for authentication
  */
 export class AuthService {
   static async signIn(credentials: SignInCredentials): Promise<{ user: User; token: string }> {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    const response = await AuthApi.signIn(credentials);
     
-    // Mock user data based on email
-    let user: User;
-    
-    if (credentials.email.includes('counselor')) {
-      user = {
-        id: '1',
-        email: credentials.email,
-        name: 'Dr. Grace Mukamana',
-        role: ROLES.COUNSELOR,
-        avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&h=150&fit=crop&crop=face',
-        isVerified: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-    } else if (credentials.email.includes('admin')) {
-      user = {
-        id: '2',
-        email: credentials.email,
-        name: 'Admin User',
-        role: ROLES.ADMIN,
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-        isVerified: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-    } else {
-      user = {
-        id: '3',
-        email: credentials.email,
-        name: 'Jean Baptiste',
-        role: ROLES.PATIENT,
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-        isVerified: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
+    // Store refresh token
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('refresh-token', response.tokens.refreshToken);
     }
     
-    const token = 'mock-jwt-token-' + Date.now()
-    
-    return { user, token }
+    return {
+      user: response.user,
+      token: response.tokens.accessToken,
+    };
   }
 
   static async signUp(credentials: SignUpCredentials): Promise<{ user: User; token: string }> {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    const response = await AuthApi.signUp(credentials);
     
-    const user: User = {
-      id: Date.now().toString(),
-      email: credentials.email,
-      name: credentials.name,
-      role: credentials.role,
-      avatar: undefined,
-      isVerified: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+    // Store refresh token
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('refresh-token', response.tokens.refreshToken);
     }
     
-    const token = 'mock-jwt-token-' + Date.now()
-    
-    return { user, token }
+    return {
+      user: response.user,
+      token: response.tokens.accessToken,
+    };
   }
 
   static async signOut(): Promise<void> {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500))
-    AuthSession.clear()
+    await AuthApi.signOut();
+    AuthSession.clear();
+    
+    // Clear refresh token
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('refresh-token');
+    }
   }
 
   static async refreshToken(): Promise<string> {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500))
-    return 'refreshed-jwt-token-' + Date.now()
+    const response = await AuthApi.refreshToken();
+    return response.accessToken;
+  }
+
+  static async getCurrentUser(): Promise<User> {
+    return AuthApi.getCurrentUser();
+  }
+
+  static async updateProfile(data: {
+    fullName?: string;
+    phoneNumber?: string;
+    avatar?: string;
+  }): Promise<User> {
+    return AuthApi.updateProfile(data);
+  }
+
+  static async changePassword(data: {
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<void> {
+    return AuthApi.changePassword(data);
+  }
+
+  static async forgotPassword(email: string): Promise<void> {
+    return AuthApi.forgotPassword(email);
+  }
+
+  static async resetPassword(data: {
+    token: string;
+    password: string;
+  }): Promise<void> {
+    return AuthApi.resetPassword(data);
   }
 }

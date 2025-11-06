@@ -287,7 +287,7 @@ export default function CounselorSettingsPage() {
     }));
   };
 
-  const handleProfileChange = (field: string, value: string | number) => {
+  const handleProfileChange = (field: string, value: string | number | string[]) => {
     setProfile(prev => ({ ...prev, [field]: value }));
     setHasUnsavedChanges(true);
   };

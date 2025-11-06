@@ -83,6 +83,7 @@ async function request<T>(
     const response = await fetch(url, {
       ...options,
       headers,
+      credentials: 'include', // Include credentials for CORS
     });
 
     // Handle 401 Unauthorized - token expired or invalid
@@ -138,6 +139,36 @@ async function request<T>(
   } catch (error) {
     if (error instanceof ApiError) {
       throw error;
+    }
+
+    // Handle fetch errors more specifically
+    // "Failed to fetch" typically means:
+    // 1. Backend server is not running
+    // 2. CORS issue
+    // 3. Network connectivity issue
+    // 4. Browser security policy blocking the request
+    if (error instanceof TypeError) {
+      const isFetchError = error.message.includes('Failed to fetch') || error.message.includes('fetch');
+      
+      if (isFetchError) {
+        // Log detailed error information for debugging
+        console.error('Fetch error details:', {
+          url,
+          method: options.method || 'GET',
+          error: error.message,
+          stack: error.stack,
+        });
+        
+        const errorMessage = `Unable to connect to backend server at ${API_BASE_URL}. Please ensure:
+1. The backend server is running (check http://localhost:10000/health)
+2. CORS is properly configured
+3. No browser extensions are blocking the request
+4. The frontend is running on http://localhost:3000`;
+        
+        throw new ApiError(errorMessage, 0);
+      }
+      
+      throw new ApiError(error.message, 0);
     }
 
     if (error instanceof Error) {

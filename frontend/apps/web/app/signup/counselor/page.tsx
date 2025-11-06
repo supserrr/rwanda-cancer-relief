@@ -6,6 +6,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { AuthService } from '@/lib/auth';
 import { validateSignUpForm } from '@/lib/validations';
 import { createClient } from '@/lib/supabase/client';
+import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
 
 // --- HELPER COMPONENTS (ICONS) ---
 
@@ -257,6 +258,15 @@ export default function CounselorSignUpPage() {
       <section className="hidden md:block flex-1 relative p-4">
         <div className="animate-slide-right animate-delay-300 absolute inset-4 rounded-3xl bg-cover bg-center" style={{ backgroundImage: `url(https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=2160&q=80)` }}></div>
       </section>
+      
+      {isLoading && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg flex flex-col items-center gap-4">
+            <Spinner variant="bars" size={32} className="text-primary" />
+            <p className="text-sm text-gray-600 dark:text-gray-300">Creating your account...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

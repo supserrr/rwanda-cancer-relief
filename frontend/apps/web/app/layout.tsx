@@ -2,10 +2,12 @@ import { Suspense } from "react"
 import { Ubuntu } from "next/font/google"
 import type { Metadata } from "next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Analytics } from "@vercel/analytics/next"
 
 import "@workspace/ui/globals.css"
 import { Providers } from "@/components/providers"
 import { ThemeColorMeta } from "@/components/ThemeColorMeta"
+import { Spinner } from "@workspace/ui/components/ui/shadcn-io/spinner"
 
 const fontSans = Ubuntu({
   subsets: ["latin"],
@@ -25,7 +27,7 @@ export const metadata: Metadata = {
 function ProvidersLoading() {
   return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <Spinner variant="bars" size={32} className="text-primary" />
     </div>
   )
 }
@@ -46,6 +48,7 @@ export default function RootLayout({
           <Providers>{children}</Providers>
         </Suspense>
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   )

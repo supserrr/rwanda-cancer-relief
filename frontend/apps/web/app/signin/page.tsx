@@ -8,6 +8,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { createClient } from '@/lib/supabase/client';
 import { GoogleOneTap } from '@/components/auth/GoogleOneTap';
 import { TestCredentials } from './test-credentials';
+import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
 
 const sampleTestimonials: Testimonial[] = [
   {
@@ -145,9 +146,9 @@ export default function SignInPageDemo() {
       />
       {isLoading && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-sm text-gray-600">Signing you in...</p>
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg flex flex-col items-center gap-4">
+            <Spinner variant="bars" size={32} className="text-primary" />
+            <p className="text-sm text-gray-600 dark:text-gray-300">Signing you in...</p>
           </div>
         </div>
       )}

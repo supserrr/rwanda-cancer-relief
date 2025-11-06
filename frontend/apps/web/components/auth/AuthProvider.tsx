@@ -231,10 +231,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     runCheckAuth();
     
     // Listen for Supabase auth state changes (for OAuth) - only if configured
-    let subscription: { unsubscribe: () => void } | null = null;
+    let subscription: { unsubscribe?: () => void } | null = null;
     if (supabaseClient) {
       try {
-        const { data } = supabaseClient.auth.onAuthStateChange((event, session) => {
+        const result = supabaseClient.auth.onAuthStateChange((event, session) => {
           if (event === 'SIGNED_IN' && session) {
             // User signed in via OAuth, refresh auth state
             runCheckAuth();
@@ -246,7 +246,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
         });
-        subscription = data;
+        
+        // onAuthStateChange returns an object with a data property
+        // The data property contains the subscription object with unsubscribe method
+        if (result && typeof result === 'object') {
+          // Check if result has a data property (Supabase v2 structure)
+          if ('data' in result && result.data) {
+            const data = result.data as any;
+            // Check if data has subscription property
+            if (data && typeof data === 'object' && 'subscription' in data && data.subscription) {
+              subscription = data.subscription;
+            } else if (data && typeof data === 'object' && 'unsubscribe' in data) {
+              // Fallback: data itself is the subscription
+              subscription = data;
+            }
+          } else if ('unsubscribe' in result && typeof result.unsubscribe === 'function') {
+            // Fallback: result itself is the subscription
+            subscription = result as { unsubscribe: () => void };
+          }
+        }
       } catch (error) {
         // Supabase not configured, no subscription needed
         console.warn('Supabase auth state listener not available:', error);
@@ -255,8 +273,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     return () => {
       isMounted = false;
-      if (subscription) {
-        subscription.unsubscribe();
+      if (subscription && typeof subscription.unsubscribe === 'function') {
+        try {
+          subscription.unsubscribe();
+        } catch (error) {
+          // Ignore errors during cleanup
+          console.warn('Error unsubscribing from auth state changes:', error);
+        }
       }
     };
   }, [pathname, supabaseClient]);

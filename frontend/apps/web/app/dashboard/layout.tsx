@@ -6,6 +6,7 @@ import { PatientLayout } from '../../components/dashboard/layouts/PatientLayout'
 import { CounselorLayout } from '../../components/dashboard/layouts/CounselorLayout';
 import { AdminLayout } from '../../components/dashboard/layouts/AdminLayout';
 import { useAuth } from '../../components/auth/AuthProvider';
+import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -20,7 +21,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <Spinner variant="bars" size={32} className="text-primary" />
       </div>
     );
   }

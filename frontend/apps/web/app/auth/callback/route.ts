@@ -20,8 +20,11 @@ export async function GET(request: Request) {
   const error = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
   
+  // Note: URL fragments (hash) are not sent to the server, so tokens in the hash
+  // will be handled by the client-side page at /auth/callback
+  
   // Log all query parameters for debugging
-  console.log('OAuth callback received:', {
+  console.log('OAuth callback received (server-side):', {
     url: request.url,
     code: code ? `${code.substring(0, 10)}...` : 'missing',
     error,
@@ -72,50 +75,204 @@ export async function GET(request: Request) {
   try {
     const supabase = await createClient();
     
-    // Check if we have a code to exchange, or if Supabase already created a session
-    let sessionData;
+    // First, try to get the session (Supabase might have already created it)
+    // This is important because Supabase OAuth might create the session before redirecting
+    const { data: { session: existingSession }, error: sessionError } = await supabase.auth.getSession();
     
-    if (code) {
-      // Exchange the authorization code for a session
-      const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    if (existingSession && !sessionError) {
+      // Session already exists - Supabase created it during OAuth flow
+      console.log('Session found without code exchange:', {
+        userId: existingSession.user.id,
+        email: existingSession.user.email,
+      });
       
-      if (exchangeError) {
-        console.error('Failed to exchange code for session:', {
-          error: exchangeError.message,
-          status: exchangeError.status,
-          code: code.substring(0, 10) + '...', // Log partial code for debugging
-        });
-        
-        const errorMessage = exchangeError.message || 'Failed to complete authentication. Please try again.';
-        return NextResponse.redirect(
-          `${origin}/auth/auth-code-error?error=${encodeURIComponent(errorMessage)}`
-        );
+      const data = { session: existingSession, user: existingSession.user };
+      
+      // If role is provided and user doesn't have a role set, update user metadata
+      if (role && data.user && (!data.user.user_metadata?.role || data.user.user_metadata.role === 'guest')) {
+        try {
+          // Update user metadata with role
+          const { error: updateError } = await supabase.auth.updateUser({
+            data: {
+              role: role,
+              ...data.user.user_metadata, // Preserve existing metadata
+            },
+          });
+
+          if (updateError) {
+            console.warn('Failed to update user role in metadata:', updateError);
+            // Don't fail the auth flow if role update fails
+          } else {
+            console.log('Successfully set user role to:', role);
+          }
+        } catch (updateErr) {
+          console.warn('Error updating user metadata with role:', updateErr);
+          // Don't fail the auth flow if role update fails
+        }
       }
-      
-      sessionData = data;
-    } else {
-      // No code provided - check if Supabase already created a session
-      // This can happen if Supabase handles the OAuth flow differently
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError || !session) {
-        console.error('Missing authorization code and no session found:', {
-          url: request.url,
-          searchParams: Object.fromEntries(searchParams.entries()),
-          sessionError: sessionError?.message,
-        });
-        
-        return NextResponse.redirect(
-          `${origin}/auth/auth-code-error?error=${encodeURIComponent('Missing authorization code. Please try signing in again.')}`
-        );
+
+      // Successfully authenticated, redirect to the intended destination
+      const forwardedHost = request.headers.get('x-forwarded-host');
+      const isLocalEnv = process.env.NODE_ENV === 'development';
+
+      if (isLocalEnv) {
+        // In development, use the origin directly
+        return NextResponse.redirect(`${origin}${next}`);
+      } else if (forwardedHost) {
+        // In production with load balancer, use the forwarded host
+        return NextResponse.redirect(`https://${forwardedHost}${next}`);
+      } else {
+        // Fallback to origin
+        return NextResponse.redirect(`${origin}${next}`);
       }
-      
-      // Use the existing session
-      sessionData = { session, user: session.user };
     }
     
-    const { data, error: exchangeError } = { data: sessionData, error: null };
-
+    // If no existing session, check if we have a code to exchange
+    if (!code) {
+      // If we don't have a code, tokens might be in the URL fragment (hash)
+      // URL fragments are not sent to the server, so we need to return HTML
+      // that will extract tokens from the hash and set the session on the client side
+      console.log('No code found, returning client-side handler to extract tokens from URL fragment');
+      
+      // Return HTML that will extract tokens from the hash and set the session
+      const html = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Completing authentication...</title>
+            <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+          </head>
+          <body>
+            <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: system-ui, sans-serif;">
+              <div style="text-align: center;">
+                <div style="border: 4px solid #f3f4f6; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 16px;"></div>
+                <p style="color: #6b7280; margin: 0;">Completing authentication...</p>
+              </div>
+            </div>
+            <style>
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            </style>
+            <script>
+              (async function() {
+                try {
+                  // Extract tokens from URL fragment (hash)
+                  const hash = window.location.hash.substring(1);
+                  const params = new URLSearchParams(hash);
+                  const accessToken = params.get('access_token');
+                  const refreshToken = params.get('refresh_token');
+                  const error = params.get('error');
+                  const errorDescription = params.get('error_description');
+                  
+                  // Check for errors in the hash
+                  if (error) {
+                    console.error('OAuth error in callback:', { error, errorDescription });
+                    window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent(errorDescription || error);
+                    return;
+                  }
+                  
+                  if (!accessToken) {
+                    console.error('No access token found in URL fragment');
+                    window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent('Missing authentication token');
+                    return;
+                  }
+                  
+                  // Initialize Supabase client
+                  const supabaseUrl = '${supabaseUrl}';
+                  const supabaseAnonKey = '${supabaseAnonKey}';
+                  
+                  if (!supabaseUrl || !supabaseAnonKey) {
+                    console.error('Supabase not configured');
+                    window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent('OAuth is not configured');
+                    return;
+                  }
+                  
+                  const { createClient } = supabase;
+                  const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+                    auth: {
+                      persistSession: true,
+                      autoRefreshToken: true,
+                      detectSessionInUrl: true,
+                    },
+                  });
+                  
+                  // Set the session using the tokens
+                  const { data: { session }, error: sessionError } = await supabaseClient.auth.setSession({
+                    access_token: accessToken,
+                    refresh_token: refreshToken || '',
+                  });
+                  
+                  if (sessionError) {
+                    console.error('Error setting session:', sessionError);
+                    window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent(sessionError.message || 'Failed to set session');
+                    return;
+                  }
+                  
+                  if (!session) {
+                    console.error('No session created from tokens');
+                    window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent('Failed to create session from tokens');
+                    return;
+                  }
+                  
+                  console.log('Session set successfully:', {
+                    userId: session.user.id,
+                    email: session.user.email,
+                  });
+                  
+                  // Get the role from query params if present
+                  const urlParams = new URLSearchParams(window.location.search);
+                  const role = urlParams.get('role');
+                  
+                  if (role && (!session.user.user_metadata?.role || session.user.user_metadata.role === 'guest')) {
+                    try {
+                      // Update user metadata with role
+                      const { error: updateError } = await supabaseClient.auth.updateUser({
+                        data: {
+                          role: role,
+                          ...session.user.user_metadata,
+                        },
+                      });
+                      
+                      if (updateError) {
+                        console.warn('Failed to update user role in metadata:', updateError);
+                        // Don't fail the auth flow if role update fails
+                      } else {
+                        console.log('Successfully set user role to:', role);
+                      }
+                    } catch (updateErr) {
+                      console.warn('Error updating user metadata with role:', updateErr);
+                      // Don't fail the auth flow if role update fails
+                    }
+                  }
+                  
+                  // Get the redirect destination from query params
+                  const next = urlParams.get('next') || '/';
+                  
+                  // Redirect to the intended destination
+                  window.location.href = next;
+                } catch (error) {
+                  console.error('Unexpected error in auth callback:', error);
+                  const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+                  window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent(errorMessage);
+                }
+              })();
+            </script>
+          </body>
+        </html>
+      `;
+      
+      return new NextResponse(html, {
+        headers: {
+          'Content-Type': 'text/html',
+        },
+      });
+    }
+    
+    // Exchange the authorization code for a session
+    const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    
     if (exchangeError) {
       console.error('Failed to exchange code for session:', {
         error: exchangeError.message,
@@ -128,7 +285,7 @@ export async function GET(request: Request) {
         `${origin}/auth/auth-code-error?error=${encodeURIComponent(errorMessage)}`
       );
     }
-
+    
     if (!data.session) {
       console.error('No session returned from code exchange:', {
         hasData: !!data,
@@ -165,18 +322,18 @@ export async function GET(request: Request) {
 
     // Successfully authenticated, redirect to the intended destination
     const forwardedHost = request.headers.get('x-forwarded-host');
-      const isLocalEnv = process.env.NODE_ENV === 'development';
+    const isLocalEnv = process.env.NODE_ENV === 'development';
 
-      if (isLocalEnv) {
+    if (isLocalEnv) {
       // In development, use the origin directly
-        return NextResponse.redirect(`${origin}${next}`);
-      } else if (forwardedHost) {
+      return NextResponse.redirect(`${origin}${next}`);
+    } else if (forwardedHost) {
       // In production with load balancer, use the forwarded host
-        return NextResponse.redirect(`https://${forwardedHost}${next}`);
-      } else {
+      return NextResponse.redirect(`https://${forwardedHost}${next}`);
+    } else {
       // Fallback to origin
-        return NextResponse.redirect(`${origin}${next}`);
-      }
+      return NextResponse.redirect(`${origin}${next}`);
+    }
   } catch (error) {
     // Handle unexpected errors
     console.error('Unexpected error in OAuth callback:', error);

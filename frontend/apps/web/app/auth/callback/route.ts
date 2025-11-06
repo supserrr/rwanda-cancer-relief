@@ -199,27 +199,366 @@ export async function GET(request: Request) {
       // Return HTML that will extract tokens from the hash and set the session
       const html = `
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
           <head>
-            <title>Completing authentication...</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Completing Authentication - Rwanda Cancer Relief</title>
             <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-          </head>
-          <body>
-            <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: system-ui, sans-serif;">
-              <div style="text-align: center;">
-                <div style="border: 4px solid #f3f4f6; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 16px;"></div>
-                <p style="color: #6b7280; margin: 0;">Completing authentication...</p>
-              </div>
-            </div>
             <style>
+              * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+              }
+              
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+                color: #1f2937;
+              }
+              
+              .container {
+                background: white;
+                border-radius: 24px;
+                padding: 48px 32px;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                max-width: 420px;
+                width: 100%;
+                text-align: center;
+                position: relative;
+                overflow: hidden;
+              }
+              
+              .container::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 4px;
+                background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #4facfe);
+                background-size: 200% 100%;
+                animation: gradient 3s ease infinite;
+              }
+              
+              @keyframes gradient {
+                0%, 100% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
+              }
+              
+              .loader-container {
+                margin-bottom: 32px;
+                position: relative;
+                height: 80px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              }
+              
+              .loader {
+                width: 64px;
+                height: 64px;
+                position: relative;
+              }
+              
+              .loader-ring {
+                position: absolute;
+                width: 64px;
+                height: 64px;
+                border: 4px solid transparent;
+                border-top-color: #667eea;
+                border-radius: 50%;
+                animation: spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+              }
+              
+              .loader-ring:nth-child(1) {
+                animation-delay: -0.45s;
+              }
+              
+              .loader-ring:nth-child(2) {
+                animation-delay: -0.3s;
+                border-top-color: #764ba2;
+                width: 48px;
+                height: 48px;
+                top: 8px;
+                left: 8px;
+              }
+              
+              .loader-ring:nth-child(3) {
+                animation-delay: -0.15s;
+                border-top-color: #f093fb;
+                width: 32px;
+                height: 32px;
+                top: 16px;
+                left: 16px;
+              }
+              
               @keyframes spin {
                 0% { transform: rotate(0deg); }
                 100% { transform: rotate(360deg); }
               }
+              
+              .checkmark {
+                width: 64px;
+                height: 64px;
+                border-radius: 50%;
+                display: block;
+                stroke-width: 3;
+                stroke: #10b981;
+                stroke-miterlimit: 10;
+                margin: 0 auto 24px;
+                box-shadow: inset 0px 0px 0px #10b981;
+                animation: fill 0.4s ease-in-out 0.4s forwards, scale 0.3s ease-in-out 0.9s both;
+                opacity: 0;
+              }
+              
+              .checkmark-circle {
+                stroke-dasharray: 166;
+                stroke-dashoffset: 166;
+                stroke-width: 3;
+                stroke-miterlimit: 10;
+                stroke: #10b981;
+                fill: none;
+                animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+              }
+              
+              .checkmark-check {
+                transform-origin: 50% 50%;
+                stroke-dasharray: 48;
+                stroke-dashoffset: 48;
+                animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+              }
+              
+              @keyframes stroke {
+                100% { stroke-dashoffset: 0; }
+              }
+              
+              @keyframes scale {
+                0%, 100% { transform: none; }
+                50% { transform: scale3d(1.1, 1.1, 1); }
+              }
+              
+              @keyframes fill {
+                100% { box-shadow: inset 0px 0px 0px 30px #10b981; }
+              }
+              
+              h1 {
+                font-size: 24px;
+                font-weight: 600;
+                color: #111827;
+                margin-bottom: 12px;
+              }
+              
+              .status-text {
+                font-size: 16px;
+                color: #6b7280;
+                margin-bottom: 8px;
+                transition: opacity 0.3s ease;
+              }
+              
+              .progress-steps {
+                margin-top: 32px;
+                text-align: left;
+              }
+              
+              .step {
+                display: flex;
+                align-items: center;
+                margin-bottom: 16px;
+                font-size: 14px;
+                color: #9ca3af;
+                transition: color 0.3s ease;
+              }
+              
+              .step.active {
+                color: #667eea;
+                font-weight: 500;
+              }
+              
+              .step.completed {
+                color: #10b981;
+              }
+              
+              .step-icon {
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                border: 2px solid #e5e7eb;
+                margin-right: 12px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+                transition: all 0.3s ease;
+              }
+              
+              .step.active .step-icon {
+                border-color: #667eea;
+                background: #667eea;
+                animation: pulse 2s ease infinite;
+              }
+              
+              .step.completed .step-icon {
+                border-color: #10b981;
+                background: #10b981;
+              }
+              
+              .step.completed .step-icon::after {
+                content: '✓';
+                color: white;
+                font-size: 12px;
+                font-weight: bold;
+              }
+              
+              @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.5; }
+              }
+              
+              .error-message {
+                background: #fef2f2;
+                border: 1px solid #fecaca;
+                border-radius: 12px;
+                padding: 16px;
+                margin-top: 24px;
+                color: #dc2626;
+                font-size: 14px;
+                display: none;
+              }
+              
+              .error-message.show {
+                display: block;
+                animation: slideDown 0.3s ease;
+              }
+              
+              @keyframes slideDown {
+                from {
+                  opacity: 0;
+                  transform: translateY(-10px);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateY(0);
+                }
+              }
+              
+              @media (prefers-color-scheme: dark) {
+                body {
+                  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+                }
+                
+                .container {
+                  background: #1f2937;
+                  color: #f9fafb;
+                }
+                
+                h1 {
+                  color: #f9fafb;
+                }
+                
+                .status-text {
+                  color: #d1d5db;
+                }
+              }
             </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="loader-container" id="loaderContainer">
+                <div class="loader">
+                  <div class="loader-ring"></div>
+                  <div class="loader-ring"></div>
+                  <div class="loader-ring"></div>
+                </div>
+              </div>
+              
+              <h1 id="title">Completing Authentication</h1>
+              <p class="status-text" id="statusText">Please wait while we sign you in...</p>
+              
+              <div class="progress-steps">
+                <div class="step" id="step1">
+                  <div class="step-icon"></div>
+                  <span>Verifying credentials</span>
+                </div>
+                <div class="step" id="step2">
+                  <div class="step-icon"></div>
+                  <span>Creating session</span>
+                </div>
+                <div class="step" id="step3">
+                  <div class="step-icon"></div>
+                  <span>Setting up your account</span>
+                </div>
+                <div class="step" id="step4">
+                  <div class="step-icon"></div>
+                  <span>Redirecting...</span>
+                </div>
+              </div>
+              
+              <div class="error-message" id="errorMessage"></div>
+            </div>
+            
             <script>
               (async function() {
+                const loaderContainer = document.getElementById('loaderContainer');
+                const title = document.getElementById('title');
+                const statusText = document.getElementById('statusText');
+                const errorMessage = document.getElementById('errorMessage');
+                const steps = {
+                  step1: document.getElementById('step1'),
+                  step2: document.getElementById('step2'),
+                  step3: document.getElementById('step3'),
+                  step4: document.getElementById('step4'),
+                };
+                
+                let currentStep = 0;
+                
+                function updateStep(stepNumber) {
+                  Object.keys(steps).forEach((key, index) => {
+                    const step = steps[key];
+                    if (index < stepNumber) {
+                      step.classList.add('completed');
+                      step.classList.remove('active');
+                    } else if (index === stepNumber) {
+                      step.classList.add('active');
+                      step.classList.remove('completed');
+                    } else {
+                      step.classList.remove('active', 'completed');
+                    }
+                  });
+                }
+                
+                function showError(message) {
+                  errorMessage.textContent = message;
+                  errorMessage.classList.add('show');
+                  title.textContent = 'Authentication Failed';
+                  statusText.textContent = 'We encountered an error while signing you in.';
+                  loaderContainer.innerHTML = '<div style="width: 64px; height: 64px; border-radius: 50%; background: #fef2f2; border: 4px solid #fecaca; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 32px; color: #dc2626;">✕</div>';
+                }
+                
+                function showSuccess() {
+                  title.textContent = 'Authentication Successful!';
+                  statusText.textContent = 'Redirecting you now...';
+                  loaderContainer.innerHTML = '<svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52"><circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/><path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/></svg>';
+                }
+                
+                // Set timeout for authentication (30 seconds)
+                const timeout = setTimeout(() => {
+                  showError('Authentication is taking longer than expected. Please try again.');
+                  setTimeout(() => {
+                    window.location.href = '/signin';
+                  }, 3000);
+                }, 30000);
+                
                 try {
+                  updateStep(0);
+                  statusText.textContent = 'Extracting authentication tokens...';
+                  
                   // Extract tokens from URL fragment (hash)
                   const hash = window.location.hash.substring(1);
                   const params = new URLSearchParams(hash);
@@ -230,24 +569,36 @@ export async function GET(request: Request) {
                   
                   // Check for errors in the hash
                   if (error) {
+                    clearTimeout(timeout);
                     console.error('OAuth error in callback:', { error, errorDescription });
-                    window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent(errorDescription || error);
+                    showError(errorDescription || error);
+                    setTimeout(() => {
+                      window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent(errorDescription || error);
+                    }, 3000);
                     return;
                   }
                   
                   if (!accessToken) {
+                    clearTimeout(timeout);
                     console.error('No access token found in URL fragment');
-                    window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent('Missing authentication token');
+                    showError('Missing authentication token. Please try signing in again.');
+                    setTimeout(() => {
+                      window.location.href = '/signin';
+                    }, 3000);
                     return;
                   }
+                  
+                  updateStep(1);
+                  statusText.textContent = 'Initializing authentication service...';
                   
                   // Initialize Supabase client
                   const supabaseUrl = '${env.NEXT_PUBLIC_SUPABASE_URL || ''}';
                   const supabaseAnonKey = '${env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}';
                   
                   if (!supabaseUrl || !supabaseAnonKey) {
+                    clearTimeout(timeout);
                     console.error('Supabase not configured');
-                    window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent('OAuth is not configured');
+                    showError('Authentication service is not configured. Please contact support.');
                     return;
                   }
                   
@@ -260,6 +611,9 @@ export async function GET(request: Request) {
                     },
                   });
                   
+                  updateStep(2);
+                  statusText.textContent = 'Creating your session...';
+                  
                   // Set the session using the tokens
                   const { data: { session }, error: sessionError } = await supabaseClient.auth.setSession({
                     access_token: accessToken,
@@ -267,14 +621,22 @@ export async function GET(request: Request) {
                   });
                   
                   if (sessionError) {
+                    clearTimeout(timeout);
                     console.error('Error setting session:', sessionError);
-                    window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent(sessionError.message || 'Failed to set session');
+                    showError(sessionError.message || 'Failed to create session. Please try again.');
+                    setTimeout(() => {
+                      window.location.href = '/signin';
+                    }, 3000);
                     return;
                   }
                   
                   if (!session) {
+                    clearTimeout(timeout);
                     console.error('No session created from tokens');
-                    window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent('Failed to create session from tokens');
+                    showError('Failed to create session. Please try signing in again.');
+                    setTimeout(() => {
+                      window.location.href = '/signin';
+                    }, 3000);
                     return;
                   }
                   
@@ -282,6 +644,9 @@ export async function GET(request: Request) {
                     userId: session.user.id,
                     email: session.user.email,
                   });
+                  
+                  updateStep(3);
+                  statusText.textContent = 'Setting up your account...';
                   
                   // Get the role from query params if present
                   const urlParams = new URLSearchParams(window.location.search);
@@ -330,12 +695,23 @@ export async function GET(request: Request) {
                     }
                   }
                   
+                  clearTimeout(timeout);
+                  updateStep(4);
+                  showSuccess();
+                  
+                  // Small delay to show success state
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                  
                   // Redirect to the intended destination
                   window.location.href = next;
                 } catch (error) {
+                  clearTimeout(timeout);
                   console.error('Unexpected error in auth callback:', error);
                   const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-                  window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent(errorMessage);
+                  showError(errorMessage);
+                  setTimeout(() => {
+                    window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent(errorMessage);
+                  }, 3000);
                 }
               })();
             </script>

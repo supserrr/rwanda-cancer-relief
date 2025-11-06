@@ -213,26 +213,27 @@ export async function GET(request: Request) {
               }
               
               body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                font-family: 'Ubuntu', ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+                background: linear-gradient(135deg, oklch(0.55 0.18 300) 0%, oklch(0.70 0.15 280) 50%, oklch(0.65 0.12 280) 100%);
                 min-height: 100vh;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 padding: 20px;
-                color: #1f2937;
+                color: oklch(0.35 0.12 300);
               }
               
               .container {
-                background: white;
+                background: oklch(1 0 0);
                 border-radius: 24px;
                 padding: 48px 32px;
-                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                box-shadow: 0 20px 60px oklch(0.35 0.12 300 / 0.2);
                 max-width: 420px;
                 width: 100%;
                 text-align: center;
                 position: relative;
                 overflow: hidden;
+                border: 1px solid oklch(0.90 0.02 300);
               }
               
               .container::before {
@@ -242,7 +243,7 @@ export async function GET(request: Request) {
                 left: 0;
                 right: 0;
                 height: 4px;
-                background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #4facfe);
+                background: linear-gradient(90deg, oklch(0.55 0.18 300), oklch(0.70 0.15 280), oklch(0.65 0.12 280), oklch(0.60 0.15 260));
                 background-size: 200% 100%;
                 animation: gradient 3s ease infinite;
               }
@@ -272,7 +273,7 @@ export async function GET(request: Request) {
                 width: 64px;
                 height: 64px;
                 border: 4px solid transparent;
-                border-top-color: #667eea;
+                border-top-color: oklch(0.55 0.18 300);
                 border-radius: 50%;
                 animation: spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
               }
@@ -283,7 +284,7 @@ export async function GET(request: Request) {
               
               .loader-ring:nth-child(2) {
                 animation-delay: -0.3s;
-                border-top-color: #764ba2;
+                border-top-color: oklch(0.70 0.15 280);
                 width: 48px;
                 height: 48px;
                 top: 8px;
@@ -292,7 +293,7 @@ export async function GET(request: Request) {
               
               .loader-ring:nth-child(3) {
                 animation-delay: -0.15s;
-                border-top-color: #f093fb;
+                border-top-color: oklch(0.65 0.12 280);
                 width: 32px;
                 height: 32px;
                 top: 16px;
@@ -310,10 +311,10 @@ export async function GET(request: Request) {
                 border-radius: 50%;
                 display: block;
                 stroke-width: 3;
-                stroke: #10b981;
+                stroke: oklch(0.55 0.18 300);
                 stroke-miterlimit: 10;
                 margin: 0 auto 24px;
-                box-shadow: inset 0px 0px 0px #10b981;
+                box-shadow: inset 0px 0px 0px oklch(0.55 0.18 300);
                 animation: fill 0.4s ease-in-out 0.4s forwards, scale 0.3s ease-in-out 0.9s both;
                 opacity: 0;
               }
@@ -323,7 +324,7 @@ export async function GET(request: Request) {
                 stroke-dashoffset: 166;
                 stroke-width: 3;
                 stroke-miterlimit: 10;
-                stroke: #10b981;
+                stroke: oklch(0.55 0.18 300);
                 fill: none;
                 animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
               }
@@ -345,19 +346,19 @@ export async function GET(request: Request) {
               }
               
               @keyframes fill {
-                100% { box-shadow: inset 0px 0px 0px 30px #10b981; }
+                100% { box-shadow: inset 0px 0px 0px 30px oklch(0.55 0.18 300); }
               }
               
               h1 {
                 font-size: 24px;
                 font-weight: 600;
-                color: #111827;
+                color: oklch(0.25 0.12 300);
                 margin-bottom: 12px;
               }
               
               .status-text {
                 font-size: 16px;
-                color: #6b7280;
+                color: oklch(0.45 0.10 300);
                 margin-bottom: 8px;
                 transition: opacity 0.3s ease;
               }
@@ -372,24 +373,24 @@ export async function GET(request: Request) {
                 align-items: center;
                 margin-bottom: 16px;
                 font-size: 14px;
-                color: #9ca3af;
+                color: oklch(0.45 0.10 300);
                 transition: color 0.3s ease;
               }
               
               .step.active {
-                color: #667eea;
+                color: oklch(0.55 0.18 300);
                 font-weight: 500;
               }
               
               .step.completed {
-                color: #10b981;
+                color: oklch(0.55 0.18 300);
               }
               
               .step-icon {
                 width: 20px;
                 height: 20px;
                 border-radius: 50%;
-                border: 2px solid #e5e7eb;
+                border: 2px solid oklch(0.90 0.02 300);
                 margin-right: 12px;
                 display: flex;
                 align-items: center;
@@ -399,14 +400,14 @@ export async function GET(request: Request) {
               }
               
               .step.active .step-icon {
-                border-color: #667eea;
-                background: #667eea;
+                border-color: oklch(0.55 0.18 300);
+                background: oklch(0.55 0.18 300);
                 animation: pulse 2s ease infinite;
               }
               
               .step.completed .step-icon {
-                border-color: #10b981;
-                background: #10b981;
+                border-color: oklch(0.55 0.18 300);
+                background: oklch(0.55 0.18 300);
               }
               
               .step.completed .step-icon::after {
@@ -422,12 +423,12 @@ export async function GET(request: Request) {
               }
               
               .error-message {
-                background: #fef2f2;
-                border: 1px solid #fecaca;
+                background: oklch(0.577 0.245 27.325 / 0.1);
+                border: 1px solid oklch(0.577 0.245 27.325 / 0.3);
                 border-radius: 12px;
                 padding: 16px;
                 margin-top: 24px;
-                color: #dc2626;
+                color: oklch(0.577 0.245 27.325);
                 font-size: 14px;
                 display: none;
               }
@@ -450,20 +451,47 @@ export async function GET(request: Request) {
               
               @media (prefers-color-scheme: dark) {
                 body {
-                  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+                  background: linear-gradient(135deg, oklch(0.15 0.02 300) 0%, oklch(0.20 0.03 300) 100%);
                 }
                 
                 .container {
-                  background: #1f2937;
-                  color: #f9fafb;
+                  background: oklch(0.20 0.03 300);
+                  color: oklch(0.98 0.01 300);
+                  border-color: oklch(0.30 0.05 300);
                 }
                 
                 h1 {
-                  color: #f9fafb;
+                  color: oklch(0.98 0.01 300);
                 }
                 
                 .status-text {
-                  color: #d1d5db;
+                  color: oklch(0.70 0.12 300);
+                }
+                
+                .step {
+                  color: oklch(0.70 0.12 300);
+                }
+                
+                .step.active {
+                  color: oklch(0.70 0.20 300);
+                }
+                
+                .step.completed {
+                  color: oklch(0.70 0.20 300);
+                }
+                
+                .step-icon {
+                  border-color: oklch(0.30 0.05 300);
+                }
+                
+                .step.active .step-icon {
+                  border-color: oklch(0.70 0.20 300);
+                  background: oklch(0.70 0.20 300);
+                }
+                
+                .step.completed .step-icon {
+                  border-color: oklch(0.70 0.20 300);
+                  background: oklch(0.70 0.20 300);
                 }
               }
             </style>
@@ -538,7 +566,7 @@ export async function GET(request: Request) {
                   errorMessage.classList.add('show');
                   title.textContent = 'Authentication Failed';
                   statusText.textContent = 'We encountered an error while signing you in.';
-                  loaderContainer.innerHTML = '<div style="width: 64px; height: 64px; border-radius: 50%; background: #fef2f2; border: 4px solid #fecaca; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 32px; color: #dc2626;">✕</div>';
+                  loaderContainer.innerHTML = '<div style="width: 64px; height: 64px; border-radius: 50%; background: oklch(0.577 0.245 27.325 / 0.1); border: 4px solid oklch(0.577 0.245 27.325 / 0.3); display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 32px; color: oklch(0.577 0.245 27.325);">✕</div>';
                 }
                 
                 function showSuccess() {

@@ -7,7 +7,6 @@ import { validateSignInForm } from '@/lib/validations';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { createClient } from '@/lib/supabase/client';
 import { GoogleOneTap } from '@/components/auth/GoogleOneTap';
-import { TestCredentials } from './test-credentials';
 import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
 
 const sampleTestimonials: Testimonial[] = [
@@ -152,7 +151,6 @@ export default function SignInPageDemo() {
           </div>
         </div>
       )}
-      <TestCredentials />
       <GoogleOneTap />
     </div>
   );

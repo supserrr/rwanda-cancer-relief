@@ -5,6 +5,9 @@
  * at build time and runtime.
  * 
  * Next.js uses NEXT_PUBLIC_ prefix for client-side environment variables.
+ * 
+ * Note: Supabase variables are optional during build to allow Vercel deployments
+ * to proceed, but will be validated at runtime when Supabase features are used.
  */
 
 import { createEnv } from "@t3-oss/env-nextjs";
@@ -15,6 +18,10 @@ import { z } from "zod";
  * 
  * This object contains all validated environment variables with proper
  * types and validation. Access this instead of process.env directly.
+ * 
+ * Supabase variables are optional during build to support deployments where
+ * they may not be configured yet, but will be validated at runtime when
+ * Supabase features are accessed.
  */
 export const env = createEnv({
   /**
@@ -31,10 +38,14 @@ export const env = createEnv({
    * 
    * Next.js requires the NEXT_PUBLIC_ prefix for client-side variables.
    * This is enforced both at type-level and at runtime.
+   * 
+   * Supabase variables are optional during build to allow deployments to proceed,
+   * but should be set for full functionality. They will be validated at runtime
+   * when Supabase client is created.
    */
   client: {
-    NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
+    NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1).optional(),
   },
   
   /**
@@ -46,9 +57,8 @@ export const env = createEnv({
    * Client variables must be explicitly destructured in runtimeEnv to ensure
    * they are included in the bundle.
    */
-  experimental__runtimeEnv: process.env,
-  
   runtimeEnv: {
+    NODE_ENV: process.env.NODE_ENV,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   },

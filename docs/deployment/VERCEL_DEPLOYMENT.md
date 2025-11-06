@@ -43,9 +43,20 @@ Vercel should auto-detect these settings from `vercel.json`:
 
 Go to **Settings → Environment Variables** and add:
 
-#### Required for Full Functionality
+#### Required for Build and Full Functionality
 
 ```
+# Supabase Configuration (Required)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
+```
+
+Get from: https://supabase.com/dashboard/project/_/settings/api
+
+#### Optional but Recommended
+
+```
+# AI SDK for chat functionality
 AI_SDK_KEY=your_ai_sdk_key_here
 ```
 
@@ -69,6 +80,8 @@ NEXT_PUBLIC_JITSI_APP_ID=your-app-id
 - Production: Select for production deployments
 - Preview: Select for pull request previews
 - Development: Select for local development
+
+**Note:** Supabase variables are optional during build, but required at runtime for Supabase features (OAuth authentication) to work. If you don't have Supabase configured yet, the build will succeed, but Supabase features will show helpful error messages when accessed.
 
 ### 4. Deploy
 

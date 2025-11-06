@@ -78,12 +78,12 @@ export class AuthApi {
 
     // Sign up with Supabase
     const { data, error } = await supabase.auth.signUp({
-      email: credentials.email,
-      password: credentials.password,
+        email: credentials.email,
+        password: credentials.password,
       options: {
         data: {
           full_name: credentials.name,
-          role: credentials.role,
+        role: credentials.role,
         },
       },
     });
@@ -176,13 +176,13 @@ export class AuthApi {
 
     // Sign in with Supabase
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: credentials.email,
-      password: credentials.password,
+        email: credentials.email,
+        password: credentials.password,
     });
 
     if (error) {
       throw new Error(error.message || 'Failed to sign in');
-    }
+      }
 
     if (!data.user || !data.session) {
       throw new Error('Failed to sign in - no user or session returned');

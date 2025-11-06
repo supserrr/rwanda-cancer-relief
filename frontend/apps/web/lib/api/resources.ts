@@ -245,7 +245,7 @@ export class ResourcesApi {
     }
 
     let query = supabase.from('resources').select('*', { count: 'exact' });
-
+    
     if (params?.type) {
       query = query.eq('type', params.type);
     }
@@ -263,7 +263,7 @@ export class ResourcesApi {
     }
     if (params?.search) {
       query = query.or(`title.ilike.%${params.search}%,description.ilike.%${params.search}%`);
-    }
+          }
 
     const limit = params?.limit || 50;
     const offset = params?.offset || 0;

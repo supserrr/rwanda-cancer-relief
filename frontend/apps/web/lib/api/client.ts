@@ -316,7 +316,7 @@ export async function post<T>(
       if (isFetchError) {
         console.error('Fetch error details:', {
           url,
-          method: 'POST',
+    method: 'POST',
           error: error.message,
           stack: error.stack,
         });

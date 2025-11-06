@@ -188,7 +188,7 @@ export class SessionsApi {
     }
 
     let query = supabase.from('sessions').select('*', { count: 'exact' });
-
+    
     if (params?.patientId) {
       query = query.eq('patient_id', params.patientId);
     }
@@ -203,7 +203,7 @@ export class SessionsApi {
     }
     if (params?.dateFrom) {
       query = query.gte('date', params.dateFrom);
-    }
+        }
     if (params?.dateTo) {
       query = query.lte('date', params.dateTo);
     }

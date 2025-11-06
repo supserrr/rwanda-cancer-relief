@@ -256,7 +256,7 @@ export async function GET(request: Request) {
                   if (error) {
                     console.error('OAuth error:', error, errorDescription);
                     clearTimeout(timeoutId);
-                    window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent(errorDescription || error);
+                      window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent(errorDescription || error);
                     return;
                   }
                   
@@ -319,8 +319,8 @@ export async function GET(request: Request) {
                   // Set session directly with tokens (no waiting for auto-detection)
                   console.log('Setting session with tokens...');
                   const { data: { session }, error: sessionError } = await supabaseClient.auth.setSession({
-                    access_token: accessToken,
-                    refresh_token: refreshToken || '',
+                      access_token: accessToken,
+                      refresh_token: refreshToken || '',
                   });
                   
                   if (sessionError) {
@@ -346,7 +346,7 @@ export async function GET(request: Request) {
                   
                   // Update user role if needed (non-blocking - don't wait)
                   if (role && (!session.user.user_metadata?.role || session.user.user_metadata.role === 'guest')) {
-                    console.log('Updating user role to:', role);
+                        console.log('Updating user role to:', role);
                     supabaseClient.auth.updateUser({
                       data: { role: role, ...session.user.user_metadata },
                     }).catch((err) => {
@@ -363,7 +363,7 @@ export async function GET(request: Request) {
                     next = userRole === 'counselor' ? '/onboarding/counselor' : '/onboarding/patient';
                   } else if (!next || next === '/') {
                     next = userRole === 'counselor' ? '/dashboard/counselor' : userRole === 'patient' ? '/dashboard/patient' : '/';
-                  }
+                    }
                   
                   if (!next.startsWith('/')) {
                     next = '/';
@@ -383,7 +383,7 @@ export async function GET(request: Request) {
                   const role = urlParams.get('role') || 'patient';
                   const next = urlParams.get('next') || '/onboarding/' + role;
                   console.log('Fallback redirect to:', next);
-                  window.location.replace(next);
+                    window.location.replace(next);
                 }
               })();
             </script>

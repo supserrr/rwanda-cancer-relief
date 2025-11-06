@@ -194,7 +194,7 @@ export class ChatApi {
 
     if (params?.participantId) {
       query = query.contains('participants', [params.participantId]);
-    }
+        }
 
     const limit = params?.limit || 50;
     const offset = params?.offset || 0;
@@ -275,7 +275,7 @@ export class ChatApi {
 
     if (params?.before) {
       query = query.lt('created_at', params.before);
-    }
+        }
     if (params?.after) {
       query = query.gt('created_at', params.after);
     }

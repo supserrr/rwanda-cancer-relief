@@ -124,7 +124,7 @@ async function runTests() {
     console.log(`      curl ${API_URL}/health`);
     console.log('   3. Verify environment variables:');
     console.log('      Create .env.local in frontend/apps/web/');
-    console.log('      NEXT_PUBLIC_API_URL=http://localhost:10000');
+      console.log('      NEXT_PUBLIC_API_URL=http://localhost:10000');
     console.log('   4. Check backend logs for errors');
     console.log('\n   Note: This application uses Supabase for all backend operations.');
     console.log('   If no backend API is needed, you can skip these tests.');

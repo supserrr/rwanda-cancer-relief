@@ -64,7 +64,16 @@ export class AuthApi {
   static async signUp(credentials: SignUpCredentials): Promise<SignInResponse> {
     const supabase = createClient();
     if (!supabase) {
-      throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+      // Check if env vars are actually set
+      const hasUrl = typeof window !== 'undefined' ? !!process.env.NEXT_PUBLIC_SUPABASE_URL : false;
+      const hasKey = typeof window !== 'undefined' ? !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY : false;
+      
+      throw new Error(
+        `Supabase is not configured. ` +
+        `URL: ${hasUrl ? 'Set' : 'Missing'}, ` +
+        `Key: ${hasKey ? 'Set' : 'Missing'}. ` +
+        `Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your Vercel environment variables and redeploy.`
+      );
     }
 
     // Sign up with Supabase
@@ -81,16 +90,25 @@ export class AuthApi {
 
     if (error) {
       // Provide more helpful error messages
-      if (error.message?.includes('Invalid API key') || error.message?.includes('JWT')) {
+      if (error.message?.includes('Invalid API key') || error.message?.includes('JWT') || error.message?.includes('invalid_token')) {
+        // Log the actual error for debugging (only in development)
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Supabase signUp error:', error);
+        }
         throw new Error(
-          'Invalid Supabase API key. Please check your NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable. ' +
-          'Make sure it matches the anon/public key from your Supabase project settings.'
+          'Invalid Supabase API key. Please verify: ' +
+          '1. NEXT_PUBLIC_SUPABASE_ANON_KEY matches the anon/public key from Supabase Settings → API. ' +
+          '2. The key is set in Vercel Environment Variables (not just .env.local). ' +
+          '3. You have redeployed after setting the variables. ' +
+          '4. The key is the anon/public key (not the service_role key).'
         );
       }
-      if (error.message?.includes('Invalid URL')) {
+      if (error.message?.includes('Invalid URL') || error.message?.includes('fetch')) {
         throw new Error(
-          'Invalid Supabase URL. Please check your NEXT_PUBLIC_SUPABASE_URL environment variable. ' +
-          'It should be in the format: https://your-project.supabase.co'
+          'Invalid Supabase URL. Please verify: ' +
+          '1. NEXT_PUBLIC_SUPABASE_URL is set to https://your-project-id.supabase.co ' +
+          '2. The URL is set in Vercel Environment Variables. ' +
+          '3. You have redeployed after setting the variables.'
         );
       }
       throw new Error(error.message || 'Failed to create account');

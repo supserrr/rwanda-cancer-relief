@@ -36,24 +36,62 @@ export function createClient(): SupabaseClient | null {
   }
   
   // Validate that Supabase environment variables are set
-  // During build time, these may not be available, so return null gracefully
-  if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  // Check both the validated env object and process.env directly
+  // In Next.js, NEXT_PUBLIC_ variables are embedded at build time
+  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL || (typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_URL : undefined);
+  const supabaseKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY || (typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY : undefined);
+  
+  if (!supabaseUrl || !supabaseKey) {
     // Only log warning in development, not during build
     if (typeof window !== 'undefined') {
-      console.warn(
-        'Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your environment variables. ' +
-        'For Vercel deployments, add these in Settings → Environment Variables.'
+      const hasEnvUrl = !!env.NEXT_PUBLIC_SUPABASE_URL;
+      const hasEnvKey = !!env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      const hasProcessUrl = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const hasProcessKey = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      
+      console.error(
+        'Supabase is not configured.\n' +
+        `env.NEXT_PUBLIC_SUPABASE_URL: ${hasEnvUrl ? 'Set' : 'Missing'}\n` +
+        `env.NEXT_PUBLIC_SUPABASE_ANON_KEY: ${hasEnvKey ? 'Set' : 'Missing'}\n` +
+        `process.env.NEXT_PUBLIC_SUPABASE_URL: ${hasProcessUrl ? 'Set' : 'Missing'}\n` +
+        `process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY: ${hasProcessKey ? 'Set' : 'Missing'}\n` +
+        '\nFor Vercel deployments:\n' +
+        '1. Go to Vercel Project → Settings → Environment Variables\n' +
+        '2. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY\n' +
+        '3. Make sure they are set for Production, Preview, and Development\n' +
+        '4. Redeploy your project (the variables must be available at BUILD time)'
       );
     }
     return null;
   }
   
+  // Validate URL format
+  if (!supabaseUrl.startsWith('https://') || !supabaseUrl.includes('.supabase.co')) {
+    if (typeof window !== 'undefined') {
+      console.error(
+        `Invalid Supabase URL format: ${supabaseUrl}\n` +
+        'Expected format: https://your-project-id.supabase.co'
+      );
+    }
+    return null;
+  }
+  
+  // Validate key format (anon keys typically start with 'eyJ')
+  if (!supabaseKey.startsWith('eyJ')) {
+    if (typeof window !== 'undefined') {
+      console.warn(
+        'Supabase anon key format looks incorrect. ' +
+        'Make sure you are using the anon/public key (not the service_role key). ' +
+        'Get it from Supabase Dashboard → Settings → API → Project API keys → anon/public'
+      );
+    }
+  }
+  
   // Create and cache the client instance with validated credentials
-  // The env object ensures NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
-  // are present and properly typed
+  // Use the fallback values we checked above
   supabaseClientInstance = createSupabaseClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    supabaseUrl,
+    supabaseKey,
     {
       auth: {
         persistSession: true,

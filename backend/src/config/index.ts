@@ -1,10 +1,12 @@
 /**
  * Configuration loader for the application
  * 
- * Loads environment variables and provides typed configuration
+ * Loads and validates environment variables using @t3-oss/env-core
+ * and provides typed configuration
  */
 
 import dotenv from 'dotenv';
+import { env } from '../env';
 
 // Load environment variables
 dotenv.config();
@@ -21,8 +23,8 @@ export interface Config {
     serviceKey: string;
   };
   jitsi: {
-    appId: string;
-    appSecret: string;
+    appId?: string;
+    appSecret?: string;
     domain: string;
   };
   frontend: {
@@ -36,63 +38,58 @@ export interface Config {
   resend?: {
     apiKey?: string;
   };
-}
-
-/**
- * Validate required environment variables
- */
-function validateEnv(): void {
-  const required = [
-    'PORT',
-    'NODE_ENV',
-    'SUPABASE_URL',
-    'SUPABASE_KEY',
-    'SUPABASE_SERVICE_KEY',
-    'FRONTEND_URL',
-  ];
-
-  const missing = required.filter((key) => !process.env[key]);
-
-  if (missing.length > 0) {
-    throw new Error(
-      `Missing required environment variables: ${missing.join(', ')}`
-    );
-  }
+  smtp?: {
+    host?: string;
+    port?: number;
+    user?: string;
+    pass?: string;
+    from?: string;
+  };
 }
 
 /**
  * Get application configuration
+ * 
+ * Uses validated environment variables from @t3-oss/env-core
+ * which ensures all required variables are present and properly typed.
  */
 export function getConfig(): Config {
-  // Only validate in production
-  if (process.env.NODE_ENV === 'production') {
-    validateEnv();
-  }
-
   return {
-    port: parseInt(process.env.PORT || '10000', 10),
-    nodeEnv: process.env.NODE_ENV || 'development',
+    port: env.PORT,
+    nodeEnv: env.NODE_ENV,
     supabase: {
-      url: process.env.SUPABASE_URL || '',
-      key: process.env.SUPABASE_KEY || '',
-      serviceKey: process.env.SUPABASE_SERVICE_KEY || '',
+      url: env.SUPABASE_URL,
+      key: env.SUPABASE_KEY,
+      serviceKey: env.SUPABASE_SERVICE_KEY,
     },
     jitsi: {
-      appId: process.env.JITSI_APP_ID || '',
-      appSecret: process.env.JITSI_APP_SECRET || '',
-      domain: process.env.JITSI_DOMAIN || '8x8.vc',
+      appId: env.JITSI_APP_ID,
+      appSecret: env.JITSI_APP_SECRET,
+      domain: env.JITSI_DOMAIN,
     },
     frontend: {
-      url: process.env.FRONTEND_URL || 'http://localhost:3000',
-      corsOrigin: process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000',
+      url: env.FRONTEND_URL,
+      corsOrigin: env.CORS_ORIGIN || env.FRONTEND_URL,
     },
     jwt: {
-      secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
-      expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+      secret: env.JWT_SECRET,
+      expiresIn: env.JWT_EXPIRES_IN,
     },
-    resend: {
-      apiKey: process.env.RESEND_API_KEY,
-    },
+    resend: env.RESEND_API_KEY
+      ? {
+          apiKey: env.RESEND_API_KEY,
+        }
+      : undefined,
+    smtp:
+      env.SMTP_HOST || env.SMTP_USER
+        ? {
+            host: env.SMTP_HOST,
+            port: env.SMTP_PORT,
+            user: env.SMTP_USER,
+            pass: env.SMTP_PASS,
+            from: env.SMTP_FROM,
+          }
+        : undefined,
   };
 }
 

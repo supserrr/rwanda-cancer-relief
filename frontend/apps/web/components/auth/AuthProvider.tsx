@@ -49,22 +49,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /**
    * Create a single Supabase client instance to avoid multiple GoTrueClient instances
-   * Only create if Supabase is configured
+   * Uses validated environment variables from @t3-oss/env-core
    */
   const supabaseClient = useMemo(() => {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    
-    if (supabaseUrl && supabaseAnonKey) {
-      try {
-        return createClient();
-      } catch (error) {
-        console.warn('Failed to create Supabase client:', error);
-        return null;
-      }
+    try {
+      return createClient();
+    } catch (error) {
+      console.warn('Failed to create Supabase client:', error);
+      return null;
     }
-    
-    return null;
   }, []);
 
   /**

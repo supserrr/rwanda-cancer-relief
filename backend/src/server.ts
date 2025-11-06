@@ -45,7 +45,8 @@ async function startServer(): Promise<void> {
     initializeSocket(httpServer);
 
     // Start server
-    httpServer.listen(config.port, () => {
+    // Bind to all interfaces (0.0.0.0) for deployment compatibility
+    httpServer.listen(config.port, '0.0.0.0', () => {
       logInfo(`Server started on port ${config.port}`, {
         environment: config.nodeEnv,
         port: config.port,

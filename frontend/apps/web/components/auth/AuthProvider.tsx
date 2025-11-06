@@ -74,10 +74,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     const authCheckPromise = (async () => {
-      try {
-        // First, check Supabase session (for OAuth) - only if Supabase is configured
-        if (supabaseClient) {
-          try {
+    try {
+      // First, check Supabase session (for OAuth) - only if Supabase is configured
+      if (supabaseClient) {
+        try {
             // Use Promise.race to timeout Supabase call if it takes too long
             // Increased timeout to 5 seconds to allow OAuth sessions to be available
             const sessionPromise = supabaseClient.auth.getSession();
@@ -89,38 +89,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             ]);
             
             const { data: { session }, error: sessionError } = sessionResult;
+          
+          if (session && !sessionError) {
+            // User is authenticated via Supabase (OAuth)
+            // Convert Supabase user to our User type
+            const supabaseUser = session.user;
+            const userMetadata = supabaseUser.user_metadata || {};
             
-            if (session && !sessionError) {
-              // User is authenticated via Supabase (OAuth)
-              // Convert Supabase user to our User type
-              const supabaseUser = session.user;
-              const userMetadata = supabaseUser.user_metadata || {};
-              
-              const currentUser: User = {
-                id: supabaseUser.id,
-                email: supabaseUser.email || '',
-                name: userMetadata.full_name || userMetadata.name || supabaseUser.email || '',
-                role: (userMetadata.role as UserRole) || 'guest',
-                avatar: userMetadata.avatar_url || supabaseUser.user_metadata?.avatar_url,
-                isVerified: supabaseUser.email_confirmed_at !== null,
-                createdAt: new Date(supabaseUser.created_at),
-                updatedAt: new Date(supabaseUser.updated_at || supabaseUser.created_at),
-                metadata: userMetadata,
-              };
-              
-              setUser(currentUser);
-              AuthSession.setUser(currentUser);
-              AuthSession.setToken(session.access_token);
-              
-              // Check onboarding status and redirect if needed
+            const currentUser: User = {
+              id: supabaseUser.id,
+              email: supabaseUser.email || '',
+              name: userMetadata.full_name || userMetadata.name || supabaseUser.email || '',
+              role: (userMetadata.role as UserRole) || 'guest',
+              avatar: userMetadata.avatar_url || supabaseUser.user_metadata?.avatar_url,
+              isVerified: supabaseUser.email_confirmed_at !== null,
+              createdAt: new Date(supabaseUser.created_at),
+              updatedAt: new Date(supabaseUser.updated_at || supabaseUser.created_at),
+              metadata: userMetadata,
+            };
+            
+            setUser(currentUser);
+            AuthSession.setUser(currentUser);
+            AuthSession.setToken(session.access_token);
+            
+            // Check onboarding status and redirect if needed
               // Only redirect if not already on onboarding page to prevent loops
-              if (currentUser && currentUser.role !== 'guest' && currentUser.role !== 'admin') {
-                const onboardingComplete = isOnboardingComplete(currentUser);
+            if (currentUser && currentUser.role !== 'guest' && currentUser.role !== 'admin') {
+              const onboardingComplete = isOnboardingComplete(currentUser);
                 // Check if we're already on the correct onboarding route
                 const expectedOnboardingRoute = getOnboardingRoute(currentUser.role);
                 const isOnCorrectOnboardingRoute = pathname === expectedOnboardingRoute;
                 
-                if (!onboardingComplete && !pathname.startsWith('/onboarding')) {
+              if (!onboardingComplete && !pathname.startsWith('/onboarding')) {
                   // Not on onboarding page, redirect to appropriate onboarding
                   const onboardingRoute = getOnboardingRoute(currentUser.role);
                   router.push(onboardingRoute);
@@ -128,31 +128,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   return;
                 } else if (!onboardingComplete && pathname.startsWith('/onboarding') && !isOnCorrectOnboardingRoute) {
                   // On wrong onboarding route, redirect to correct one
-                  const onboardingRoute = getOnboardingRoute(currentUser.role);
-                  router.push(onboardingRoute);
-                  setIsLoading(false);
-                  return;
-                }
-                // If already on correct onboarding route, don't redirect
+                const onboardingRoute = getOnboardingRoute(currentUser.role);
+                router.push(onboardingRoute);
+                setIsLoading(false);
+                return;
               }
-              
-              setIsLoading(false);
-              return;
+                // If already on correct onboarding route, don't redirect
             }
-          } catch (error) {
-            // Supabase not configured or error, fall through to backend auth
-            if (process.env.NODE_ENV === 'development') {
-              console.warn('Supabase auth check failed, using backend auth:', error);
-            }
+            
+            setIsLoading(false);
+            return;
           }
+        } catch (error) {
+          // Supabase not configured or error, fall through to backend auth
+            if (process.env.NODE_ENV === 'development') {
+          console.warn('Supabase auth check failed, using backend auth:', error);
+            }
         }
-        
-        // Fallback to backend token-based auth
-        const token = AuthSession.getToken();
-        const userData = AuthSession.getUser();
-        
-        if (token && userData) {
-          try {
+      }
+      
+      // Fallback to backend token-based auth
+      const token = AuthSession.getToken();
+      const userData = AuthSession.getUser();
+      
+      if (token && userData) {
+        try {
             // Verify token by getting current user from backend with timeout
             const currentUserPromise = AuthService.getCurrentUser();
             const timeoutPromise = new Promise<never>((_, reject) => 
@@ -164,40 +164,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               timeoutPromise
             ]);
             
-            setUser(currentUser);
-            AuthSession.setUser(currentUser);
-            
-            // Check onboarding status and redirect if needed
-            if (currentUser && currentUser.role !== 'guest' && currentUser.role !== 'admin') {
-              const onboardingComplete = isOnboardingComplete(currentUser);
-              if (!onboardingComplete && !pathname.startsWith('/onboarding')) {
-                const onboardingRoute = getOnboardingRoute(currentUser.role);
-                router.push(onboardingRoute);
-                return;
-              }
+          setUser(currentUser);
+          AuthSession.setUser(currentUser);
+          
+          // Check onboarding status and redirect if needed
+          if (currentUser && currentUser.role !== 'guest' && currentUser.role !== 'admin') {
+            const onboardingComplete = isOnboardingComplete(currentUser);
+            if (!onboardingComplete && !pathname.startsWith('/onboarding')) {
+              const onboardingRoute = getOnboardingRoute(currentUser.role);
+              router.push(onboardingRoute);
+              return;
             }
-          } catch (error) {
+          }
+        } catch (error) {
             // Token is invalid or timeout, clear storage
             if (process.env.NODE_ENV === 'development') {
-              console.error('Token verification failed:', error);
+          console.error('Token verification failed:', error);
             }
-            AuthSession.clear();
-            setUser(null);
-          }
-        } else {
-          // No token or user data - user is not authenticated
+          AuthSession.clear();
           setUser(null);
         }
-      } catch (error) {
-        // Catch any unexpected errors during auth check
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Unexpected error during auth check:', error);
-        }
+      } else {
+          // No token or user data - user is not authenticated
         setUser(null);
-        AuthSession.clear();
-      } finally {
-        setIsLoading(false);
       }
+    } catch (error) {
+      // Catch any unexpected errors during auth check
+        if (process.env.NODE_ENV === 'development') {
+      console.error('Unexpected error during auth check:', error);
+        }
+      setUser(null);
+      AuthSession.clear();
+    } finally {
+      setIsLoading(false);
+    }
     })();
 
     // Race between auth check and timeout
@@ -373,15 +373,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const isAuthRoute = pathname.startsWith('/signin') || pathname.startsWith('/signup');
     const isDashboardRoute = pathname.startsWith('/dashboard');
-    const isPublicRoute = ['/', '/about', '/contact', '/counselors', '/get-help', '/onboarding'].includes(pathname) || pathname.startsWith('/onboarding');
+    const isOnboardingRoute = pathname.startsWith('/onboarding');
+    // Auth callback and error pages are special - they handle OAuth flow
+    const isAuthCallbackRoute = pathname.startsWith('/auth/callback') || pathname.startsWith('/auth/auth-code-error');
+    // Only truly public routes that don't require authentication
+    const isPublicRoute = ['/', '/about', '/contact', '/counselors', '/get-help'].includes(pathname);
 
-    // Allow unauthenticated users to access auth pages and public routes
+    // Allow unauthenticated users to access auth pages, auth callback routes, and public routes only
     if (!isAuthenticated) {
-      // Only redirect unauthenticated users from protected routes (dashboard)
-      if (isDashboardRoute) {
+      // Redirect unauthenticated users from all protected routes
+      // Everything after signup/signin requires authentication
+      if (isDashboardRoute || isOnboardingRoute) {
         router.push('/signin');
+        return;
       }
-      // Allow access to auth pages and public routes - no redirect needed
+      // Allow access to auth pages, auth callback routes, and public routes only
+      if (!isAuthRoute && !isAuthCallbackRoute && !isPublicRoute) {
+        // Any other route requires authentication
+        router.push('/signin');
+        return;
+      }
       return;
     }
 

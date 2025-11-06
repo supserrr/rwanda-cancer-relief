@@ -27,13 +27,13 @@ export async function GET(request: Request) {
   
   // Log all query parameters for debugging (only in development)
   if (process.env.NODE_ENV === 'development') {
-    console.log('OAuth callback received (server-side):', {
-      url: request.url,
-      code: code ? `${code.substring(0, 10)}...` : 'missing',
-      error,
-      errorDescription,
-      allParams: Object.fromEntries(searchParams.entries()),
-    });
+  console.log('OAuth callback received (server-side):', {
+    url: request.url,
+    code: code ? `${code.substring(0, 10)}...` : 'missing',
+    error,
+    errorDescription,
+    allParams: Object.fromEntries(searchParams.entries()),
+  });
   }
   
   // Check if OAuth provider returned an error
@@ -124,10 +124,10 @@ export async function GET(request: Request) {
     if (existingSession && !sessionError) {
       // Session already exists - Supabase created it during OAuth flow
       if (process.env.NODE_ENV === 'development') {
-        console.log('Session found without code exchange:', {
-          userId: existingSession.user.id,
-          email: existingSession.user.email,
-        });
+      console.log('Session found without code exchange:', {
+        userId: existingSession.user.id,
+        email: existingSession.user.email,
+      });
       }
       
       const data = { session: existingSession, user: existingSession.user };
@@ -209,7 +209,7 @@ export async function GET(request: Request) {
       // URL fragments are not sent to the server, so we need to return HTML
       // that will extract tokens from the hash and set the session on the client side
       if (process.env.NODE_ENV === 'development') {
-        console.log('No code found, returning client-side handler to extract tokens from URL fragment');
+      console.log('No code found, returning client-side handler to extract tokens from URL fragment');
       }
       
       // Return minimal HTML that will extract tokens from the hash and set the session
@@ -221,120 +221,171 @@ export async function GET(request: Request) {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Completing Authentication</title>
-            <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" onload="window.supabaseLoaded = true"></script>
           </head>
           <body>
+            <div style="display: flex; align-items: center; justify-content: center; height: 100vh; font-family: system-ui;">
+              <div style="text-align: center;">
+                <p>Completing authentication...</p>
+                <p style="font-size: 0.875rem; color: #666; margin-top: 0.5rem;">Please wait while we sign you in</p>
+              </div>
+            </div>
             <script>
+              // Add timeout fallback - if script doesn't complete in 10 seconds, redirect
+              const timeoutId = setTimeout(() => {
+                console.error('OAuth callback timeout - redirecting to fallback');
+                const urlParams = new URLSearchParams(window.location.search);
+                const role = urlParams.get('role') || 'patient';
+                const next = urlParams.get('next') || '/onboarding/' + role;
+                window.location.replace(next);
+              }, 10000);
+              
               (async function() {
-                // Extract tokens immediately from URL fragment (hash)
-                const hash = window.location.hash.substring(1);
-                const params = new URLSearchParams(hash);
-                const accessToken = params.get('access_token');
-                const refreshToken = params.get('refresh_token');
-                const error = params.get('error');
-                const errorDescription = params.get('error_description');
-                
-                // Check for errors immediately
-                if (error) {
-                  window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent(errorDescription || error);
-                  return;
-                }
-                
-                if (!accessToken) {
-                  window.location.href = '/signin?error=missing_token';
-                  return;
-                }
-                
-                // Wait for Supabase library to load (optimized - check more frequently)
-                let attempts = 0;
-                let supabaseLib = null;
-                
-                // Check immediately first
-                if (typeof window.supabase !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
-                  supabaseLib = window.supabase;
-                } else {
-                  // Poll more frequently (every 50ms instead of 100ms) with shorter timeout (2 seconds instead of 5)
-                  while (attempts < 40) {
-                    if (typeof window.supabase !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
+                try {
+                  console.log('Starting OAuth callback processing...');
+                  
+                  // Extract tokens immediately from URL fragment (hash)
+                  const hash = window.location.hash.substring(1);
+                  const params = new URLSearchParams(hash);
+                  const accessToken = params.get('access_token');
+                  const refreshToken = params.get('refresh_token');
+                  const error = params.get('error');
+                  const errorDescription = params.get('error_description');
+                  
+                  // Check for errors immediately
+                  if (error) {
+                    console.error('OAuth error:', error, errorDescription);
+                    clearTimeout(timeoutId);
+                    window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent(errorDescription || error);
+                    return;
+                  }
+                  
+                  if (!accessToken) {
+                    console.error('No access token found in URL');
+                    clearTimeout(timeoutId);
+                    window.location.href = '/signin?error=missing_token';
+                    return;
+                  }
+                  
+                  console.log('Access token found, waiting for Supabase library...');
+                  
+                  // Wait for Supabase library to load
+                  // The UMD build exposes the library as window.supabase with createClient function
+                  let attempts = 0;
+                  let supabaseLib = null;
+                  
+                  // Wait for script to load and library to be available
+                  while (attempts < 100) { // Increased timeout to 5 seconds (100 * 50ms)
+                    // Check if library is available - UMD build exposes it as window.supabase
+                    if (typeof window.supabase !== 'undefined' && 
+                        window.supabase && 
+                        typeof window.supabase.createClient === 'function') {
                       supabaseLib = window.supabase;
+                      console.log('Supabase library loaded after', attempts * 50, 'ms');
                       break;
                     }
                     await new Promise(resolve => setTimeout(resolve, 50));
                     attempts++;
                   }
+                  
+                  if (!supabaseLib) {
+                    console.error('Supabase library not loaded after timeout');
+                    clearTimeout(timeoutId);
+                    window.location.href = '/signin?error=library_load_failed';
+                    return;
+                  }
+                  
+                  // Initialize Supabase client
+                  const supabaseUrl = '${supabaseUrl || ''}';
+                  const supabaseAnonKey = '${supabaseAnonKey || ''}';
+                  
+                  if (!supabaseUrl || !supabaseAnonKey) {
+                    console.error('Supabase not configured:', { hasUrl: !!supabaseUrl, hasKey: !!supabaseAnonKey });
+                    clearTimeout(timeoutId);
+                    window.location.href = '/signin?error=not_configured';
+                    return;
+                  }
+                  
+                  console.log('Creating Supabase client...');
+                  const { createClient } = supabaseLib;
+                  const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+                    auth: {
+                      persistSession: true,
+                      autoRefreshToken: true,
+                      detectSessionInUrl: false, // Disable auto-detection, we'll set it manually for speed
+                    },
+                  });
+                  
+                  // Set session directly with tokens (no waiting for auto-detection)
+                  console.log('Setting session with tokens...');
+                  const { data: { session }, error: sessionError } = await supabaseClient.auth.setSession({
+                    access_token: accessToken,
+                    refresh_token: refreshToken || '',
+                  });
+                  
+                  if (sessionError) {
+                    console.error('Session error:', sessionError);
+                    clearTimeout(timeoutId);
+                    window.location.href = '/signin?error=session_failed&details=' + encodeURIComponent(sessionError.message || 'Unknown error');
+                    return;
+                  }
+                  
+                  if (!session) {
+                    console.error('No session returned from setSession');
+                    clearTimeout(timeoutId);
+                    window.location.href = '/signin?error=session_failed&details=No session returned';
+                    return;
+                  }
+                  
+                  console.log('Session set successfully, user:', session.user.email);
+                  
+                  // Get redirect destination
+                  const urlParams = new URLSearchParams(window.location.search);
+                  const role = urlParams.get('role');
+                  let next = urlParams.get('next') || '/';
+                  
+                  // Update user role if needed (non-blocking - don't wait)
+                  if (role && (!session.user.user_metadata?.role || session.user.user_metadata.role === 'guest')) {
+                    console.log('Updating user role to:', role);
+                    supabaseClient.auth.updateUser({
+                      data: { role: role, ...session.user.user_metadata },
+                    }).catch((err) => {
+                      console.warn('Failed to update user role (non-blocking):', err);
+                    }); // Ignore errors - don't block redirect
+                  }
+                  
+                  // Determine redirect path
+                  const userMetadata = session.user.user_metadata || {};
+                  const onboardingCompleted = userMetadata.onboarding_completed === true;
+                  const userRole = (userMetadata.role as string) || role || 'patient';
+                  
+                  if (!onboardingCompleted) {
+                    next = userRole === 'counselor' ? '/onboarding/counselor' : '/onboarding/patient';
+                  } else if (!next || next === '/') {
+                    next = userRole === 'counselor' ? '/dashboard/counselor' : userRole === 'patient' ? '/dashboard/patient' : '/';
+                  }
+                  
+                  if (!next.startsWith('/')) {
+                    next = '/';
+                  }
+                  
+                  console.log('Redirecting to:', next);
+                  
+                  // Clear timeout since we're redirecting successfully
+                  clearTimeout(timeoutId);
+                  
+                  // Redirect immediately
+                  window.location.replace(next);
+                } catch (error) {
+                  console.error('Auth callback error:', error);
+                  clearTimeout(timeoutId);
+                  const urlParams = new URLSearchParams(window.location.search);
+                  const role = urlParams.get('role') || 'patient';
+                  const next = urlParams.get('next') || '/onboarding/' + role;
+                  console.log('Fallback redirect to:', next);
+                  window.location.replace(next);
                 }
-                
-                if (!supabaseLib) {
-                  console.error('Supabase library not loaded');
-                  window.location.href = '/signin?error=library_load_failed';
-                  return;
-                }
-                
-                // Initialize Supabase client
-                const supabaseUrl = '${supabaseUrl || ''}';
-                const supabaseAnonKey = '${supabaseAnonKey || ''}';
-                
-                if (!supabaseUrl || !supabaseAnonKey) {
-                  window.location.href = '/signin?error=not_configured';
-                  return;
-                }
-                
-                const { createClient } = supabaseLib;
-                const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-                  auth: {
-                    persistSession: true,
-                    autoRefreshToken: true,
-                    detectSessionInUrl: false, // Disable auto-detection, we'll set it manually for speed
-                  },
-                });
-                
-                // Set session directly with tokens (no waiting for auto-detection)
-                const { data: { session }, error: sessionError } = await supabaseClient.auth.setSession({
-                  access_token: accessToken,
-                  refresh_token: refreshToken || '',
-                });
-                
-                if (sessionError || !session) {
-                  window.location.href = '/signin?error=session_failed';
-                  return;
-                }
-                
-                // Get redirect destination
-                const urlParams = new URLSearchParams(window.location.search);
-                const role = urlParams.get('role');
-                let next = urlParams.get('next') || '/';
-                
-                // Update user role if needed (non-blocking - don't wait)
-                if (role && (!session.user.user_metadata?.role || session.user.user_metadata.role === 'guest')) {
-                  supabaseClient.auth.updateUser({
-                    data: { role: role, ...session.user.user_metadata },
-                  }).catch(() => {}); // Ignore errors - don't block redirect
-                }
-                
-                // Determine redirect path
-                const userMetadata = session.user.user_metadata || {};
-                const onboardingCompleted = userMetadata.onboarding_completed === true;
-                const userRole = (userMetadata.role as string) || role || 'patient';
-                
-                if (!onboardingCompleted) {
-                  next = userRole === 'counselor' ? '/onboarding/counselor' : '/onboarding/patient';
-                } else if (!next || next === '/') {
-                  next = userRole === 'counselor' ? '/dashboard/counselor' : userRole === 'patient' ? '/dashboard/patient' : '/';
-                }
-                
-                if (!next.startsWith('/')) {
-                  next = '/';
-                }
-                
-                // Redirect immediately
-                window.location.replace(next);
-              })().catch((error) => {
-                console.error('Auth callback error:', error);
-                const urlParams = new URLSearchParams(window.location.search);
-                const role = urlParams.get('role') || 'patient';
-                const next = urlParams.get('next') || '/onboarding/' + role;
-                window.location.replace(next);
-              });
+              })();
             </script>
           </body>
         </html>

@@ -7,6 +7,7 @@ import { AuthService } from '@/lib/auth';
 import { validateSignUpForm } from '@/lib/validations';
 import { createClient } from '@/lib/supabase/client';
 import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
+import { env } from '@/src/env';
 
 // --- HELPER COMPONENTS (ICONS) ---
 
@@ -140,18 +141,26 @@ export default function PatientSignUpPage() {
       setIsLoading(true);
       
       // Check if Supabase is configured
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
       
       if (!supabaseUrl || !supabaseAnonKey) {
-        setError('Google Sign-Up is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local file.');
+        const isProduction = process.env.NODE_ENV === 'production';
+        const errorMessage = isProduction
+          ? 'Google Sign-Up is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your Vercel project settings (Settings → Environment Variables).'
+          : 'Google Sign-Up is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local file.';
+        setError(errorMessage);
         setIsLoading(false);
         return;
       }
       
       const supabase = createClient();
       if (!supabase) {
-        setError('Google Sign-Up is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local file.');
+        const isProduction = process.env.NODE_ENV === 'production';
+        const errorMessage = isProduction
+          ? 'Google Sign-Up is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your Vercel project settings (Settings → Environment Variables).'
+          : 'Google Sign-Up is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local file.';
+        setError(errorMessage);
         setIsLoading(false);
         return;
       }

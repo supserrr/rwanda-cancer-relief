@@ -8,6 +8,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { createClient } from '@/lib/supabase/client';
 import { GoogleOneTap } from '@/components/auth/GoogleOneTap';
 import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
+import { env } from '@/src/env';
 
 const sampleTestimonials: Testimonial[] = [
   {
@@ -78,17 +79,25 @@ export default function SignInPageDemo() {
       setError(null);
       
       // Check if Supabase is configured
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
       
       if (!supabaseUrl || !supabaseAnonKey) {
-        setError('Google Sign-In is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local file.');
+        const isProduction = process.env.NODE_ENV === 'production';
+        const errorMessage = isProduction
+          ? 'Google Sign-In is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your Vercel project settings (Settings → Environment Variables).'
+          : 'Google Sign-In is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local file.';
+        setError(errorMessage);
         return;
       }
       
       const supabase = createClient();
       if (!supabase) {
-        setError('Google Sign-In is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local file.');
+        const isProduction = process.env.NODE_ENV === 'production';
+        const errorMessage = isProduction
+          ? 'Google Sign-In is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your Vercel project settings (Settings → Environment Variables).'
+          : 'Google Sign-In is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local file.';
+        setError(errorMessage);
         return;
       }
       

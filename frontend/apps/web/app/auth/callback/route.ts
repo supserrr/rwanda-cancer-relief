@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getOnboardingRoute } from '@/lib/auth';
+import { env } from '@/src/env';
 
 /**
  * OAuth callback handler
@@ -48,8 +49,8 @@ export async function GET(request: Request) {
   }
 
   // Check if Supabase is configured
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error('Supabase not configured:', {
@@ -69,7 +70,11 @@ export async function GET(request: Request) {
             const hash = window.location.hash.substring(1);
             if (hash) {
               // Redirect to error page with message
-              window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent('OAuth is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your environment variables.');
+              const isProduction = process.env.NODE_ENV === 'production';
+              const errorMsg = isProduction
+                ? 'OAuth is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your Vercel project settings (Settings → Environment Variables).'
+                : 'OAuth is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your environment variables.';
+              window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent(errorMsg);
             } else {
               window.location.href = '/auth/auth-code-error?error=' + encodeURIComponent('OAuth is not configured. Please contact support.');
             }
@@ -103,7 +108,10 @@ export async function GET(request: Request) {
     const supabase = await createClient();
     
     if (!supabase) {
-      const errorMessage = 'Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your environment variables.';
+      const isProduction = process.env.NODE_ENV === 'production';
+      const errorMessage = isProduction
+        ? 'Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your Vercel project settings (Settings → Environment Variables).'
+        : 'Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your environment variables.';
       return NextResponse.redirect(
         `${origin}/auth/auth-code-error?error=${encodeURIComponent(errorMessage)}`
       );
@@ -234,8 +242,8 @@ export async function GET(request: Request) {
                   }
                   
                   // Initialize Supabase client
-                  const supabaseUrl = '${supabaseUrl}';
-                  const supabaseAnonKey = '${supabaseAnonKey}';
+                  const supabaseUrl = '${env.NEXT_PUBLIC_SUPABASE_URL || ''}';
+                  const supabaseAnonKey = '${env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}';
                   
                   if (!supabaseUrl || !supabaseAnonKey) {
                     console.error('Supabase not configured');

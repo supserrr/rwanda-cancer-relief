@@ -11,6 +11,7 @@ import Script from 'next/script';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { env } from '@/src/env';
 
 declare const google: {
   accounts: {
@@ -52,9 +53,9 @@ export function GoogleOneTap() {
     if (isInitialized) return;
     
     // Check if Supabase and Google are configured
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const googleClientId = env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     
     if (!supabaseUrl || !supabaseAnonKey || !googleClientId) {
       // Silently skip if not configured (optional feature)

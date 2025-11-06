@@ -284,15 +284,15 @@ export class AdminApi {
     }
 
     // Get current user metadata
-    const { data: { user: currentUser }, error: getUserError } = await supabase.auth.admin.getUserById(userId);
-    if (getUserError || !currentUser.user) {
+    const { data: currentUserData, error: getUserError } = await supabase.auth.admin.getUserById(userId);
+    if (getUserError || !currentUserData?.user) {
       throw new Error(getUserError?.message || 'Failed to get user');
     }
 
     // Update user metadata with new role
     const { data: { user }, error } = await supabase.auth.admin.updateUserById(userId, {
       user_metadata: {
-        ...currentUser.user.user_metadata,
+        ...currentUserData.user.user_metadata,
         role: data.role,
       },
     });

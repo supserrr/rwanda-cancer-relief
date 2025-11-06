@@ -34,15 +34,6 @@
     "overrides": {
       "@types/react": "19.2.2",
       "@types/react-dom": "19.2.2"
-    },
-    "allowedBuildScripts": [
-      "@tailwindcss/oxide",
-      "@vercel/speed-insights",
-      "core-js",
-      "core-js-pure",
-      "esbuild",
-      "msw",
-      "sharp"
-    ]
+    }
   }
 }

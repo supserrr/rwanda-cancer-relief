@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from "@workspace/ui/components/button";
 import { Input } from '@workspace/ui/components/input';
@@ -61,6 +61,10 @@ export default function CounselorOnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const profileFileInputRef = useRef<HTMLInputElement>(null);
+  const resumeFileInputRef = useRef<HTMLInputElement>(null);
+  const licenseFileInputRef = useRef<HTMLInputElement>(null);
+  const certificationsFileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<CounselorOnboardingData>({
     licenseNumber: '',
     licenseExpiry: '',
@@ -261,19 +265,26 @@ export default function CounselorOnboardingPage() {
         </Avatar>
         <div className="flex items-center gap-3">
           <input
+            ref={profileFileInputRef}
             id="counselor-profile-upload"
             type="file"
             accept="image/png,image/jpeg"
             className="hidden"
             onChange={(e) => handleProfileImageChange(e.target.files?.[0] || null)}
           />
-          <label htmlFor="counselor-profile-upload">
-            <Button variant="outline" size="sm">Upload Photo</Button>
-          </label>
+          <Button 
+            variant="outline" 
+            size="sm"
+            type="button"
+            onClick={() => profileFileInputRef.current?.click()}
+          >
+            Upload Photo
+          </Button>
           {formData.profileImage && (
             <Button
               variant="ghost"
               size="sm"
+              type="button"
               onClick={() => handleProfileImageChange(null)}
             >
               Remove
@@ -521,15 +532,21 @@ export default function CounselorOnboardingPage() {
               {formData.resumeFile ? formData.resumeFile.name : 'Click to upload or drag and drop'}
             </p>
             <input
+              ref={resumeFileInputRef}
               type="file"
               accept=".pdf"
               onChange={(e) => handleFileUpload('resumeFile', e.target.files?.[0] || null)}
               className="hidden"
               id="resume-upload"
             />
-            <label htmlFor="resume-upload" className="cursor-pointer">
-              <Button variant="outline" size="sm">Choose File</Button>
-            </label>
+            <Button 
+              variant="outline" 
+              size="sm"
+              type="button"
+              onClick={() => resumeFileInputRef.current?.click()}
+            >
+              Choose File
+            </Button>
           </div>
         </div>
 
@@ -541,15 +558,21 @@ export default function CounselorOnboardingPage() {
               {formData.licenseFile ? formData.licenseFile.name : 'Click to upload or drag and drop'}
             </p>
             <input
+              ref={licenseFileInputRef}
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
               onChange={(e) => handleFileUpload('licenseFile', e.target.files?.[0] || null)}
               className="hidden"
               id="license-upload"
             />
-            <label htmlFor="license-upload" className="cursor-pointer">
-              <Button variant="outline" size="sm">Choose File</Button>
-            </label>
+            <Button 
+              variant="outline" 
+              size="sm"
+              type="button"
+              onClick={() => licenseFileInputRef.current?.click()}
+            >
+              Choose File
+            </Button>
           </div>
         </div>
 
@@ -561,15 +584,21 @@ export default function CounselorOnboardingPage() {
               {formData.certificationsFile ? formData.certificationsFile.name : 'Click to upload or drag and drop'}
             </p>
             <input
+              ref={certificationsFileInputRef}
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
               onChange={(e) => handleFileUpload('certificationsFile', e.target.files?.[0] || null)}
               className="hidden"
               id="certifications-upload"
             />
-            <label htmlFor="certifications-upload" className="cursor-pointer">
-              <Button variant="outline" size="sm">Choose File</Button>
-            </label>
+            <Button 
+              variant="outline" 
+              size="sm"
+              type="button"
+              onClick={() => certificationsFileInputRef.current?.click()}
+            >
+              Choose File
+            </Button>
           </div>
         </div>
       </div>

@@ -187,7 +187,8 @@ export class SessionsApi {
       throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
     }
 
-    let query = supabase.from('sessions').select('*', { count: 'exact' });
+    // Select specific columns to avoid triggering RLS recursion on related tables
+    let query = supabase.from('sessions').select('id,patient_id,counselor_id,date,time,duration,type,status,notes,jitsi_room_url,jitsi_room_name,rating,created_at,updated_at', { count: 'exact' });
     
     if (params?.patientId) {
       query = query.eq('patient_id', params.patientId);

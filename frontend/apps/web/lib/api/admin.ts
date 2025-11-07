@@ -221,9 +221,8 @@ export class AdminApi {
   }
 
   /**
-   * Get user by ID using Supabase
-   * Note: This requires a database view or RPC function that exposes user data.
-   * Admin API methods require service role key which should not be exposed in frontend.
+   * Get user by ID using Supabase Edge Function
+   * Uses the admin Edge Function with service role key
    */
   static async getUser(userId: string): Promise<AdminUser> {
     const supabase = createClient();
@@ -231,40 +230,38 @@ export class AdminApi {
       throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
     }
 
-    // Use a database view or RPC function instead of admin API
-    // For now, get user from auth.users via a database view
-    // You'll need to create a view like:
-    // CREATE VIEW public.user_profiles AS
-    // SELECT id, email, raw_user_meta_data->>'full_name' as full_name,
-    //        raw_user_meta_data->>'role' as role, email_confirmed_at IS NOT NULL as is_verified,
-    //        created_at, last_sign_in_at
-    // FROM auth.users;
-    
-    const { data: user, error } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    const { data, error } = await supabase.functions.invoke('admin', {
+      method: 'POST',
+      body: { action: 'getUser', userId },
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
-    if (error || !user) {
-      throw new Error(error?.message || 'Failed to get user. Please create a user_profiles view in your database.');
+    if (error) {
+      throw new Error(error.message || 'Failed to get user');
     }
 
+    // The Edge Function returns { success: true, data: { ... } }
+    if (!data || !data.success || !data.data) {
+      throw new Error(data?.error?.message || 'Failed to get user');
+    }
+
+    const user = data.data;
     return {
       id: user.id,
       email: user.email || '',
-      fullName: user.full_name,
+      fullName: user.fullName || user.full_name,
       role: (user.role as AdminUser['role']) || 'patient',
-      isVerified: user.is_verified || false,
-      createdAt: user.created_at,
-      lastLogin: user.last_sign_in_at || undefined,
+      isVerified: user.isVerified || user.is_verified || false,
+      createdAt: user.createdAt || user.created_at,
+      lastLogin: user.lastLogin || user.last_login || undefined,
     };
   }
 
   /**
-   * List users using Supabase
-   * Note: This requires a database view or RPC function that exposes user data.
-   * Admin API methods require service role key which should not be exposed in frontend.
+   * List users using Supabase Edge Function
+   * Uses the admin Edge Function with service role key
    */
   static async listUsers(params?: UserQueryParams): Promise<ListUsersResponse> {
     const supabase = createClient();
@@ -272,57 +269,50 @@ export class AdminApi {
       throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
     }
 
-    // Use a database view or RPC function instead of admin API
-    // You'll need to create a view like:
-    // CREATE VIEW public.user_profiles AS
-    // SELECT id, email, raw_user_meta_data->>'full_name' as full_name,
-    //        raw_user_meta_data->>'role' as role, email_confirmed_at IS NOT NULL as is_verified,
-    //        created_at, last_sign_in_at
-    // FROM auth.users;
-    
-    let query = supabase.from('user_profiles').select('*', { count: 'exact' });
-
-    if (params?.role) {
-      query = query.eq('role', params.role);
-    }
-    if (params?.isVerified !== undefined) {
-      query = query.eq('is_verified', params.isVerified);
-    }
-    if (params?.search) {
-      query = query.or(`email.ilike.%${params.search}%,full_name.ilike.%${params.search}%`);
-    }
-
-    const limit = params?.limit || 50;
-    const offset = params?.offset || 0;
-    query = query.range(offset, offset + limit - 1);
-    query = query.order('created_at', { ascending: false });
-
-    const { data: users, error, count } = await query;
+    const { data, error } = await supabase.functions.invoke('admin', {
+      method: 'POST',
+      body: {
+        action: 'listUsers',
+        limit: params?.limit,
+        offset: params?.offset,
+        role: params?.role,
+        isVerified: params?.isVerified,
+        search: params?.search,
+      },
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
     if (error) {
-      throw new Error(error.message || 'Failed to list users. Please create a user_profiles view in your database.');
+      throw new Error(error.message || 'Failed to list users');
     }
 
+    // The Edge Function returns { success: true, data: { users: [...], total, count, limit, offset } }
+    if (!data || !data.success || !data.data) {
+      throw new Error(data?.error?.message || 'Failed to list users');
+    }
+
+    const response = data.data;
     return {
-      users: (users || []).map(u => ({
+      users: (response.users || []).map((u: any) => ({
         id: u.id,
         email: u.email || '',
-        fullName: u.full_name,
+        fullName: u.fullName || u.full_name,
         role: (u.role as AdminUser['role']) || 'patient',
-        isVerified: u.is_verified || false,
-        createdAt: u.created_at,
-        lastLogin: u.last_sign_in_at || undefined,
+        isVerified: u.isVerified || u.is_verified || false,
+        createdAt: u.createdAt || u.created_at,
+        lastLogin: u.lastLogin || u.last_login || undefined,
       })),
-      total: count || 0,
-      limit,
-      offset,
+      total: response.total || response.count || 0,
+      limit: response.limit || params?.limit || 50,
+      offset: response.offset || params?.offset || 0,
     };
   }
 
   /**
-   * Update user role using Supabase
-   * Note: This requires a database function or Edge Function with service role key.
-   * Admin operations should be done server-side for security.
+   * Update user role using Supabase Edge Function
+   * Uses the admin Edge Function with service role key
    */
   static async updateUserRole(
     userId: string,
@@ -333,25 +323,38 @@ export class AdminApi {
       throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
     }
 
-    // Use a database function or Edge Function to update user role
-    // For now, we'll call an Edge Function that handles this server-side
-    // You'll need to create an Edge Function like: supabase/functions/update-user-role
-    
-    const { data: result, error } = await supabase.functions.invoke('update-user-role', {
-      body: { userId, role: data.role },
+    const { data: result, error } = await supabase.functions.invoke('admin', {
+      method: 'POST',
+      body: { action: 'updateUserRole', userId, role: data.role },
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
 
     if (error || !result) {
-      throw new Error(error?.message || 'Failed to update user role. Please create an Edge Function for this operation.');
+      throw new Error(error?.message || result?.error?.message || 'Failed to update user role');
     }
 
-    return result as AdminUser;
+    // The Edge Function returns { success: true, data: { ... } }
+    if (!result.success || !result.data) {
+      throw new Error(result?.error?.message || 'Failed to update user role');
+    }
+
+    const user = result.data;
+    return {
+      id: user.id,
+      email: user.email || '',
+      fullName: user.fullName || user.full_name,
+      role: (user.role as AdminUser['role']) || 'patient',
+      isVerified: user.isVerified || user.is_verified || false,
+      createdAt: user.createdAt || user.created_at,
+      lastLogin: user.lastLogin || user.last_login || undefined,
+    };
   }
 
   /**
-   * Delete user using Supabase
-   * Note: This requires a database function or Edge Function with service role key.
-   * Admin operations should be done server-side for security.
+   * Delete user using Supabase Edge Function
+   * Uses the admin Edge Function with service role key
    */
   static async deleteUser(userId: string): Promise<void> {
     const supabase = createClient();
@@ -359,16 +362,21 @@ export class AdminApi {
       throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
     }
 
-    // Use a database function or Edge Function to delete user
-    // For now, we'll call an Edge Function that handles this server-side
-    // You'll need to create an Edge Function like: supabase/functions/delete-user
-    
-    const { error } = await supabase.functions.invoke('delete-user', {
-      body: { userId },
+    const { data, error } = await supabase.functions.invoke('admin', {
+      method: 'POST',
+      body: { action: 'deleteUser', userId },
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
 
     if (error) {
-      throw new Error(error.message || 'Failed to delete user. Please create an Edge Function for this operation.');
+      throw new Error(error.message || 'Failed to delete user');
+    }
+
+    // The Edge Function returns { success: true, data: null }
+    if (!data || !data.success) {
+      throw new Error(data?.error?.message || 'Failed to delete user');
     }
   }
 }

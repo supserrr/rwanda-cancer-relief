@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from "@workspace/ui/components/button";
 import { Input } from '@workspace/ui/components/input';
@@ -49,6 +49,7 @@ export default function PatientOnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<PatientOnboardingData>({
     age: '',
     gender: '',
@@ -198,19 +199,26 @@ export default function PatientOnboardingPage() {
         </Avatar>
         <div className="flex items-center gap-3">
           <input
+            ref={fileInputRef}
             id="patient-profile-upload"
             type="file"
             accept="image/png,image/jpeg"
             className="hidden"
             onChange={(e) => handleProfileImageChange(e.target.files?.[0] || null)}
           />
-          <label htmlFor="patient-profile-upload">
-            <Button variant="outline" size="sm">Upload Photo</Button>
-          </label>
+          <Button 
+            variant="outline" 
+            size="sm"
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Upload Photo
+          </Button>
           {formData.profileImage && (
             <Button
               variant="ghost"
               size="sm"
+              type="button"
               onClick={() => handleProfileImageChange(null)}
             >
               Remove

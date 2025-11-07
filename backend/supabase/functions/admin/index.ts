@@ -57,7 +57,7 @@ async function handleGetAnalytics(request: Request): Promise<Response> {
 /**
  * List users
  */
-async function handleListUsers(request: Request): Promise<Response> {
+async function handleListUsers(request: Request, params?: { limit?: number; offset?: number; role?: string; isVerified?: boolean; search?: string }): Promise<Response> {
   try {
     const user = await requireAuth(request);
     requireRole(user, 'admin');
@@ -65,13 +65,16 @@ async function handleListUsers(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const supabaseAdmin = getSupabaseServiceClient();
 
-    const limit = url.searchParams.get('limit');
-    const offset = url.searchParams.get('offset');
-    const role = url.searchParams.get('role');
+    // Get params from URL query string or from function params
+    const limit = params?.limit || (url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : 50);
+    const offset = params?.offset || (url.searchParams.get('offset') ? Number(url.searchParams.get('offset')) : 0);
+    const role = params?.role || url.searchParams.get('role');
+    const isVerified = params?.isVerified !== undefined ? params.isVerified : (url.searchParams.get('isVerified') === 'true');
+    const search = params?.search || url.searchParams.get('search');
 
     const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers({
-      page: offset ? Math.floor(Number(offset) / (limit ? Number(limit) : 10)) + 1 : 1,
-      perPage: limit ? Number(limit) : 10,
+      page: offset ? Math.floor(Number(offset) / (limit ? Number(limit) : 50)) + 1 : 1,
+      perPage: limit ? Number(limit) : 50,
     });
 
     if (error) {
@@ -89,6 +92,18 @@ async function handleListUsers(request: Request): Promise<Response> {
       filteredUsers = filteredUsers.filter((u) => u.user_metadata?.role === role);
     }
 
+    if (isVerified !== undefined) {
+      filteredUsers = filteredUsers.filter((u) => !!u.email_confirmed_at === isVerified);
+    }
+
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filteredUsers = filteredUsers.filter((u) => 
+        u.email?.toLowerCase().includes(searchLower) ||
+        u.user_metadata?.full_name?.toLowerCase().includes(searchLower)
+      );
+    }
+
     const formattedUsers = filteredUsers.map((u) => ({
       id: u.id,
       email: u.email,
@@ -97,10 +112,17 @@ async function handleListUsers(request: Request): Promise<Response> {
       phoneNumber: u.user_metadata?.phone_number,
       createdAt: u.created_at,
       updatedAt: u.updated_at,
+      isVerified: !!u.email_confirmed_at,
     }));
 
     return corsResponse(
-      JSON.stringify(successResponse({ users: formattedUsers, total: formattedUsers.length, count: formattedUsers.length, limit: limit ? Number(limit) : 10, offset: offset ? Number(offset) : 0 })),
+      JSON.stringify(successResponse({ 
+        users: formattedUsers, 
+        total: formattedUsers.length, 
+        count: formattedUsers.length, 
+        limit: Number(limit), 
+        offset: Number(offset) 
+      })),
       { status: 200 },
       request
     );
@@ -157,13 +179,23 @@ async function handleGetUser(request: Request, userId: string): Promise<Response
 /**
  * Update user role
  */
-async function handleUpdateUserRole(request: Request, userId: string): Promise<Response> {
+async function handleUpdateUserRole(request: Request, userId: string, body?: any): Promise<Response> {
   try {
     const user = await requireAuth(request);
     requireRole(user, 'admin');
 
-    const body = await request.json();
-    const { role } = body;
+    // Get role from body if provided, otherwise parse from request
+    let role: string | undefined;
+    if (body && body.role) {
+      role = body.role;
+    } else {
+      try {
+        const requestBody = await request.json();
+        role = requestBody.role;
+      } catch {
+        // Body might already be parsed
+      }
+    }
 
     if (!role || !['patient', 'counselor', 'admin'].includes(role)) {
       return corsResponse(
@@ -278,28 +310,94 @@ serve(async (request: Request) => {
   const method = request.method;
 
   try {
-    const pathParts = path.split('/').filter(Boolean);
-    const resource = pathParts.length > 0 && pathParts[0] !== '' ? pathParts[0] : null;
-    const resourceId = pathParts.length > 1 ? pathParts[1] : null;
-    const action = pathParts.length > 2 ? pathParts[2] : null;
+    // Support both pathname-based routing (for direct HTTP calls) and body-based routing (for invoke calls)
+    let action: string | null = null;
+    let resourceId: string | null = null;
+    let body: any = null;
 
-    if (method === 'GET' && path === '/analytics') {
-      return await handleGetAnalytics(request);
+    // Try to parse body for invoke calls (POST requests)
+    if (method === 'POST') {
+      try {
+        const clonedRequest = request.clone();
+        body = await clonedRequest.json();
+        if (body && body.action) {
+          action = body.action;
+          resourceId = body.userId || body.id || null;
+        }
+      } catch {
+        // Body might be empty or not JSON - use pathname-based routing
+      }
     }
 
-    if (method === 'GET' && resource === 'users' && !resourceId) {
-      return await handleListUsers(request);
+    // Use pathname-based routing (for direct HTTP calls)
+    if (!action) {
+      const pathParts = path.split('/').filter(Boolean);
+      const resource = pathParts.length > 0 && pathParts[0] !== '' ? pathParts[0] : null;
+      resourceId = pathParts.length > 1 ? pathParts[1] : null;
+      const pathAction = pathParts.length > 2 ? pathParts[2] : null;
+
+      if (method === 'GET' && path === '/analytics') {
+        return await handleGetAnalytics(request);
+      }
+
+      if (method === 'GET' && resource === 'users' && !resourceId) {
+        return await handleListUsers(request);
+      }
+
+      if (method === 'GET' && resource === 'users' && resourceId && !pathAction) {
+        return await handleGetUser(request, resourceId);
+      }
+
+      if (method === 'PUT' && resource === 'users' && resourceId && pathAction === 'role') {
+        return await handleUpdateUserRole(request, resourceId);
+      }
+
+      if (method === 'DELETE' && resource === 'users' && resourceId && !pathAction) {
+        return await handleDeleteUser(request, resourceId);
+      }
     }
 
-    if (method === 'GET' && resource === 'users' && resourceId && !action) {
+    // Handle invoke-based calls (POST with action in body)
+    if (action === 'listUsers') {
+      return await handleListUsers(request, {
+        limit: body?.limit,
+        offset: body?.offset,
+        role: body?.role,
+        isVerified: body?.isVerified,
+        search: body?.search,
+      });
+    }
+
+    if (action === 'getUser') {
+      if (!resourceId) {
+        return corsResponse(
+          JSON.stringify(errorResponse('Bad request', 'User ID is required')),
+          { status: 400 },
+          request
+        );
+      }
       return await handleGetUser(request, resourceId);
     }
 
-    if (method === 'PUT' && resource === 'users' && resourceId && action === 'role') {
-      return await handleUpdateUserRole(request, resourceId);
+    if (action === 'updateUserRole') {
+      if (!resourceId) {
+        return corsResponse(
+          JSON.stringify(errorResponse('Bad request', 'User ID is required')),
+          { status: 400 },
+          request
+        );
+      }
+      return await handleUpdateUserRole(request, resourceId, body);
     }
 
-    if (method === 'DELETE' && resource === 'users' && resourceId && !action) {
+    if (action === 'deleteUser') {
+      if (!resourceId) {
+        return corsResponse(
+          JSON.stringify(errorResponse('Bad request', 'User ID is required')),
+          { status: 400 },
+          request
+        );
+      }
       return await handleDeleteUser(request, resourceId);
     }
 

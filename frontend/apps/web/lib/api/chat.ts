@@ -187,7 +187,8 @@ export class ChatApi {
       throw new Error('User not authenticated');
     }
 
-    let query = supabase.from('chats').select('*', { count: 'exact' });
+    // Select specific columns to avoid triggering RLS recursion on related tables
+    let query = supabase.from('chats').select('id,participants,participant_names,participant_avatars,last_message,unread_count,created_at,updated_at', { count: 'exact' });
 
     // Filter chats where user is a participant
     query = query.contains('participants', [user.id]);

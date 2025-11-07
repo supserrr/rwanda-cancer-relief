@@ -77,12 +77,14 @@ export default function PatientSignUpPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const router = useRouter();
 
   const handleSignUp = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsLoading(true);
     setError(null);
+    setSuccessMessage(null);
 
     try {
       const formData = new FormData(event.currentTarget);
@@ -105,20 +107,24 @@ export default function PatientSignUpPage() {
       // Create user account
       const result = await AuthService.signUp(data);
       
-      // Check if email confirmation is required
-      if (!result.token || result.token === '') {
-        // Email confirmation required
-        setError('Account created! Please check your email to confirm your account before signing in.');
-        return;
-      }
+      // Always show email confirmation message
+      setSuccessMessage('Account created! Please check your email to confirm your account before signing in.');
       
-      // Store auth data in localStorage
-      localStorage.setItem('auth-token', result.token);
-      localStorage.setItem('user-data', JSON.stringify(result.user));
-      localStorage.setItem('user-role', result.user.role);
+      // Clear the form
+      event.currentTarget.reset();
+      
+      // Only redirect if there's a session (email confirmation disabled)
+      if (result.token && result.token !== '') {
+        // Store auth data in localStorage
+        localStorage.setItem('auth-token', result.token);
+        localStorage.setItem('user-data', JSON.stringify(result.user));
+        localStorage.setItem('user-role', result.user.role);
 
-      // Redirect to onboarding
-      router.push('/onboarding/patient');
+        // Redirect to onboarding after a short delay to show the message
+        setTimeout(() => {
+          router.push('/onboarding/patient');
+        }, 2000);
+      }
     } catch (err) {
       // Extract error message from API error
       let errorMessage = 'Account creation failed. Please try again.';
@@ -201,6 +207,11 @@ export default function PatientSignUpPage() {
       {error && (
         <div className="fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50">
           {error}
+        </div>
+      )}
+      {successMessage && (
+        <div className="fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50">
+          {successMessage}
         </div>
       )}
       {/* Left column: sign-up form */}

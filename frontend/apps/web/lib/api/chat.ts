@@ -131,7 +131,14 @@ export class ChatApi {
       .single();
 
     if (existingChat) {
-      return this.mapChatFromDb(existingChat);
+      if (existingChat.unread_count === null || existingChat.unread_count === undefined) {
+        await supabase
+          .from('chats')
+          .update({ unread_count: 0 })
+          .eq('id', existingChat.id);
+        existingChat.unread_count = 0;
+      }
+      return this.mapChatFromDb(existingChat, user.id);
     }
 
     // Create new chat
@@ -139,6 +146,7 @@ export class ChatApi {
       .from('chats')
       .insert({
         participants: [user.id, data.participantId],
+        unread_count: 0,
       })
       .select()
       .single();
@@ -147,7 +155,7 @@ export class ChatApi {
       throw new Error(error.message || 'Failed to create chat');
     }
 
-    return this.mapChatFromDb(chat);
+    return this.mapChatFromDb(chat, user.id);
   }
 
   /**
@@ -157,6 +165,11 @@ export class ChatApi {
     const supabase = createClient();
     if (!supabase) {
       throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
     }
 
     const { data: chat, error } = await supabase
@@ -169,7 +182,7 @@ export class ChatApi {
       throw new Error(error.message || 'Failed to get chat');
     }
 
-    return this.mapChatFromDb(chat);
+    return this.mapChatFromDb(chat, user.id);
   }
 
   /**
@@ -188,7 +201,9 @@ export class ChatApi {
     }
 
     // Select specific columns to avoid triggering RLS recursion on related tables
-    let query = supabase.from('chats').select('id,participants,participant_names,participant_avatars,last_message,unread_count,created_at,updated_at', { count: 'exact' });
+    let query = supabase
+      .from('chats')
+      .select('id,participants,participant_names,participant_avatars,last_message,unread_count,created_at,updated_at', { count: 'exact' });
 
     // Filter chats where user is a participant
     query = query.contains('participants', [user.id]);
@@ -209,7 +224,7 @@ export class ChatApi {
     }
 
     return {
-      chats: (chats || []).map(c => this.mapChatFromDb(c)),
+      chats: (chats || []).map(c => this.mapChatFromDb(c, user.id)),
       total: count || 0,
       limit,
       offset,
@@ -245,14 +260,49 @@ export class ChatApi {
       .select()
       .single();
 
-    if (error) {
+    if (error || !message) {
       throw new Error(error.message || 'Failed to send message');
     }
 
-    // Update chat's updated_at timestamp
+    const { data: chatRecord, error: chatFetchError } = await supabase
+      .from('chats')
+      .select('participants, unread_count')
+      .eq('id', data.chatId)
+      .single();
+
+    if (chatFetchError || !chatRecord) {
+      throw new Error(chatFetchError?.message || 'Failed to update chat metadata');
+    }
+
+    const currentUnread = Number(chatRecord.unread_count ?? 0);
+    const participantCount = Array.isArray(chatRecord.participants) ? chatRecord.participants.length : 0;
+    const recipients = Array.isArray(chatRecord.participants)
+      ? chatRecord.participants.filter((participantId: string) => participantId !== user.id)
+      : [];
+    const unreadIncrement = recipients.length > 0 ? 1 : 0;
+    const updatedUnreadCount = participantCount <= 1 ? 0 : currentUnread + unreadIncrement;
+
+    const lastMessagePayload = {
+      id: message.id,
+      chat_id: message.chat_id,
+      sender_id: message.sender_id,
+      sender_name: message.sender_name ?? user.user_metadata?.full_name ?? user.email ?? '',
+      sender_avatar: message.sender_avatar ?? user.user_metadata?.avatar_url ?? null,
+      content: message.content,
+      type: message.type,
+      file_url: message.file_url,
+      is_read: message.is_read,
+      created_at: message.created_at,
+      updated_at: message.updated_at,
+    };
+
     await supabase
       .from('chats')
-      .update({ updated_at: new Date().toISOString() })
+      .update({
+        updated_at: new Date().toISOString(),
+        last_message: lastMessagePayload,
+        unread_count: updatedUnreadCount,
+      })
       .eq('id', data.chatId);
 
     return this.mapMessageFromDb(message);
@@ -333,19 +383,38 @@ export class ChatApi {
         throw new Error(error.message || 'Failed to mark messages as read');
       }
     }
+
+    const { error: chatUpdateError } = await supabase
+      .from('chats')
+      .update({
+        unread_count: 0,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', chatId);
+
+    if (chatUpdateError) {
+      throw new Error(chatUpdateError.message || 'Failed to update chat read status');
+    }
   }
 
   /**
    * Map database chat to API chat format
    */
-  private static mapChatFromDb(dbChat: Record<string, unknown>): Chat {
+  private static mapChatFromDb(dbChat: Record<string, unknown>, currentUserId?: string): Chat {
+    const lastMessagePayload = dbChat.last_message as Record<string, unknown> | undefined;
+    const lastMessage = lastMessagePayload ? this.mapMessageFromDb(lastMessagePayload) : undefined;
+    const unreadCountValue =
+      typeof dbChat.unread_count === 'number'
+        ? (dbChat.unread_count as number)
+        : Number(dbChat.unread_count ?? 0);
+
     return {
       id: dbChat.id as string,
       participants: (dbChat.participants as string[]) || [],
       participantNames: dbChat.participant_names as Record<string, string> | undefined,
       participantAvatars: dbChat.participant_avatars as Record<string, string> | undefined,
-      lastMessage: dbChat.last_message ? this.mapMessageFromDb(dbChat.last_message as Record<string, unknown>) : undefined,
-      unreadCount: dbChat.unread_count as number || 0,
+      lastMessage,
+      unreadCount: unreadCountValue || 0,
       createdAt: dbChat.created_at as string,
       updatedAt: dbChat.updated_at as string,
     };
@@ -355,9 +424,22 @@ export class ChatApi {
    * Map database message to API message format
    */
   private static mapMessageFromDb(dbMessage: Record<string, unknown>): Message {
+    const chatId =
+      (dbMessage.chat_id as string) ??
+      (dbMessage.chatId as string) ??
+      '';
+    const createdAt =
+      (dbMessage.created_at as string) ??
+      (dbMessage.createdAt as string) ??
+      new Date().toISOString();
+    const updatedAt =
+      (dbMessage.updated_at as string) ??
+      (dbMessage.updatedAt as string) ??
+      createdAt;
+
     return {
       id: dbMessage.id as string,
-      chatId: dbMessage.chat_id as string,
+      chatId,
       senderId: dbMessage.sender_id as string,
       senderName: dbMessage.sender_name as string | undefined,
       senderAvatar: dbMessage.sender_avatar as string | undefined,
@@ -365,8 +447,8 @@ export class ChatApi {
       type: dbMessage.type as MessageType,
       fileUrl: dbMessage.file_url as string | undefined,
       isRead: dbMessage.is_read as boolean,
-      createdAt: dbMessage.created_at as string,
-      updatedAt: dbMessage.updated_at as string,
+      createdAt,
+      updatedAt,
     };
   }
 }

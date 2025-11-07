@@ -16,6 +16,7 @@ import { requireAuth, requireRole } from '../_shared/auth.ts';
 import { successResponse, errorResponse } from '../_shared/types.ts';
 
 const corsOptions = {
+  origin: true,
   allowedHeaders: [
     'Content-Type',
     'Authorization',

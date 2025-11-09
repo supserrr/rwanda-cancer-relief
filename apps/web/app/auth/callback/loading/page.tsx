@@ -33,8 +33,8 @@ export default function AuthCallbackLoadingPage() {
   const nextParam = searchParams.get('next')
   const errorParam = searchParams.get('error')
 
-  const [status, setStatus] = useState('Preparing secure sign in…')
-  const [detail, setDetail] = useState('Gathering your encrypted tokens.')
+  const [status, setStatus] = useState('Connecting you with Rwanda Cancer Relief…')
+  const [detail, setDetail] = useState('Preparing secure access to your counseling and care resources.')
   const [progress, setProgress] = useState(12)
   const [error, setError] = useState<string | null>(null)
   const [showRetry, setShowRetry] = useState(false)
@@ -53,8 +53,8 @@ export default function AuthCallbackLoadingPage() {
       if (!isMounted) return
       const resolved = description ?? message
       setError(resolved)
-      setStatus('We hit a snag')
-      setDetail(resolved)
+      setStatus('We need a quick restart')
+      setDetail(resolved || 'We could not complete your sign in just yet. Please try again or reach out to our care team.')
       setProgress(0)
       setShowRetry(true)
     }
@@ -74,7 +74,7 @@ export default function AuthCallbackLoadingPage() {
       }
     }
 
-    setStep(18, 'Collecting secure sign-in details…', 'Thank you for your patience — this will only take a moment.')
+    setStep(18, 'Confirming your sign-in request…', 'We are securely verifying your credentials. Thank you for your patience.')
 
     const run = async () => {
       try {
@@ -111,16 +111,16 @@ export default function AuthCallbackLoadingPage() {
         const fragmentError = fragmentParams.get('error') || fragmentParams.get('error_description')
 
         if (fragmentError) {
-          fail('We could not complete authentication.', fragmentError)
+          fail('We were unable to finish signing you in.', fragmentError)
           return
         }
 
         if (!accessToken) {
-          fail('We could not find a secure sign-in token. Please try again.')
+          fail('We could not find the secure token we need. Please try again.')
           return
         }
 
-        setStep(36, 'Connecting to Supabase…', 'Creating your secure Rwanda Cancer Relief session.')
+        setStep(36, 'Activating your secure session…', 'Opening the doorway to your Rwanda Cancer Relief support network.')
 
         const {
           data: { session },
@@ -132,11 +132,11 @@ export default function AuthCallbackLoadingPage() {
 
         if (sessionError || !session) {
           console.error('Supabase setSession error', sessionError)
-          fail('We could not establish your session. Please sign in again.')
+          fail('We could not establish your secure session. Please sign in again.')
           return
         }
 
-        setStep(58, 'Personalizing your experience…', 'Reviewing your onboarding progress.')
+        setStep(58, 'Personalizing your care experience…', 'Reviewing your onboarding progress and support preferences.')
 
         const userMetadata = session.user.user_metadata ?? {}
         const resolvedRole = (userMetadata.role as UserRole) || (roleParam as UserRole) || 'patient'
@@ -176,10 +176,10 @@ export default function AuthCallbackLoadingPage() {
         let nextPath = typeof nextParam === 'string' && nextParam.startsWith('/') ? nextParam : ''
 
         if (!onboardingComplete) {
-          setStep(76, 'Almost there…', 'We will guide you through onboarding next.')
+          setStep(76, 'Almost there…', 'We will guide you through onboarding to tailor your support plan.')
           nextPath = getOnboardingRoute(resolvedRole)
         } else {
-          setStep(76, 'Loading your dashboard…', 'Preparing your personalized resources.')
+          setStep(76, 'Loading your dashboard…', 'Gathering the latest updates from your care team.')
           if (!nextPath || nextPath === '/') {
             if (resolvedRole === 'counselor') {
               nextPath = '/dashboard/counselor'
@@ -193,11 +193,11 @@ export default function AuthCallbackLoadingPage() {
           }
         }
 
-        setStep(92, 'Final security checks…', 'Ensuring everything is ready.')
+        setStep(92, 'Final wellness checks…', 'Making sure everything is ready before we redirect you.')
 
         await supabase.auth.getSession()
 
-        setStep(100, 'Redirecting now…', 'Welcome back to Rwanda Cancer Relief!')
+        setStep(100, 'Redirecting now…', 'Welcome back to Rwanda Cancer Relief—your support network is ready.')
         router.replace(nextPath)
       } catch (err) {
         console.error('Unexpected error during OAuth callback processing', err)
@@ -244,7 +244,7 @@ export default function AuthCallbackLoadingPage() {
           {showRetry ? (
             <div className="space-y-4 text-center">
               <p className="text-sm text-muted-foreground">
-                {error ?? 'We could not finish signing you in. Please try again.'}
+                {error ?? 'We were unable to finish signing you in. Please try again or contact our care team.'}
               </p>
               <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <Button onClick={handleSignIn}>Return to Sign In</Button>
@@ -255,7 +255,7 @@ export default function AuthCallbackLoadingPage() {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center">
-              You will be redirected automatically once everything is ready.
+              We will redirect you automatically as soon as everything is set.
             </p>
           )}
         </CardContent>

@@ -5,6 +5,10 @@ import { useRouter, usePathname } from 'next/navigation';
 import { AuthService, AuthSession, User, UserRole, getDashboardRoute, getOnboardingRoute, isOnboardingComplete, ROLES } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/client';
 
+const PUBLIC_PATHS = ['/', '/about', '/contact', '/counselors', '/get-help'];
+
+const isPublicPath = (path: string) => PUBLIC_PATHS.includes(path);
+
 /**
  * Authentication context interface with complete API
  */
@@ -120,20 +124,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const expectedOnboardingRoute = getOnboardingRoute(currentUser.role);
                 const isOnCorrectOnboardingRoute = pathname === expectedOnboardingRoute;
                 
-              if (!onboardingComplete && !pathname.startsWith('/onboarding')) {
+              if (!onboardingComplete && !pathname.startsWith('/onboarding') && !isPublicPath(pathname)) {
                   // Not on onboarding page, redirect to appropriate onboarding
                   const onboardingRoute = getOnboardingRoute(currentUser.role);
                   router.push(onboardingRoute);
                   setIsLoading(false);
                   return;
-                } else if (!onboardingComplete && pathname.startsWith('/onboarding') && !isOnCorrectOnboardingRoute) {
+                } else if (
+                  !onboardingComplete &&
+                  pathname.startsWith('/onboarding') &&
+                  !isOnCorrectOnboardingRoute
+                ) {
                   // On wrong onboarding route, redirect to correct one
                 const onboardingRoute = getOnboardingRoute(currentUser.role);
                 router.push(onboardingRoute);
                 setIsLoading(false);
                 return;
               }
-                // If already on correct onboarding route, don't redirect
+                // If already on correct onboarding route, or public route, don't redirect
             }
             
             setIsLoading(false);
@@ -171,7 +179,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Check onboarding status and redirect if needed
             if (currentUser.role !== 'guest' && currentUser.role !== 'admin') {
               const onboardingComplete = isOnboardingComplete(currentUser);
-              if (!onboardingComplete && !pathname.startsWith('/onboarding')) {
+              const isPublicRoute = isPublicPath(pathname);
+              if (!onboardingComplete && !pathname.startsWith('/onboarding') && !isPublicRoute) {
                 const onboardingRoute = getOnboardingRoute(currentUser.role);
                 router.push(onboardingRoute);
                 return;
@@ -257,7 +266,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Check onboarding status and redirect accordingly
       if (result.user.role !== 'guest' && result.user.role !== 'admin') {
         const onboardingComplete = isOnboardingComplete(result.user);
-        if (!onboardingComplete) {
+        const isPublicRoute = isPublicPath(pathname);
+        if (!onboardingComplete && !isPublicRoute) {
           // Redirect to onboarding if not completed
           const onboardingRoute = getOnboardingRoute(result.user.role);
           router.push(onboardingRoute);
@@ -384,8 +394,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const isOnboardingRoute = pathname.startsWith('/onboarding');
     // Auth callback and error pages are special - they handle OAuth flow
     const isAuthCallbackRoute = pathname.startsWith('/auth/callback') || pathname.startsWith('/auth/auth-code-error');
-    // Only truly public routes that don't require authentication
-    const isPublicRoute = ['/', '/about', '/contact', '/counselors', '/get-help'].includes(pathname);
+    const isPublicRoute = isPublicPath(pathname);
 
     // Allow unauthenticated users to access auth pages, auth callback routes, and public routes only
     if (!isAuthenticated) {
@@ -409,7 +418,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Check onboarding status first
       if (user.role !== 'guest' && user.role !== 'admin') {
         const onboardingComplete = isOnboardingComplete(user);
-        if (!onboardingComplete) {
+        const isPublicRoute = isPublicPath(pathname);
+        if (!onboardingComplete && !pathname.startsWith('/onboarding') && !isPublicRoute) {
           // Redirect to onboarding if not completed
           const onboardingRoute = getOnboardingRoute(user.role);
           router.push(onboardingRoute);
@@ -429,7 +439,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (isAuthenticated && isDashboardRoute && user) {
       if (user.role !== 'guest' && user.role !== 'admin') {
         const onboardingComplete = isOnboardingComplete(user);
-        if (!onboardingComplete) {
+        const isPublicRoute = isPublicPath(pathname);
+        if (!onboardingComplete && !pathname.startsWith('/onboarding') && !isPublicRoute) {
           // Redirect to onboarding if not completed
           const onboardingRoute = getOnboardingRoute(user.role);
           router.push(onboardingRoute);

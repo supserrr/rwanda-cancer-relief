@@ -640,15 +640,22 @@ export class AuthApi {
       getMetadataStringArray('languages', 'language_preferences') ??
       coerceStringArrayValue(userMetadata.languages);
 
-    await syncProfileRecord(supabase, user.id, {
-      fullName: sanitizedFullName,
-      avatarUrl: sanitizedAvatar,
-      metadata: data.metadata,
-      userMetadata,
-      availability: sanitizedAvailability,
-      specialty: sanitizedSpecialty,
-      experienceYears: sanitizedExperience,
-    });
+    try {
+      await syncProfileRecord(supabase, user.id, {
+        fullName: sanitizedFullName,
+        avatarUrl: sanitizedAvatar,
+        metadata: data.metadata,
+        userMetadata,
+        availability: sanitizedAvailability,
+        specialty: sanitizedSpecialty,
+        experienceYears: sanitizedExperience,
+      });
+    } catch (syncError) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[AuthApi.updateProfile] Failed to sync profile record', syncError);
+      }
+      // Continue without throwing so onboarding can complete even if profile sync fails
+    }
 
     const mergedMetadata: Record<string, unknown> = {
       ...userMetadata,
@@ -674,7 +681,11 @@ export class AuthApi {
     }
     if (sanitizedAvatar) {
       mergedMetadata.avatar_url = sanitizedAvatar;
+    } else if (coerceStringValue(userMetadata.avatar_url)) {
+      mergedMetadata.avatar_url = coerceStringValue(userMetadata.avatar_url);
     }
+
+    const finalAvatar = sanitizedAvatar || coerceStringValue(userMetadata.avatar_url) || undefined;
 
     const userData: User = {
       id: user.id,
@@ -686,7 +697,7 @@ export class AuthApi {
         user.email ||
         '',
       role: (userMetadata.role as User['role']) || 'patient',
-      avatar: sanitizedAvatar || userMetadata.avatar_url,
+      avatar: finalAvatar,
       isVerified: user.email_confirmed_at !== null,
       createdAt: new Date(user.created_at),
       updatedAt: new Date(user.updated_at || user.created_at),

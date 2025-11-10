@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { Button } from '@workspace/ui/components/button';
@@ -79,6 +79,47 @@ export default function PatientSettingsPage() {
     priority: 'medium' as SupportTicketPriority,
     description: ''
   });
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const handleAvatarButtonClick = () => {
+    if (isUploadingAvatar) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const isImage = /image\/(png|jpeg|jpg)/i.test(file.type);
+    const isSmallEnough = file.size <= 2 * 1024 * 1024;
+
+    if (!isImage || !isSmallEnough) {
+      toast.error('Please upload a JPG or PNG image under 2MB.');
+      event.target.value = '';
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const { url } = await AuthApi.uploadProfileImage(file);
+      setProfile((prev) => ({
+        ...prev,
+        avatar_url: url,
+      }));
+      toast.success('Profile image updated successfully.');
+    } catch (error) {
+      console.error('Failed to upload avatar:', error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Failed to update profile image. Please try again.',
+      );
+    } finally {
+      setIsUploadingAvatar(false);
+      event.target.value = '';
+    }
+  };
+
 
   const [myTickets, setMyTickets] = useState<SupportTicketRecord[]>([]);
   const [isLoadingTickets, setIsLoadingTickets] = useState(false);
@@ -782,9 +823,22 @@ export default function PatientSettingsPage() {
                       size="sm"
                       variant="outline"
                       className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full shadow-lg border-primary/20 hover:bg-primary/10"
+                      onClick={handleAvatarButtonClick}
+                      disabled={isUploadingAvatar}
                     >
-                      <Camera className="h-4 w-4 text-primary" />
+                      {isUploadingAvatar ? (
+                        <Spinner variant="bars" size={16} className="text-primary" />
+                      ) : (
+                        <Camera className="h-4 w-4 text-primary" />
+                      )}
                     </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg"
+                      className="hidden"
+                      onChange={handleAvatarFileChange}
+                    />
                   </div>
                   <div className="flex-1">
                     <h2 className="text-2xl font-bold text-foreground">{user?.name || 'Patient'}</h2>

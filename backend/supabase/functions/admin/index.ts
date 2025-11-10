@@ -171,7 +171,7 @@ const handleListUsers = async (
     .select(
       'id,full_name,role,is_verified,metadata,specialty,experience_years,availability,avatar_url,assigned_counselor_id,' +
         'created_at,updated_at,visibility_settings,approval_status,approval_submitted_at,approval_reviewed_at,' +
-        'approval_notes,counselor_profiles(*)',
+        'approval_notes,counselor_profiles(*),counselor_documents(*)',
       { count: 'exact' },
     );
 
@@ -205,6 +205,22 @@ const handleListUsers = async (
   const ids = (data ?? []).map((row) => row.id);
   const authUsersMap = await fetchAuthUsers(serviceClient, ids);
 
+  const documentsByProfile = new Map<string, any[]>();
+  if (ids.length > 0) {
+    const { data: documents } = await serviceClient
+      .from('counselor_documents')
+      .select('*')
+      .in('profile_id', ids);
+    (documents ?? []).forEach((doc) => {
+      const profileId = doc.profile_id as string | undefined;
+      if (profileId) {
+        const existing = documentsByProfile.get(profileId) ?? [];
+        existing.push(doc);
+        documentsByProfile.set(profileId, existing);
+      }
+    });
+  }
+
   const combined = (data ?? []).map((row) => {
     const authUser = authUsersMap.get(row.id);
     return {
@@ -212,6 +228,7 @@ const handleListUsers = async (
       email: authUser?.email ?? row.metadata?.email ?? null,
       lastLogin: authUser?.last_login ?? row.updated_at,
       createdAt: authUser?.created_at ?? row.created_at,
+      counselor_documents: documentsByProfile.get(row.id) ?? [],
     };
   });
 
@@ -266,6 +283,11 @@ const handleGetUser = async (
   const authUser = await fetchAuthUsers(serviceClient, [payload.userId]);
   const authData = authUser.get(payload.userId);
 
+  const { data: documents } = await serviceClient
+    .from('counselor_documents')
+    .select('*')
+    .eq('profile_id', payload.userId);
+
   return new Response(
     JSON.stringify({
       success: true,
@@ -274,6 +296,7 @@ const handleGetUser = async (
         email: authData?.email ?? data.metadata?.email ?? null,
         lastLogin: authData?.last_login ?? data.updated_at,
         createdAt: authData?.created_at ?? data.created_at,
+        counselor_documents: documents ?? [],
       },
     }),
     { status: 200, headers: corsHeaders },

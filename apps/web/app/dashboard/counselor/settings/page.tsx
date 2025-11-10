@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { Button } from '@workspace/ui/components/button';
@@ -58,7 +58,7 @@ import { toast } from 'sonner';
 import { Textarea } from '@workspace/ui/components/textarea';
 import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
 import { normalizeAvatarUrl } from '@workspace/ui/lib/avatar';
-import type { VisibilitySettings, VisibilitySurface, CounselorApprovalStatus, CounselorAvailabilityStatus } from '../../../../lib/types';
+import type { VisibilitySettings, VisibilitySurface, CounselorApprovalStatus, CounselorAvailabilityStatus, CounselorDocument } from '../../../../lib/types';
 
 const LANGUAGE_OPTIONS = ['Kinyarwanda', 'English', 'French', 'Swahili'];
 
@@ -276,6 +276,55 @@ export default function CounselorSettingsPage() {
     approvalReviewedAt: '',
     avatar_url: user?.avatar || '',
   });
+  const [documents, setDocuments] = useState<CounselorDocument[]>([]);
+
+  const supabaseUrl = useMemo(() => {
+    const fromEnv =
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      (typeof window !== 'undefined' ? window.process?.env?.NEXT_PUBLIC_SUPABASE_URL : undefined);
+    return fromEnv ? fromEnv.replace(/\/+$/, '') : undefined;
+  }, []);
+
+  const toPublicUrl = useCallback(
+    (value: string | undefined | null) => {
+      if (!value) {
+        return undefined;
+      }
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return undefined;
+      }
+      if (/^(https?:)?\/\//i.test(trimmed) || trimmed.startsWith('data:')) {
+        return trimmed;
+      }
+      if (!supabaseUrl) {
+        return trimmed;
+      }
+      const normalizedPath = trimmed.replace(/^\/+/, '');
+      if (normalizedPath.startsWith('storage/v1/object/public/')) {
+        return `${supabaseUrl}/${normalizedPath}`;
+      }
+      return `${supabaseUrl}/storage/v1/object/public/${normalizedPath}`;
+    },
+    [supabaseUrl],
+  );
+
+  const formatDocumentType = useCallback((type: CounselorDocument['documentType']) => {
+    switch (type) {
+      case 'resume':
+        return 'Resume / CV';
+      case 'license':
+        return 'Professional License';
+      case 'certification':
+        return 'Certification';
+      case 'background_check':
+        return 'Background Check';
+      case 'insurance':
+        return 'Insurance';
+      default:
+        return type.replace(/_/g, ' ');
+    }
+  }, []);
 
   const profileAvatarUrl = useMemo(
     () => normalizeAvatarUrl(profile.avatar_url || user?.avatar),
@@ -387,6 +436,15 @@ export default function CounselorSettingsPage() {
           .filter((line) => line.length > 0)
           .join('\n');
 
+        const documentsFromUser = Array.isArray(currentUser.documents) ? currentUser.documents : [];
+        const resumeDocumentRecord = documentsFromUser.find((document) => document.documentType === 'resume');
+        const licenseDocumentRecord = documentsFromUser.find((document) => document.documentType === 'license');
+        const certificationDocumentNames = documentsFromUser
+          .filter((document) => document.documentType === 'certification')
+          .map((document) => document.displayName ?? document.storagePath.split('/').pop() ?? 'Certification');
+
+        setDocuments(documentsFromUser);
+
         setProfile((prev) => ({
           ...prev,
           name: resolvedName ?? '',
@@ -464,9 +522,18 @@ export default function CounselorSettingsPage() {
             metadata.graduationYear !== undefined
               ? String(metadata.graduationYear)
               : '',
-          resumeFileName: (metadata.resumeFileName as string) ?? '',
-          licenseFileName: (metadata.licenseFileName as string) ?? '',
-          certificationFileNames: Array.isArray(metadata.certificationFileNames)
+          resumeFileName:
+            resumeDocumentRecord?.displayName ??
+            (metadata.resumeFileName as string) ??
+            '',
+          licenseFileName:
+            licenseDocumentRecord?.displayName ??
+            (metadata.licenseFileName as string) ??
+            '',
+          certificationFileNames:
+            certificationDocumentNames.length > 0
+              ? certificationDocumentNames
+              : Array.isArray(metadata.certificationFileNames)
             ? metadata.certificationFileNames.map((value) => String(value))
             : Array.isArray(counselorProfile?.metadata?.certificationFileNames)
               ? (counselorProfile?.metadata?.certificationFileNames as unknown[]).map((value) => String(value))
@@ -638,7 +705,7 @@ export default function CounselorSettingsPage() {
         certificationFileNames: profile.certificationFileNames,
       };
 
-      await AuthApi.updateProfile({
+      const updatedUser = await AuthApi.updateProfile({
         fullName: profile.name,
         professionalTitle: profile.professionalTitle.trim() || undefined,
         phoneNumber: profile.phoneNumber,
@@ -649,6 +716,27 @@ export default function CounselorSettingsPage() {
         visibilitySettings,
         counselorProfile: counselorProfilePayload,
       });
+
+      const updatedDocuments = Array.isArray(updatedUser.documents) ? updatedUser.documents : [];
+      setDocuments(updatedDocuments);
+
+      if (updatedDocuments.length > 0) {
+        const updatedResumeDocument = updatedDocuments.find((document) => document.documentType === 'resume');
+        const updatedLicenseDocument = updatedDocuments.find((document) => document.documentType === 'license');
+        const updatedCertificationNames = updatedDocuments
+          .filter((document) => document.documentType === 'certification')
+          .map((document) => document.displayName ?? document.storagePath.split('/').pop() ?? 'Certification');
+
+        setProfile((prev) => ({
+          ...prev,
+          resumeFileName:
+            updatedResumeDocument?.displayName ?? prev.resumeFileName ?? '',
+          licenseFileName:
+            updatedLicenseDocument?.displayName ?? prev.licenseFileName ?? '',
+          certificationFileNames:
+            updatedCertificationNames.length > 0 ? updatedCertificationNames : prev.certificationFileNames,
+        }));
+      }
        
       setHasUnsavedChanges(false);
       toast.success('Profile updated successfully');

@@ -13,6 +13,7 @@ const SUPABASE_URL =
   null;
 
 let cachedClient: SupabaseClient | null = null;
+let missingServiceWarningLogged = false;
 
 /**
  * Create or return a cached Supabase service-role client.
@@ -26,9 +27,12 @@ export function getServiceClient(): SupabaseClient | null {
   }
 
   if (!SUPABASE_URL || !SERVICE_KEY) {
-    console.error(
+    if (!missingServiceWarningLogged) {
+      console.warn(
       '[supabase/service] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. Account administration features will be unavailable.',
     );
+      missingServiceWarningLogged = true;
+    }
     return null;
   }
 

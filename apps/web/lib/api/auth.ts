@@ -12,6 +12,7 @@ import type {
   CounselorProfileRecord,
   CounselorApprovalStatus,
   CounselorAvailabilityStatus,
+  CounselorDocument,
 } from '../types';
 
 /**
@@ -105,6 +106,8 @@ interface SyncProfileOptions {
   avatarUrl?: string;
   metadata?: Record<string, unknown>;
   userMetadata?: Record<string, unknown>;
+  role?: User['role'];
+  isVerified?: boolean;
   specialty?: string;
   experienceYears?: number;
   availability?: string;
@@ -144,6 +147,40 @@ const coerceNumberValue = (value: unknown): number | undefined => {
     return Number.isNaN(parsed) ? undefined : parsed;
   }
   return undefined;
+};
+
+const coerceUserRoleValue = (value: unknown): User['role'] | undefined => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'patient' || normalized === 'counselor' || normalized === 'admin' || normalized === 'guest') {
+    return normalized as User['role'];
+  }
+  return undefined;
+};
+
+const coerceBooleanValue = (value: unknown): boolean | undefined => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['true', '1', 'yes', 'y'].includes(normalized)) {
+      return true;
+    }
+    if (['false', '0', 'no', 'n'].includes(normalized)) {
+      return false;
+    }
+  }
+  return undefined;
+};
+
+const getRecordValue = <T>(record: Record<string, unknown> | undefined, key: string): T | undefined => {
+  if (!record) {
+    return undefined;
+  }
+  return record[key] as T | undefined;
 };
 
 const coerceStringArrayValue = (value: unknown): string[] | undefined => {
@@ -254,6 +291,70 @@ const mapCounselorProfileRow = (row: CounselorProfileRow): CounselorProfileRecor
   };
 };
 
+type CounselorDocumentRow = {
+  id: string;
+  profile_id: string;
+  document_type: CounselorDocument['documentType'];
+  storage_path: string;
+  display_name: string | null;
+  issued_at: string | null;
+  expires_at: string | null;
+  status: CounselorDocument['status'];
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+const mapCounselorDocumentRow = (row: CounselorDocumentRow): CounselorDocument => {
+  return {
+    id: row.id,
+    profileId: row.profile_id,
+    documentType: row.document_type,
+    storagePath: row.storage_path,
+    displayName: row.display_name ?? undefined,
+    issuedAt: row.issued_at ?? undefined,
+    expiresAt: row.expires_at ?? undefined,
+    status: row.status,
+    reviewedAt: row.reviewed_at ?? undefined,
+    reviewedBy: row.reviewed_by ?? undefined,
+    notes: row.notes ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+};
+
+const slugifyForStorage = (value: string): string => {
+  return value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+};
+
+const buildDocumentStoragePath = (
+  profileId: string,
+  type: CounselorDocument['documentType'],
+  fileName: string,
+): { bucket: string; storagePath: string; objectPath: string } => {
+  const bucket = 'counselor-documents';
+  const extension = fileName.includes('.') ? fileName.split('.').pop() : undefined;
+  const baseName = fileName.replace(/\.[^/.]+$/, '');
+  const slug = slugifyForStorage(baseName || 'document');
+  const timestamp = Date.now();
+  const randomSuffix = Math.random().toString(36).slice(2, 8);
+  const safeExtension = extension ? extension.toLowerCase() : 'dat';
+  const objectPath = `${profileId}/${type}/${timestamp}-${randomSuffix}-${slug}.${safeExtension}`;
+  const storagePath = `${bucket}/${objectPath}`;
+  return {
+    bucket,
+    storagePath,
+    objectPath,
+  };
+};
+
 async function syncProfileRecord(
   supabase: SupabaseClient,
   userId: string,
@@ -297,6 +398,31 @@ async function syncProfileRecord(
     id: userId,
     updated_at: new Date().toISOString(),
   };
+
+  const explicitRole = coerceUserRoleValue(options.role);
+  const metadataRole = coerceUserRoleValue(getRecordValue(options.metadata, 'role'));
+  const userMetadataRole = coerceUserRoleValue(getRecordValue(options.userMetadata, 'role'));
+  const effectiveRole = explicitRole ?? metadataRole ?? userMetadataRole;
+
+  if (effectiveRole) {
+    payload.role = effectiveRole;
+    mergedMetadata.role = effectiveRole;
+  } else if (!existingProfile) {
+    payload.role = 'guest';
+  }
+
+  if (payload.role && mergedMetadata.role !== payload.role) {
+    mergedMetadata.role = payload.role;
+  }
+
+  const resolvedIsVerified =
+    typeof options.isVerified === 'boolean'
+      ? options.isVerified
+      : coerceBooleanValue(getRecordValue(options.userMetadata, 'email_verified'));
+
+  if (resolvedIsVerified !== undefined) {
+    payload.is_verified = resolvedIsVerified;
+  }
 
   if (options.visibilitySettings !== undefined) {
     payload.visibility_settings = options.visibilitySettings;
@@ -821,6 +947,21 @@ export class AuthApi {
       updatedAt: new Date(data.user.updated_at || data.user.created_at),
     };
 
+    try {
+      await syncProfileRecord(supabase, data.user.id, {
+        fullName: displayNameSignUp,
+        metadata: { ...userMetadata },
+        userMetadata,
+        role: user.role,
+        isVerified: user.isVerified,
+        approvalStatus: user.role === 'counselor' ? 'pending' : undefined,
+      });
+    } catch (syncError) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[AuthApi.signUp] Failed to sync profile', syncError);
+      }
+    }
+
     return {
       user,
       tokens: {
@@ -879,6 +1020,20 @@ export class AuthApi {
       createdAt: new Date(data.user.created_at),
       updatedAt: new Date(data.user.updated_at || data.user.created_at),
     };
+
+    try {
+      await syncProfileRecord(supabase, data.user.id, {
+        fullName: displayNameSignIn,
+        metadata: { ...userMetadata },
+        userMetadata,
+        role: user.role,
+        isVerified: user.isVerified,
+      });
+    } catch (syncError) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[AuthApi.signIn] Failed to sync profile', syncError);
+      }
+    }
 
     return {
       user,
@@ -942,6 +1097,7 @@ export class AuthApi {
     let approvalReviewedAt: string | undefined;
     let approvalNotes: string | undefined;
     let counselorProfile: CounselorProfileRecord | undefined;
+    let counselorDocuments: CounselorDocument[] = [];
 
     if (user.last_sign_in_at) {
       mergedMetadata.lastSignInAt = user.last_sign_in_at;
@@ -1071,6 +1227,79 @@ export class AuthApi {
         counselorProfile = mapCounselorProfileRow(counselorProfileRow);
         mergedMetadata.counselorProfile = counselorProfile;
       }
+
+      const { data: documentsRows, error: documentsError } = await supabase
+        .from('counselor_documents')
+        .select('*')
+        .eq('profile_id', user.id);
+
+      if (documentsError && process.env.NODE_ENV !== 'production') {
+        console.warn('[AuthApi.getCurrentUser] Failed to load counselor documents', documentsError);
+      }
+
+      if (Array.isArray(documentsRows) && documentsRows.length > 0) {
+        counselorDocuments = documentsRows.map(mapCounselorDocumentRow);
+
+        const documentMetadata = counselorDocuments.map((document) => ({
+          label: document.displayName ?? document.documentType,
+          url: document.storagePath,
+          type: document.documentType,
+        }));
+        mergedMetadata.uploadedDocuments = documentMetadata;
+        mergedMetadata.documents = documentMetadata;
+
+        const resumeDocument = counselorDocuments.find((document) => document.documentType === 'resume');
+        if (resumeDocument) {
+          mergedMetadata.resumeFile = resumeDocument.storagePath;
+          mergedMetadata.resume_file = resumeDocument.storagePath;
+        }
+
+        const licenseDocument = counselorDocuments.find((document) => document.documentType === 'license');
+        if (licenseDocument) {
+          mergedMetadata.licenseFile = licenseDocument.storagePath;
+          mergedMetadata.license_file = licenseDocument.storagePath;
+        }
+
+        const certificationDocs = counselorDocuments.filter((document) => document.documentType === 'certification');
+        if (certificationDocs.length > 0) {
+          mergedMetadata.certificationDocuments = certificationDocs.map((document) => ({
+            name: document.displayName ?? 'Certification',
+            url: document.storagePath,
+          }));
+          mergedMetadata.certification_documents = mergedMetadata.certificationDocuments;
+        }
+      }
+    }
+
+    if (counselorDocuments.length > 0) {
+      const documentMetadata = counselorDocuments.map((document) => ({
+        label: document.displayName ?? document.documentType,
+        url: document.storagePath,
+        type: document.documentType,
+      }));
+      mergedMetadata.uploadedDocuments = documentMetadata;
+      mergedMetadata.documents = documentMetadata;
+
+      const resumeDocument = counselorDocuments.find((document) => document.documentType === 'resume');
+      if (resumeDocument) {
+        mergedMetadata.resumeFile = resumeDocument.storagePath;
+        mergedMetadata.resume_file = resumeDocument.storagePath;
+      }
+
+      const licenseDocument = counselorDocuments.find((document) => document.documentType === 'license');
+      if (licenseDocument) {
+        mergedMetadata.licenseFile = licenseDocument.storagePath;
+        mergedMetadata.license_file = licenseDocument.storagePath;
+      }
+
+      const certificationDocs = counselorDocuments.filter((document) => document.documentType === 'certification');
+      if (certificationDocs.length > 0) {
+        mergedMetadata.certificationDocuments = certificationDocs.map((document) => ({
+          name: document.displayName ?? 'Certification',
+          url: document.storagePath,
+        }));
+        mergedMetadata.certification_documents = mergedMetadata.certificationDocuments;
+      }
     }
 
     const metadataAvatar =
@@ -1118,12 +1347,16 @@ export class AuthApi {
       isVerified: user.email_confirmed_at !== null,
       createdAt: new Date(user.created_at),
       updatedAt: new Date(user.updated_at || user.created_at),
+      lastLogin: user.last_sign_in_at ? new Date(user.last_sign_in_at) : undefined,
       metadata: mergedMetadata,
       visibilitySettings,
       approvalStatus,
       approvalSubmittedAt,
       approvalReviewedAt,
-    } as User & { metadata?: Record<string, unknown> };
+      approvalNotes,
+      counselorProfile,
+      documents: counselorDocuments,
+    };
 
     if (approvalNotes) {
       (userData as User & { approvalNotes?: string }).approvalNotes = approvalNotes;
@@ -1485,6 +1718,7 @@ export class AuthApi {
     const finalAvatar = sanitizedAvatar || coerceStringValue(userMetadata.avatar_url) || undefined;
 
     let counselorProfile: CounselorProfileRecord | undefined;
+    let counselorDocuments: CounselorDocument[] = [];
     if (derivedRole === 'counselor') {
       const { data: counselorProfileRow } = await supabase
         .from('counselor_profiles')
@@ -1495,6 +1729,48 @@ export class AuthApi {
       if (counselorProfileRow) {
         counselorProfile = mapCounselorProfileRow(counselorProfileRow);
         mergedMetadata.counselorProfile = counselorProfile;
+      }
+
+      const { data: documentsRows, error: documentsError } = await supabase
+        .from('counselor_documents')
+        .select('*')
+        .eq('profile_id', user.id);
+
+      if (documentsError && process.env.NODE_ENV !== 'production') {
+        console.warn('[AuthApi.updateProfile] Failed to load counselor documents', documentsError);
+      }
+
+      if (!documentsError && Array.isArray(documentsRows) && documentsRows.length > 0) {
+        counselorDocuments = documentsRows.map(mapCounselorDocumentRow);
+
+        const documentMetadata = counselorDocuments.map((document) => ({
+          label: document.displayName ?? document.documentType,
+          url: document.storagePath,
+          type: document.documentType,
+        }));
+        mergedMetadata.uploadedDocuments = documentMetadata;
+        mergedMetadata.documents = documentMetadata;
+
+        const resumeDocument = counselorDocuments.find((document) => document.documentType === 'resume');
+        if (resumeDocument) {
+          mergedMetadata.resumeFile = resumeDocument.storagePath;
+          mergedMetadata.resume_file = resumeDocument.storagePath;
+        }
+
+        const licenseDocument = counselorDocuments.find((document) => document.documentType === 'license');
+        if (licenseDocument) {
+          mergedMetadata.licenseFile = licenseDocument.storagePath;
+          mergedMetadata.license_file = licenseDocument.storagePath;
+        }
+
+        const certificationDocs = counselorDocuments.filter((document) => document.documentType === 'certification');
+        if (certificationDocs.length > 0) {
+          mergedMetadata.certificationDocuments = certificationDocs.map((document) => ({
+            name: document.displayName ?? 'Certification',
+            url: document.storagePath,
+          }));
+          mergedMetadata.certification_documents = mergedMetadata.certificationDocuments;
+        }
       }
     }
 
@@ -1519,6 +1795,7 @@ export class AuthApi {
       createdAt: new Date(user.created_at),
       updatedAt: new Date(user.updated_at || user.created_at),
       metadata: mergedMetadata,
+      documents: counselorDocuments,
     } as User & { metadata?: Record<string, unknown> };
 
     const preferredLanguageValue = coerceStringValue(mergedMetadata.preferredLanguage);
@@ -1593,6 +1870,94 @@ export class AuthApi {
     }
 
     return userData;
+  }
+
+  static async uploadCounselorDocuments(params: {
+    resumeFile?: File | null;
+    licenseFile?: File | null;
+    certificationFiles?: File[] | null;
+  }): Promise<CounselorDocument[]> {
+    const supabase = createClient();
+    if (!supabase) {
+      throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+    }
+
+    const filesToUpload: Array<{ file: File; type: CounselorDocument['documentType'] }> = [];
+    if (params.resumeFile instanceof File) {
+      filesToUpload.push({ file: params.resumeFile, type: 'resume' });
+    }
+    if (params.licenseFile instanceof File) {
+      filesToUpload.push({ file: params.licenseFile, type: 'license' });
+    }
+    if (Array.isArray(params.certificationFiles)) {
+      params.certificationFiles
+        .filter((file): file is File => file instanceof File)
+        .forEach((file) => {
+          filesToUpload.push({ file, type: 'certification' });
+        });
+    }
+
+    if (filesToUpload.length === 0) {
+      return [];
+    }
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error(authError?.message || 'Failed to determine authenticated user.');
+    }
+
+    const uploadedDocuments: CounselorDocument[] = [];
+
+    for (const { file, type } of filesToUpload) {
+      const { bucket, storagePath, objectPath } = buildDocumentStoragePath(user.id, type, file.name);
+
+      const { error: uploadError } = await supabase.storage.from(bucket).upload(objectPath, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+      if (uploadError) {
+        throw new Error(uploadError.message || `Failed to upload ${type} document.`);
+      }
+
+      if (type === 'resume' || type === 'license') {
+        const { error: deleteError } = await supabase
+          .from('counselor_documents')
+          .delete()
+          .eq('profile_id', user.id)
+          .eq('document_type', type);
+        if (deleteError) {
+          // Attempt to clean up the uploaded file before throwing
+          await supabase.storage.from(bucket).remove([objectPath]).catch(() => undefined);
+          throw new Error(deleteError.message || `Failed to replace existing ${type} document.`);
+        }
+      }
+
+      const insertPayload = {
+        profile_id: user.id,
+        document_type: type,
+        storage_path: storagePath,
+        display_name: file.name,
+      } satisfies Partial<CounselorDocumentRow>;
+
+      const { data: insertedRow, error: insertError } = await supabase
+        .from('counselor_documents')
+        .insert(insertPayload)
+        .select('*')
+        .single<CounselorDocumentRow>();
+
+      if (insertError || !insertedRow) {
+        await supabase.storage.from(bucket).remove([objectPath]).catch(() => undefined);
+        throw new Error(insertError?.message || `Failed to record ${type} document metadata.`);
+      }
+
+      uploadedDocuments.push(mapCounselorDocumentRow(insertedRow));
+    }
+
+    return uploadedDocuments;
   }
 
   /**

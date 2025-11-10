@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { Button } from '@workspace/ui/components/button';
 import { Badge } from '@workspace/ui/components/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@workspace/ui/components/avatar';
 import { Input } from '@workspace/ui/components/input';
+import { Textarea } from '@workspace/ui/components/textarea';
 import { 
   Dialog,
   DialogContent,
@@ -83,7 +84,45 @@ export default function AdminApprovalsPage() {
   const [selectedCounselor, setSelectedCounselor] = useState<AdminUser | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const pendingCount = useMemo(() => counselors.length, [counselors]);
+  const [isRequestInfoDialogOpen, setIsRequestInfoDialogOpen] = useState(false);
+  const [requestInfoNotes, setRequestInfoNotes] = useState('');
+  const supabaseUrlRef = useRef<string | undefined>(undefined);
+
+  if (supabaseUrlRef.current === undefined) {
+    const fromEnv =
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      (typeof window !== 'undefined' ? window.process?.env?.NEXT_PUBLIC_SUPABASE_URL : undefined);
+    supabaseUrlRef.current = fromEnv ? fromEnv.replace(/\/+$/, '') : undefined;
+  }
+
+  const toPublicUrl = useCallback(
+    (value: string | undefined | null) => {
+      if (!value) {
+        return undefined;
+      }
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return undefined;
+      }
+      if (/^(https?:)?\/\//i.test(trimmed) || trimmed.startsWith('data:')) {
+        return trimmed;
+      }
+      const supabaseUrl = supabaseUrlRef.current;
+      if (!supabaseUrl) {
+        return trimmed;
+      }
+      const normalizedPath = trimmed.replace(/^\/+/, '');
+      if (normalizedPath.startsWith('storage/v1/object/public/')) {
+        return `${supabaseUrl}/${normalizedPath}`;
+      }
+      return `${supabaseUrl}/storage/v1/object/public/${normalizedPath}`;
+    },
+    [],
+  );
+  const pendingCount = useMemo(
+    () => counselors.filter((counselor) => (counselor.approvalStatus ?? 'pending') !== 'approved').length,
+    [counselors],
+  );
   const newThisWeekCount = useMemo(
     () =>
       counselors.filter(
@@ -93,15 +132,16 @@ export default function AdminApprovalsPage() {
     [counselors],
   );
   const highExperienceCount = useMemo(
-    () => counselors.filter((counselor) => ((counselor as any).experience || 0) >= 5).length,
+    () =>
+      counselors.filter(
+        (counselor) => (counselor.experienceYears ?? counselor.experience ?? 0) >= 5,
+      ).length,
     [counselors],
   );
   const multilingualCount = useMemo(
     () =>
       counselors.filter(
-        (counselor) =>
-          Array.isArray((counselor as any).languages) &&
-          ((counselor as any).languages as string[]).length >= 3,
+        (counselor) => Array.isArray(counselor.languages) && counselor.languages.length >= 3,
       ).length,
     [counselors],
   );
@@ -113,8 +153,7 @@ export default function AdminApprovalsPage() {
       try {
         setLoading(true);
         const response = await AdminApi.listUsers({ role: 'counselor' });
-        const pending = response.users.filter((counselor) => counselor.approvalStatus !== 'approved');
-        setCounselors(pending);
+        setCounselors(response.users);
       } catch (error) {
         console.error('Error loading counselors:', error);
         toast.error('Failed to load pending counselors');
@@ -127,22 +166,76 @@ export default function AdminApprovalsPage() {
   }, []);
 
   // Get unique specialties from counselors
-  const specialties = ['all', ...new Set(counselors.map(c => (c as any).specialty).filter(Boolean))];
+  const specialties = useMemo(() => {
+    const values = new Set<string>();
+    counselors.forEach((c) => {
+      if (c.specialty) {
+        values.add(c.specialty);
+      } else if (c.specializations && c.specializations.length > 0) {
+        c.specializations.forEach((spec) => values.add(spec));
+      }
+    });
+    return ['all', ...values];
+  }, [counselors]);
 
-  const filteredCounselors = counselors.filter(counselor => {
-    const matchesSearch = (counselor.fullName || counselor.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         counselor.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ((counselor as any).specialty || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSpecialty = selectedSpecialty === 'all' || (counselor as any).specialty === selectedSpecialty;
-    const experience = (counselor as any).experience || 0;
-    const matchesExperience = selectedExperience === 'all' || 
-      (selectedExperience === '0-2' && experience <= 2) ||
-      (selectedExperience === '3-5' && experience >= 3 && experience <= 5) ||
-      (selectedExperience === '6-10' && experience >= 6 && experience <= 10) ||
-      (selectedExperience === '10+' && experience > 10);
+  const filteredCounselors = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    const filtered = counselors.filter((counselor) => {
+      const primarySpecialty =
+        counselor.specialty ||
+        (counselor.specializations && counselor.specializations[0]) ||
+        '';
+      const languages = counselor.languages ?? [];
+      const practiceName = counselor.practiceName ?? '';
+
+      const matchesSearch =
+        normalizedSearch.length === 0 ||
+        (counselor.fullName || counselor.email || '')
+          .toLowerCase()
+          .includes(normalizedSearch) ||
+        counselor.email.toLowerCase().includes(normalizedSearch) ||
+        primarySpecialty.toLowerCase().includes(normalizedSearch) ||
+        practiceName.toLowerCase().includes(normalizedSearch) ||
+        languages.some((language) => language.toLowerCase().includes(normalizedSearch));
+
+      const matchesSpecialty =
+        selectedSpecialty === 'all' ||
+        counselor.specialty === selectedSpecialty ||
+        (counselor.specializations ?? []).includes(selectedSpecialty);
+
+      const experienceValue = counselor.experienceYears ?? counselor.experience ?? 0;
+      const matchesExperience =
+        selectedExperience === 'all' ||
+        (selectedExperience === '0-2' && experienceValue <= 2) ||
+        (selectedExperience === '3-5' && experienceValue >= 3 && experienceValue <= 5) ||
+        (selectedExperience === '6-10' && experienceValue >= 6 && experienceValue <= 10) ||
+        (selectedExperience === '10+' && experienceValue > 10);
     
     return matchesSearch && matchesSpecialty && matchesExperience;
   });
+
+    const statusOrder: Record<string, number> = {
+      pending: 0,
+      needs_more_info: 1,
+      suspended: 2,
+      rejected: 3,
+      approved: 4,
+    };
+
+    return filtered.sort((a, b) => {
+      const statusA = a.approvalStatus ?? 'pending';
+      const statusB = b.approvalStatus ?? 'pending';
+      const orderA = statusOrder[statusA] ?? 99;
+      const orderB = statusOrder[statusB] ?? 99;
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      const dateA = new Date(a.approvalSubmittedAt ?? a.createdAt).getTime();
+      const dateB = new Date(b.approvalSubmittedAt ?? b.createdAt).getTime();
+      return dateA - dateB;
+    });
+  }, [counselors, searchTerm, selectedSpecialty, selectedExperience]);
 
   const handleViewDetails = (counselor: AdminUser) => {
     setSelectedCounselor(counselor);
@@ -152,6 +245,8 @@ export default function AdminApprovalsPage() {
   const handleCloseModal = () => {
     setIsDetailModalOpen(false);
     setSelectedCounselor(null);
+    setIsRequestInfoDialogOpen(false);
+    setRequestInfoNotes('');
   };
 
   const handleApprove = async (counselorId: string) => {
@@ -191,16 +286,29 @@ export default function AdminApprovalsPage() {
     }
   };
 
-  const handleRequestInfo = async (counselorId: string) => {
+  const handleRequestInfo = () => {
+    if (!selectedCounselor) {
+      return;
+    }
+    setRequestInfoNotes(selectedCounselor.approvalNotes ?? '');
+    setIsRequestInfoDialogOpen(true);
+  };
+
+  const submitRequestInfo = async () => {
+    if (!selectedCounselor) {
+      return;
+    }
+    const counselorId = selectedCounselor.id;
+
     setIsProcessing(true);
     try {
-      const notes = window.prompt('What information do you need from this counselor?', selectedCounselor?.approvalNotes ?? '') || undefined;
       await AdminApi.updateCounselorApproval(counselorId, {
         approvalStatus: 'needs_more_info',
-        approvalNotes: notes,
+        approvalNotes: requestInfoNotes.trim() || undefined,
       });
       toast.success('Requested additional information from the counselor.');
       setCounselors((prev) => prev.filter((c) => c.id !== counselorId));
+      setIsRequestInfoDialogOpen(false);
       handleCloseModal();
     } catch (error) {
       console.error('Error requesting more information:', error);
@@ -215,19 +323,6 @@ export default function AdminApprovalsPage() {
     if (experience <= 5) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
     if (experience <= 10) return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
     return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-  };
-
-  const getApprovalBadgeStyles = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return { className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', label: 'Approved' };
-      case 'rejected':
-        return { className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', label: 'Rejected' };
-      case 'needs_more_info':
-        return { className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', label: 'Needs More Info' };
-      default:
-        return { className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', label: 'Pending Approval' };
-    }
   };
 
   return (
@@ -361,9 +456,9 @@ export default function AdminApprovalsPage() {
                 <TableHead>Counselor</TableHead>
                 <TableHead>Specialty</TableHead>
                 <TableHead>Experience</TableHead>
-                <TableHead>Languages</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead>Applied</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -373,7 +468,10 @@ export default function AdminApprovalsPage() {
                 <TableCell>
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src={undefined} alt={counselor.fullName || counselor.email} />
+                      <AvatarImage
+                        src={toPublicUrl(counselor.avatarUrl)}
+                        alt={counselor.fullName || counselor.email}
+                      />
                       <AvatarFallback>
                         {(counselor.fullName || counselor.email || 'C').split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                       </AvatarFallback>
@@ -386,40 +484,38 @@ export default function AdminApprovalsPage() {
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline" className="border-primary/20">
-                    {(counselor as any).specialty || 'General Counseling'}
+                    {counselor.specialty ||
+                      counselor.specializations?.[0] ||
+                      'General Counseling'}
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <Badge className={getExperienceColor((counselor as any).experience || 0)}>
-                    {(counselor as any).experience || 0} years
+                  <Badge
+                    className={getExperienceColor(counselor.experienceYears ?? counselor.experience ?? 0)}
+                  >
+                    {counselor.experienceYears ?? counselor.experience ?? 0} years
                   </Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {((counselor as any).languages && Array.isArray((counselor as any).languages)) 
-                      ? (counselor as any).languages.slice(0, 2).map((lang: string, index: number) => (
-                        <Badge key={index} variant="secondary" className="text-xs">
-                          {lang}
-                        </Badge>
-                      ))
-                      : null}
-                    {((counselor as any).languages && Array.isArray((counselor as any).languages) && (counselor as any).languages.length > 2) && (
-                      <Badge variant="secondary" className="text-xs">
-                        +{(counselor as any).languages.length - 2}
-                      </Badge>
-                    )}
-                  </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1 text-sm text-muted-foreground">
                     <MapPin className="h-3 w-3" />
-                    <span>{(counselor as any).location || 'N/A'}</span>
+                    <span>{counselor.practiceLocation || counselor.location || 'N/A'}</span>
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="text-sm">
-                    {new Date(counselor.createdAt).toLocaleDateString()}
+                    {new Date(counselor.approvalSubmittedAt ?? counselor.createdAt).toLocaleDateString()}
                   </div>
+                </TableCell>
+                <TableCell>
+                  {(() => {
+                    const { label, className } = getApprovalBadgeStyles(counselor.approvalStatus ?? 'pending');
+                    return (
+                      <Badge className={`${className} text-xs`}>
+                        {label}
+                      </Badge>
+                    );
+                  })()}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end space-x-2">
@@ -437,7 +533,7 @@ export default function AdminApprovalsPage() {
             )) : (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-8">
-                  <p className="text-muted-foreground">No pending applications found</p>
+                  <p className="text-muted-foreground">No counselor applications found</p>
                 </TableCell>
               </TableRow>
             )}
@@ -478,35 +574,65 @@ export default function AdminApprovalsPage() {
             <DialogDescription>
               {selectedCounselor && (
                 <span>
-                  {(selectedCounselor as any).specialty || 'General Counseling'} • {(selectedCounselor as any).experience || 0} years experience • {((selectedCounselor as any).languages && Array.isArray((selectedCounselor as any).languages)) ? (selectedCounselor as any).languages.length : 0} languages
+                  {(selectedCounselor.specialty || selectedCounselor.specializations?.[0] || 'General Counseling')} • {(selectedCounselor.experienceYears ?? selectedCounselor.experience ?? 0)} years experience • {(selectedCounselor.languages?.length ?? selectedCounselor.counselorProfile?.languages?.length ?? 0)} languages
                 </span>
               )}
             </DialogDescription>
           </DialogHeader>
 
-          {selectedCounselor && (
+          {selectedCounselor &&
+            (() => {
+              const profile = selectedCounselor.counselorProfile;
+              const languages = selectedCounselor.languages ?? profile?.languages ?? [];
+              const specializations =
+                selectedCounselor.specializations ?? profile?.specializations ?? [];
+              const consultationTypes =
+                selectedCounselor.consultationTypes ?? profile?.sessionModalities ?? [];
+              const demographics =
+                selectedCounselor.demographicsServed ?? profile?.demographicsServed ?? [];
+              const professionalHighlights =
+                selectedCounselor.professionalHighlights ?? profile?.professionalHighlights ?? [];
+              const educationHistory =
+                selectedCounselor.educationHistory ?? profile?.educationHistory ?? [];
+              const documents = selectedCounselor.documents ?? [];
+              const references = Array.isArray(selectedCounselor.professionalReferences)
+                ? selectedCounselor.professionalReferences
+                : profile?.professionalReferences ?? [];
+              const applicationDate =
+                selectedCounselor.approvalSubmittedAt ?? selectedCounselor.createdAt;
+
+              return (
             <div className="space-y-6 mt-6">
               {/* Basic Information */}
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-4">
                   <div className="flex items-start gap-4">
                     <Avatar className="h-16 w-16 flex-shrink-0">
-                      <AvatarImage src={undefined} alt={selectedCounselor.fullName || selectedCounselor.email} />
+                          <AvatarImage
+                            src={toPublicUrl(selectedCounselor.avatarUrl)}
+                            alt={selectedCounselor.fullName || selectedCounselor.email}
+                          />
                       <AvatarFallback className="text-lg">
-                        {(selectedCounselor.fullName || selectedCounselor.email || 'C').split(' ').map(n => n[0]).join('').slice(0, 2)}
+                            {(selectedCounselor.fullName || selectedCounselor.email || 'C')
+                              .split(' ')
+                              .map((n) => n[0])
+                              .join('')
+                              .slice(0, 2)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1 space-y-2">
-                      <h4 className="text-lg font-semibold">{selectedCounselor.fullName || selectedCounselor.email}</h4>
+                          <h4 className="text-lg font-semibold">
+                            {selectedCounselor.fullName || selectedCounselor.email}
+                          </h4>
                       <div className="space-y-1">
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Mail className="h-3 w-3 flex-shrink-0" />
                           <span className="break-all">{selectedCounselor.email}</span>
                         </div>
-                        {(selectedCounselor as any).phoneNumber && (
+                            {selectedCounselor.phoneNumber && (
                           <div className="flex items-center gap-1 text-sm text-muted-foreground">
                             <Phone className="h-3 w-3 flex-shrink-0" />
-                            <span>{(selectedCounselor as any).phoneNumber}</span>
+                                <span>{selectedCounselor.phoneNumber}</span>
                           </div>
                         )}
                       </div>
@@ -514,19 +640,25 @@ export default function AdminApprovalsPage() {
                   </div>
 
                   <div className="space-y-3">
-                    {(selectedCounselor as any).location && (
+                        {(selectedCounselor.practiceLocation || selectedCounselor.location) && (
                       <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        <span className="text-sm">{(selectedCounselor as any).location}</span>
+                            <span className="text-sm">
+                              {selectedCounselor.practiceLocation || selectedCounselor.location}
+                            </span>
                       </div>
                     )}
                     <div className="flex items-center gap-2">
                       <Award className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <span className="text-sm">{(selectedCounselor as any).specialty || 'General Counseling'}</span>
+                          <span className="text-sm">
+                            {selectedCounselor.specialty || specializations[0] || 'General Counseling'}
+                          </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <span className="text-sm">{(selectedCounselor as any).experience || 0} years experience</span>
+                          <span className="text-sm">
+                            {selectedCounselor.experienceYears ?? selectedCounselor.experience ?? 0} years experience
+                          </span>
                     </div>
                   </div>
                 </div>
@@ -535,93 +667,112 @@ export default function AdminApprovalsPage() {
                   <div>
                     <h5 className="font-medium mb-3 text-sm">Languages</h5>
                     <div className="flex flex-wrap gap-2">
-                      {((selectedCounselor as any).languages && Array.isArray((selectedCounselor as any).languages)) 
-                        ? (selectedCounselor as any).languages.map((language: string, index: number) => (
+                          {languages.length > 0 ? (
+                            languages.map((language, index) => (
                           <Badge key={index} variant="secondary" className="text-xs">
                             {language}
                           </Badge>
                         ))
-                        : <span className="text-sm text-muted-foreground">Not provided</span>}
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Not provided</span>
+                          )}
                     </div>
                   </div>
 
-                  {(selectedCounselor as any).availability && (
+                      {selectedCounselor.availabilityStatus && (
                     <div>
                       <h5 className="font-medium mb-3 text-sm">Availability</h5>
                       <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                        {(selectedCounselor as any).availability}
+                            {selectedCounselor.availabilityStatus}
                       </Badge>
                     </div>
                   )}
 
-                  <div>
-                    <h5 className="font-medium mb-3 text-sm">Application Date</h5>
+                      <div className="space-y-2">
+                        <h5 className="font-medium mb-1 text-sm">Application Date</h5>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Calendar className="h-3 w-3 flex-shrink-0" />
-                      <span>{new Date(selectedCounselor.createdAt).toLocaleDateString()}</span>
+                          <span>{new Date(applicationDate).toLocaleDateString()}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Professional License Information */}
-              {(selectedCounselor as any).licenseNumber && (
-                <div className="space-y-6 border-t pt-6">
-                  <h5 className="font-medium flex items-center gap-2 text-sm">
-                    <Shield className="h-4 w-4" />
-                    Professional License
+                  {/* Practice & Availability */}
+                  {(selectedCounselor.practiceName ||
+                    selectedCounselor.serviceRegions ||
+                    selectedCounselor.acceptingNewPatients !== undefined ||
+                    selectedCounselor.telehealthOffered !== undefined) && (
+                    <div className="space-y-4 border-t pt-6">
+                      <h5 className="font-medium text-sm flex items-center gap-2">
+                        <Briefcase className="h-4 w-4" />
+                        Practice & Availability
                   </h5>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {selectedCounselor.practiceName && (
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">License Number</p>
-                      <p className="text-sm font-medium">{(selectedCounselor as any).licenseNumber || 'Not provided'}</p>
+                            <p className="text-xs text-muted-foreground mb-1">Practice Name</p>
+                            <p className="text-sm font-medium">{selectedCounselor.practiceName}</p>
                     </div>
+                        )}
+                        {selectedCounselor.practiceLocation && (
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">License Expiry</p>
-                      <p className="text-sm font-medium">{(selectedCounselor as any).licenseExpiry || 'Not provided'}</p>
+                            <p className="text-xs text-muted-foreground mb-1">Practice Location</p>
+                            <p className="text-sm font-medium">{selectedCounselor.practiceLocation}</p>
                     </div>
+                        )}
+                        {selectedCounselor.acceptingNewPatients !== undefined && (
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Issuing Authority</p>
-                      <p className="text-sm font-medium">{(selectedCounselor as any).issuingAuthority || 'Not provided'}</p>
-                    </div>
-                  </div>
+                            <p className="text-xs text-muted-foreground mb-1">Accepting New Patients</p>
+                            <Badge variant="outline" className="text-xs">
+                              {selectedCounselor.acceptingNewPatients ? 'Yes' : 'No'}
+                            </Badge>
                 </div>
               )}
-
-              {/* Education Information */}
-              {((selectedCounselor as any).highestDegree || (selectedCounselor as any).university) && (
-                <div className="space-y-6 border-t pt-6">
-                  <h5 className="font-medium flex items-center gap-2 text-sm">
-                    <GraduationCap className="h-4 w-4" />
-                    Education & Certifications
-                  </h5>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(selectedCounselor as any).highestDegree && (
+                        {selectedCounselor.waitlistEnabled !== undefined && (
                       <div>
-                        <p className="text-xs text-muted-foreground mb-1">Highest Degree</p>
-                        <p className="text-sm font-medium">{(selectedCounselor as any).highestDegree}</p>
+                            <p className="text-xs text-muted-foreground mb-1">Waitlist Enabled</p>
+                            <Badge variant="outline" className="text-xs">
+                              {selectedCounselor.waitlistEnabled ? 'Yes' : 'No'}
+                            </Badge>
                       </div>
                     )}
-                    {(selectedCounselor as any).university && (
+                        {selectedCounselor.telehealthOffered !== undefined && (
                       <div>
-                        <p className="text-xs text-muted-foreground mb-1">University/Institution</p>
-                        <p className="text-sm font-medium">{(selectedCounselor as any).university}</p>
+                            <p className="text-xs text-muted-foreground mb-1">Telehealth Offered</p>
+                            <Badge variant="outline" className="text-xs">
+                              {selectedCounselor.telehealthOffered ? 'Yes' : 'No'}
+                            </Badge>
                       </div>
                     )}
-                    {(selectedCounselor as any).graduationYear && (
+                        {selectedCounselor.inPersonOffered !== undefined && (
                       <div>
-                        <p className="text-xs text-muted-foreground mb-1">Graduation Year</p>
-                        <p className="text-sm font-medium">{(selectedCounselor as any).graduationYear}</p>
+                            <p className="text-xs text-muted-foreground mb-1">In-person Sessions</p>
+                            <Badge variant="outline" className="text-xs">
+                              {selectedCounselor.inPersonOffered ? 'Yes' : 'No'}
+                            </Badge>
                       </div>
                     )}
                   </div>
-                  {(selectedCounselor as any).additionalCertifications && (selectedCounselor as any).additionalCertifications.length > 0 && (
-                    <div className="mt-4">
-                      <p className="text-xs text-muted-foreground mb-2">Additional Certifications</p>
+                      {(selectedCounselor.serviceRegions && selectedCounselor.serviceRegions.length > 0) && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Service Regions</p>
                       <div className="flex flex-wrap gap-2">
-                        {(selectedCounselor as any).additionalCertifications.map((cert: string, index: number) => (
-                          <Badge key={index} variant="secondary" className="text-xs">
-                            {cert}
+                            {selectedCounselor.serviceRegions.map((region, index) => (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {region}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {(selectedCounselor.sessionModalities && selectedCounselor.sessionModalities.length > 0) && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Session Modalities</p>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedCounselor.sessionModalities.map((modality, index) => (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {modality}
                           </Badge>
                         ))}
                       </div>
@@ -631,13 +782,16 @@ export default function AdminApprovalsPage() {
               )}
 
               {/* Specializations & Consultation Types */}
-              {((selectedCounselor as any).specializations || (selectedCounselor as any).consultationTypes) && (
+                  {(specializations.length > 0 ||
+                    consultationTypes.length > 0 ||
+                    demographics.length > 0 ||
+                    selectedCounselor.approachSummary) && (
                 <div className="space-y-4 border-t pt-6">
-                  {(selectedCounselor as any).specializations && (selectedCounselor as any).specializations.length > 0 && (
+                      {specializations.length > 0 && (
                     <div>
                       <h5 className="font-medium mb-3 text-sm">Specializations</h5>
                       <div className="flex flex-wrap gap-2">
-                        {(selectedCounselor as any).specializations.map((spec: string, index: number) => (
+                            {specializations.map((spec, index) => (
                           <Badge key={index} variant="outline" className="text-xs">
                             {spec}
                           </Badge>
@@ -645,20 +799,20 @@ export default function AdminApprovalsPage() {
                       </div>
                     </div>
                   )}
-                  {(selectedCounselor as any).consultationTypes && (selectedCounselor as any).consultationTypes.length > 0 && (
+                      {consultationTypes.length > 0 && (
                     <div>
                       <h5 className="font-medium mb-3 text-sm">Consultation Types</h5>
                       <div className="flex flex-wrap gap-2">
-                        {(selectedCounselor as any).consultationTypes.map((type: string, index: number) => {
-                          const icons: Record<string, any> = {
+                            {consultationTypes.map((type, index) => {
+                              const icons: Record<string, React.ElementType> = {
                             chat: MessageCircle,
                             video: Video,
-                            phone: Phone
+                                phone: Phone,
                           };
                           const labels: Record<string, string> = {
                             chat: 'Text Chat',
                             video: 'Video Call',
-                            phone: 'Phone Call'
+                                phone: 'Phone Call',
                           };
                           const Icon = icons[type] || MessageCircle;
                           return (
@@ -671,19 +825,129 @@ export default function AdminApprovalsPage() {
                       </div>
                     </div>
                   )}
+                      {demographics.length > 0 && (
+                        <div>
+                          <h5 className="font-medium mb-3 text-sm">Demographics Served</h5>
+                          <div className="flex flex-wrap gap-2">
+                            {demographics.map((demographic, index) => (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {demographic}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {selectedCounselor.approachSummary && (
+                        <div>
+                          <h5 className="font-medium mb-2 text-sm">Approach Summary</h5>
+                          <div className="p-4 border rounded-lg bg-muted/50">
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                              {selectedCounselor.approachSummary}
+                            </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Previous Employers */}
-              {(selectedCounselor as any).previousEmployers && (
-                <div className="space-y-3 border-t pt-6">
+                  {/* Professional License Information */}
+                  {(selectedCounselor.licenseNumber ||
+                    selectedCounselor.licenseJurisdiction ||
+                    selectedCounselor.licenseExpiry) && (
+                    <div className="space-y-6 border-t pt-6">
                   <h5 className="font-medium flex items-center gap-2 text-sm">
-                    <Briefcase className="h-4 w-4" />
-                    Previous Employers/Experience
+                        <Shield className="h-4 w-4" />
+                        Professional License
                   </h5>
-                  <div className="p-4 border rounded-lg bg-muted/50">
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{(selectedCounselor as any).previousEmployers}</p>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {selectedCounselor.licenseNumber && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">License Number</p>
+                            <p className="text-sm font-medium">{selectedCounselor.licenseNumber}</p>
                   </div>
+                        )}
+                        {selectedCounselor.licenseJurisdiction && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">License Jurisdiction</p>
+                            <p className="text-sm font-medium">{selectedCounselor.licenseJurisdiction}</p>
+                          </div>
+                        )}
+                        {selectedCounselor.licenseExpiry && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">License Expiry</p>
+                            <p className="text-sm font-medium">{selectedCounselor.licenseExpiry}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Education Information */}
+                  {(selectedCounselor.highestDegree ||
+                    selectedCounselor.university ||
+                    selectedCounselor.graduationYear ||
+                    educationHistory.length > 0 ||
+                    (selectedCounselor.additionalCertifications &&
+                      selectedCounselor.additionalCertifications.length > 0)) && (
+                    <div className="space-y-6 border-t pt-6">
+                      <h5 className="font-medium flex items-center gap-2 text-sm">
+                        <GraduationCap className="h-4 w-4" />
+                        Education & Certifications
+                      </h5>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {selectedCounselor.highestDegree && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Highest Degree</p>
+                            <p className="text-sm font-medium">{selectedCounselor.highestDegree}</p>
+                          </div>
+                        )}
+                        {selectedCounselor.university && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">University/Institution</p>
+                            <p className="text-sm font-medium">{selectedCounselor.university}</p>
+                          </div>
+                        )}
+                        {selectedCounselor.graduationYear && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Graduation Year</p>
+                            <p className="text-sm font-medium">{selectedCounselor.graduationYear}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {educationHistory.length > 0 && (
+                        <div className="space-y-3">
+                          <p className="text-xs text-muted-foreground mb-1">Education History</p>
+                          <div className="space-y-2">
+                            {educationHistory.map((item, index) => (
+                              <div key={index} className="p-3 border rounded-lg bg-muted/40">
+                                <p className="text-sm font-medium">
+                                  {item.degree || 'Degree not specified'}
+                                </p>
+                                {(item.institution || item.graduationYear) && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {[item.institution, item.graduationYear].filter(Boolean).join(' • ')}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedCounselor.additionalCertifications &&
+                        selectedCounselor.additionalCertifications.length > 0 && (
+                          <div className="mt-4">
+                            <p className="text-xs text-muted-foreground mb-2">Additional Certifications</p>
+                            <div className="flex flex-wrap gap-2">
+                              {selectedCounselor.additionalCertifications.map((cert, index) => (
+                                <Badge key={index} variant="secondary" className="text-xs">
+                                  {cert}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                 </div>
               )}
 
@@ -695,7 +959,11 @@ export default function AdminApprovalsPage() {
                     Credentials
                   </h5>
                   <div className="p-4 border rounded-lg bg-muted/50">
-                    <p className="text-sm leading-relaxed">{(selectedCounselor as any).credentials || 'Not provided'}</p>
+                        <p className="text-sm leading-relaxed">
+                          {Array.isArray(selectedCounselor.credentials)
+                            ? selectedCounselor.credentials.join(', ')
+                            : selectedCounselor.credentials || 'Not provided'}
+                        </p>
                   </div>
                 </div>
 
@@ -705,46 +973,126 @@ export default function AdminApprovalsPage() {
                     Professional Bio
                   </h5>
                   <div className="p-4 border rounded-lg bg-muted/50">
-                    <p className="text-sm leading-relaxed">{(selectedCounselor as any).bio || 'Not provided'}</p>
+                        <p className="text-sm leading-relaxed">
+                          {selectedCounselor.bio || profile?.bio || 'Not provided'}
+                        </p>
                   </div>
                 </div>
+
+                    {professionalHighlights.length > 0 && (
+                      <div className="space-y-3">
+                        <h5 className="font-medium flex items-center gap-2 text-sm">
+                          <Star className="h-4 w-4" />
+                          Professional Highlights
+                        </h5>
+                        <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
+                          {professionalHighlights.map((highlight, index) => (
+                            <li key={index}>{highlight}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {selectedCounselor.previousEmployers && (
+                      <div className="space-y-3">
+                        <h5 className="font-medium flex items-center gap-2 text-sm">
+                          <Briefcase className="h-4 w-4" />
+                          Previous Employers / Experience
+                        </h5>
+                        <div className="p-4 border rounded-lg bg-muted/50">
+                          <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                            {selectedCounselor.previousEmployers}
+                          </p>
+                        </div>
+                      </div>
+                    )}
               </div>
 
               {/* Motivation */}
-              {(selectedCounselor as any).motivation && (
+                  {selectedCounselor.motivationStatement && (
                 <div className="space-y-3 border-t pt-6">
                   <h5 className="font-medium flex items-center gap-2 text-sm">
                     <Heart className="h-4 w-4" />
                     Motivation to Join RCR
                   </h5>
                   <div className="p-4 border rounded-lg bg-muted/50">
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{(selectedCounselor as any).motivation}</p>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                          {selectedCounselor.motivationStatement}
+                        </p>
                   </div>
                 </div>
               )}
 
               {/* References */}
-              {(selectedCounselor as any).references && (
+                  {references && references.length > 0 && (
                 <div className="space-y-3 border-t pt-6">
                   <h5 className="font-medium flex items-center gap-2 text-sm">
                     <User className="h-4 w-4" />
                     Professional References
                   </h5>
-                  <div className="p-4 border rounded-lg bg-muted/50">
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{(selectedCounselor as any).references}</p>
+                      <div className="space-y-3">
+                        {references.map((reference, index) => {
+                          const refRecord =
+                            reference && typeof reference === 'object'
+                              ? (reference as Record<string, unknown>)
+                              : typeof reference === 'string'
+                                ? ({ name: reference } as Record<string, unknown>)
+                                : undefined;
+
+                          const referenceName = (() => {
+                            const recordName = refRecord?.name;
+                            if (typeof recordName === 'string') {
+                              const trimmed = recordName.trim();
+                              if (trimmed.length > 0) {
+                                return trimmed;
+                              }
+                            }
+                            return 'Reference';
+                          })();
+
+                          const detailKeys: Array<'organization' | 'email' | 'phone'> = [
+                            'organization',
+                            'email',
+                            'phone',
+                          ];
+                          const refDetails = detailKeys
+                            .map((key) => {
+                              const value = refRecord?.[key];
+                              return typeof value === 'string' && value.trim().length > 0
+                                ? value.trim()
+                                : undefined;
+                            })
+                            .filter((value): value is string => Boolean(value));
+
+                          return (
+                            <div key={index} className="p-4 border rounded-lg bg-muted/40">
+                              <p className="text-sm font-medium">{referenceName}</p>
+                              {refDetails.length > 0 ? (
+                                <p className="text-xs text-muted-foreground">{refDetails.join(' • ')}</p>
+                              ) : null}
+                            </div>
+                          );
+                        })}
                   </div>
                 </div>
               )}
 
               {/* Emergency Contact */}
-              {(selectedCounselor as any).emergencyContact && (
+                  {(selectedCounselor.emergencyContactName || selectedCounselor.emergencyContactPhone) && (
                 <div className="space-y-3 border-t pt-6">
                   <h5 className="font-medium flex items-center gap-2 text-sm">
                     <Phone className="h-4 w-4" />
                     Emergency Contact
                   </h5>
-                  <div className="p-4 border rounded-lg bg-muted/50">
-                    <p className="text-sm">{(selectedCounselor as any).emergencyContact}</p>
+                      <div className="p-4 border rounded-lg bg-muted/50 space-y-1">
+                        {selectedCounselor.emergencyContactName && (
+                          <p className="text-sm font-medium">{selectedCounselor.emergencyContactName}</p>
+                        )}
+                        {selectedCounselor.emergencyContactPhone && (
+                          <p className="text-sm text-muted-foreground">
+                            {selectedCounselor.emergencyContactPhone}
+                          </p>
+                        )}
                   </div>
                 </div>
               )}
@@ -755,81 +1103,30 @@ export default function AdminApprovalsPage() {
                   <Download className="h-4 w-4" />
                   Uploaded Documents
                 </h5>
-                {(selectedCounselor as any).resumeFile || (selectedCounselor as any).licenseFile || (selectedCounselor as any).certificationsFile ? (
+                {documents.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {(selectedCounselor as any).resumeFile ? (
-                      <a 
-                        href={(selectedCounselor as any).resumeFile}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block p-3 border rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer group"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <FileText className="h-5 w-5 text-primary group-hover:text-primary/80" />
-                          <Download className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    {documents.map((doc, index) => (
+                      <div key={index} className="p-4 border rounded-lg bg-muted/30 flex flex-col gap-2">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <FileText className="h-4 w-4" />
+                          {doc.label}
                         </div>
-                        <p className="text-xs text-muted-foreground mb-1">Resume/CV</p>
-                        <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">View PDF</p>
-                      </a>
-                    ) : (
-                      <div className="p-3 border border-dashed rounded-lg bg-muted/20">
-                        <FileText className="h-5 w-5 mb-2 text-muted-foreground" />
-                        <p className="text-xs text-muted-foreground mb-1">Resume/CV</p>
-                        <p className="text-xs text-muted-foreground">Not uploaded</p>
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={toPublicUrl(doc.url) ?? doc.url} target="_blank" rel="noopener noreferrer">
+                            <Download className="h-4 w-4 mr-2" />
+                            View Document
+                          </a>
+                        </Button>
                       </div>
-                    )}
-                    {(selectedCounselor as any).licenseFile ? (
-                      <a 
-                        href={(selectedCounselor as any).licenseFile}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block p-3 border rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer group"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <Shield className="h-5 w-5 text-primary group-hover:text-primary/80" />
-                          <Download className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    ))}
                         </div>
-                        <p className="text-xs text-muted-foreground mb-1">License</p>
-                        <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">View PDF</p>
-                      </a>
                     ) : (
-                      <div className="p-3 border border-dashed rounded-lg bg-muted/20">
-                        <Shield className="h-5 w-5 mb-2 text-muted-foreground" />
-                        <p className="text-xs text-muted-foreground mb-1">License</p>
-                        <p className="text-xs text-muted-foreground">Not uploaded</p>
-                      </div>
-                    )}
-                    {(selectedCounselor as any).certificationsFile ? (
-                      <a 
-                        href={(selectedCounselor as any).certificationsFile}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block p-3 border rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer group"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <Award className="h-5 w-5 text-primary group-hover:text-primary/80" />
-                          <Download className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </div>
-                        <p className="text-xs text-muted-foreground mb-1">Certifications</p>
-                        <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">View PDF</p>
-                      </a>
-                    ) : (
-                      <div className="p-3 border border-dashed rounded-lg bg-muted/20">
-                        <Award className="h-5 w-5 mb-2 text-muted-foreground" />
-                        <p className="text-xs text-muted-foreground mb-1">Certifications</p>
-                        <p className="text-xs text-muted-foreground">Not uploaded</p>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="p-6 border border-dashed rounded-lg bg-muted/20 text-center">
-                    <Download className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">No documents uploaded</p>
-                  </div>
+                  <div className="text-sm text-muted-foreground">No documents uploaded</div>
                 )}
-              </div>
-            </div>
-          )}
+                        </div>
+                      </div>
+          );
+        })()}
 
           <DialogFooter className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
             <div className="text-sm text-muted-foreground">
@@ -839,7 +1136,7 @@ export default function AdminApprovalsPage() {
               <Button
                 variant="outline"
                 disabled={isProcessing || !selectedCounselor}
-                onClick={() => selectedCounselor && handleRequestInfo(selectedCounselor.id)}
+                onClick={handleRequestInfo}
               >
                 Request More Info
               </Button>
@@ -879,6 +1176,70 @@ export default function AdminApprovalsPage() {
                 )}
               </Button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Request Info Dialog */}
+      <Dialog
+        open={isRequestInfoDialogOpen}
+        onOpenChange={(open) => {
+          setIsRequestInfoDialogOpen(open);
+          if (!open) {
+            setRequestInfoNotes('');
+          } else if (selectedCounselor) {
+            setRequestInfoNotes(selectedCounselor.approvalNotes ?? '');
+          }
+        }}
+      >
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-100">
+                <MessageCircle className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <span className="text-muted-foreground">Request More Information</span>
+                <h3 className="text-lg font-semibold">
+                  {selectedCounselor?.fullName || selectedCounselor?.email}
+                </h3>
+              </div>
+            </DialogTitle>
+            <DialogDescription asChild>
+              <span className="text-sm text-muted-foreground">
+                Please provide a detailed reason for requesting more information from this counselor.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              placeholder="Enter your message..."
+              value={requestInfoNotes}
+              onChange={(e) => setRequestInfoNotes(e.target.value)}
+              className="min-h-[150px] bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
+            />
+          </div>
+          <DialogFooter className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsRequestInfoDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={submitRequestInfo}
+              disabled={isProcessing}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {isProcessing ? (
+                <>
+                  <Spinner variant="bars" size={16} className="text-white mr-2" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Send Request
+                </>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

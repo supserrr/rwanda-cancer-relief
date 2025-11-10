@@ -16,7 +16,13 @@ import { env } from '@/src/env';
  * Singleton Supabase client instance
  * This ensures only one client is created per browser context
  */
-let supabaseClientInstance: SupabaseClient | null = null;
+const globalRef: Record<string, unknown> =
+  typeof globalThis !== 'undefined' ? (globalThis as Record<string, unknown>) : {};
+
+const SUPABASE_BROWSER_CLIENT_KEY = '__supabase_browser_client__';
+
+let supabaseClientInstance: SupabaseClient | null =
+  (globalRef[SUPABASE_BROWSER_CLIENT_KEY] as SupabaseClient | undefined) ?? null;
 
 /**
  * Create or get the singleton Supabase client for client-side usage
@@ -107,6 +113,8 @@ export function createClient(): SupabaseClient | null {
       },
     }
   );
+
+  globalRef[SUPABASE_BROWSER_CLIENT_KEY] = supabaseClientInstance;
 
   return supabaseClientInstance;
 }

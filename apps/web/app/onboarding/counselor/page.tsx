@@ -33,9 +33,14 @@ import {
   Video,
 } from 'lucide-react';
 import { AuthApi } from '../../../lib/api/auth';
+import type {
+  VisibilitySurface,
+  VisibilitySettings,
+  CounselorAvailabilityStatus,
+  CounselorDocument,
+} from '../../../lib/types';
 import { toast } from 'sonner';
 import { useAuth } from '@/components/auth/AuthProvider';
-import type { VisibilitySurface, VisibilitySettings, CounselorAvailabilityStatus } from '../../../lib/types';
 
 interface CounselorOnboardingData {
   professionalTitle: string;
@@ -435,6 +440,42 @@ export default function CounselorOnboardingPage() {
       const trimmedProfessionalTitle = formData.professionalTitle.trim();
       const hasLicense = formData.hasLicense;
 
+      const shouldUploadDocuments =
+        Boolean(formData.resumeFile) ||
+        (hasLicense && (Boolean(formData.licenseFile) || formData.certificationFiles.length > 0));
+
+      let uploadedDocuments: CounselorDocument[] = [];
+      if (shouldUploadDocuments) {
+        uploadedDocuments = await AuthApi.uploadCounselorDocuments({
+          resumeFile: formData.resumeFile ?? undefined,
+          licenseFile: hasLicense ? formData.licenseFile ?? undefined : undefined,
+          certificationFiles: hasLicense ? formData.certificationFiles : [],
+        });
+      }
+
+      const resumeDocument = uploadedDocuments.find((document) => document.documentType === 'resume');
+      const licenseDocument = uploadedDocuments.find((document) => document.documentType === 'license');
+      const certificationDocumentUploads = uploadedDocuments.filter(
+        (document) => document.documentType === 'certification',
+      );
+
+      const certificationDocumentsForProfile =
+        certificationDocumentUploads.length > 0
+          ? certificationDocumentUploads.map((document) => ({
+              name: document.displayName ?? 'Certification',
+              url: document.storagePath,
+            }))
+          : [];
+
+      const uploadedDocumentsMetadata =
+        uploadedDocuments.length > 0
+          ? uploadedDocuments.map((document) => ({
+              label: document.displayName ?? document.documentType,
+              url: document.storagePath,
+              type: document.documentType,
+            }))
+          : [];
+
       const counselorProfilePayload = {
         practiceName: formData.practiceName.trim() || undefined,
         practiceLocation: formData.practiceLocation.trim() || undefined,
@@ -458,14 +499,9 @@ export default function CounselorOnboardingPage() {
         licenseNumber: hasLicense ? formData.licenseNumber.trim() || undefined : undefined,
         licenseJurisdiction: hasLicense ? formData.licenseJurisdiction.trim() || undefined : undefined,
         licenseExpiry: hasLicense ? formData.licenseExpiry || undefined : undefined,
-        certificationDocuments: hasLicense
-          ? formData.certificationFiles.map((file) => ({
-              name: file.name,
-              issuedAt: undefined,
-              expiresAt: undefined,
-              url: undefined,
-            }))
-          : [],
+        licenseDocumentUrl: licenseDocument?.storagePath ?? undefined,
+        resumeUrl: resumeDocument?.storagePath ?? undefined,
+        certificationDocuments: certificationDocumentsForProfile,
         cpdStatus: formData.cpdStatus.trim() || undefined,
         cpdRenewalDueAt: formData.cpdRenewalDueAt || undefined,
         professionalReferences: parseProfessionalReferences(formData.professionalReferencesNote),
@@ -475,9 +511,17 @@ export default function CounselorOnboardingPage() {
         metadata: {
           professionalTitle: trimmedProfessionalTitle || undefined,
           licenseProvided: hasLicense,
-          certificationFileNames: formData.certificationFiles.map((file) => file.name),
-          resumeFileName: formData.resumeFile?.name,
-          licenseFileName: hasLicense ? formData.licenseFile?.name : undefined,
+          certificationFileNames:
+            certificationDocumentUploads.length > 0
+              ? certificationDocumentUploads.map(
+                  (document) => document.displayName ?? document.storagePath.split('/').pop() ?? 'Certification',
+                )
+              : formData.certificationFiles.map((file) => file.name),
+          resumeFileName:
+            resumeDocument?.displayName ?? formData.resumeFile?.name ?? undefined,
+          licenseFileName: hasLicense
+            ? licenseDocument?.displayName ?? formData.licenseFile?.name ?? undefined
+            : undefined,
         },
       };
 
@@ -522,6 +566,37 @@ export default function CounselorOnboardingPage() {
         onboarding_completed: true,
         onboarding_completed_at: submittedAt,
       };
+
+      if (uploadedDocumentsMetadata.length > 0) {
+        metadata.uploadedDocuments = uploadedDocumentsMetadata;
+        metadata.documents = uploadedDocumentsMetadata;
+      }
+
+      if (resumeDocument) {
+        metadata.resumeFile = resumeDocument.storagePath;
+        metadata.resume_file = resumeDocument.storagePath;
+        metadata.resumeFileName = resumeDocument.displayName ?? resumeDocument.storagePath.split('/').pop();
+      } else if (formData.resumeFile?.name) {
+        metadata.resumeFileName = formData.resumeFile.name;
+      }
+
+      if (licenseDocument) {
+        metadata.licenseFile = licenseDocument.storagePath;
+        metadata.license_file = licenseDocument.storagePath;
+        metadata.licenseFileName = licenseDocument.displayName ?? licenseDocument.storagePath.split('/').pop();
+      } else if (hasLicense && formData.licenseFile?.name) {
+        metadata.licenseFileName = formData.licenseFile.name;
+      }
+
+      if (certificationDocumentsForProfile.length > 0) {
+        metadata.certificationDocuments = certificationDocumentsForProfile;
+        metadata.certification_documents = certificationDocumentsForProfile;
+        metadata.certificationFileNames = certificationDocumentsForProfile
+          .map((document) => document.name)
+          .filter(Boolean);
+      } else if (formData.certificationFiles.length > 0) {
+        metadata.certificationFileNames = formData.certificationFiles.map((file) => file.name);
+      }
 
       const updatePayload = {
         professionalTitle: trimmedProfessionalTitle || undefined,

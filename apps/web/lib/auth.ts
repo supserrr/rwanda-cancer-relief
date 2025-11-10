@@ -13,6 +13,7 @@ import type {
   VisibilitySettings,
   CounselorApprovalStatus,
   CounselorProfileRecord,
+  CounselorDocument,
 } from './types';
 
 export type UserRole = 'patient' | 'counselor' | 'admin' | 'guest'
@@ -27,6 +28,7 @@ export interface User {
   isVerified: boolean
   createdAt: Date
   updatedAt: Date
+  lastLogin?: Date
   metadata?: Record<string, unknown>
   phoneNumber?: string
   preferredLanguage?: string
@@ -43,6 +45,7 @@ export interface User {
   approvalReviewedAt?: string | null
   approvalNotes?: string | null
   counselorProfile?: CounselorProfileRecord | null
+  documents?: CounselorDocument[]
 }
 
 export interface AuthState {

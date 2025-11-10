@@ -1,5 +1,6 @@
 import { cache } from 'react';
 
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { getServiceClient } from '@/lib/supabase/service';
 
@@ -278,12 +279,29 @@ const preferenceKeyByType: Record<string, string> = {
 const getTypeCache = cache(() => new Map<string, NotificationTypeConfig>());
 
 export class NotificationService {
-  private static async getServiceClient() {
+  private static missingServiceWarningLogged = false;
+  private static fallbackClient: SupabaseClient | null = null;
+
+  private static async getServiceClient(): Promise<SupabaseClient | null> {
     const client = getServiceClient();
-    if (!client) {
-      throw new Error('Supabase service role client is not configured. Please set SUPABASE_SERVICE_ROLE_KEY.');
+    if (client) {
+      return client;
     }
-    return client;
+    if (!NotificationService.missingServiceWarningLogged) {
+      console.warn(
+        '[NotificationService] Supabase service client is not configured. Falling back to standard client session.',
+      );
+      NotificationService.missingServiceWarningLogged = true;
+    }
+    if (!NotificationService.fallbackClient) {
+      try {
+        NotificationService.fallbackClient = createClient();
+      } catch (error) {
+        console.warn('[NotificationService] Failed to create fallback client:', error);
+        return null;
+      }
+    }
+    return NotificationService.fallbackClient;
   }
 
   private static async getTypeConfig(typeKey: string): Promise<NotificationTypeConfig | null> {
@@ -293,6 +311,9 @@ export class NotificationService {
     }
 
     const service = await NotificationService.getServiceClient();
+    if (!service) {
+      return null;
+    }
     const { data, error } = await service
       .from('notification_types')
       .select('*')
@@ -314,6 +335,13 @@ export class NotificationService {
 
   private static async getUserPreferences(userId: string): Promise<Record<string, unknown>> {
     const service = await NotificationService.getServiceClient();
+    if (!service) {
+      return {
+        notificationPreferences: {},
+        supportPreferences: {},
+        fullName: '',
+      };
+    }
     const { data, error } = await service
       .from('profiles')
       .select('notification_preferences, support_preferences, full_name')
@@ -380,6 +408,9 @@ export class NotificationService {
 
   private static async insertNotification(payload: Partial<EnqueueNotificationOptions> & { userId: string; title: string; message: string; typeKey: string; deliveryStatus: NotificationDeliveryStatus; }): Promise<void> {
     const service = await NotificationService.getServiceClient();
+    if (!service) {
+      return;
+    }
     const { error } = await service.from('notifications').insert({
       user_id: payload.userId,
       title: payload.title,
@@ -393,8 +424,14 @@ export class NotificationService {
     });
 
     if (error) {
-      console.error('[NotificationService] Failed to enqueue notification:', error);
-      throw new Error(error.message || 'Failed to enqueue notification');
+      const message = typeof error?.message === 'string' && error.message.length > 0
+        ? error.message
+        : 'Unknown Supabase error';
+      console.warn(
+        `[NotificationService] Failed to enqueue notification (non-blocking): ${message}`,
+        error,
+      );
+      return;
     }
   }
 
@@ -426,6 +463,9 @@ export class NotificationService {
 
   static async enqueueMessageNotifications(payload: MessageNotificationPayload): Promise<void> {
     const service = await NotificationService.getServiceClient();
+    if (!service) {
+      return;
+    }
     const { data: message, error } = await service
       .from('messages')
       .select('id, chat_id, sender_id, content, sender_name, sender_avatar, created_at')
@@ -491,6 +531,9 @@ export class NotificationService {
 
   static async enqueuePatientAssignmentNotifications(payload: PatientAssignmentPayload): Promise<void> {
     const service = await NotificationService.getServiceClient();
+    if (!service) {
+      return;
+    }
 
     const { data: patientProfile } = await service
       .from('profiles')
@@ -537,6 +580,9 @@ export class NotificationService {
 
   static async ensureSessionReminderForSession(sessionId: string): Promise<void> {
     const service = await NotificationService.getServiceClient();
+    if (!service) {
+      return;
+    }
     const { data: session, error } = await service
       .from('sessions')
       .select('id, patient_id, counselor_id, date, time, status, type, duration')
@@ -647,6 +693,9 @@ export class NotificationService {
 
   static async seedUpcomingSessionReminders(windowMinutes = 1440): Promise<void> {
     const service = await NotificationService.getServiceClient();
+    if (!service) {
+      return;
+    }
     const from = new Date();
     const to = new Date(Date.now() + windowMinutes * 60 * 1000);
 
@@ -673,6 +722,9 @@ export class NotificationService {
 
   static async dispatchDueNotifications(limit = 100): Promise<number> {
     const service = await NotificationService.getServiceClient();
+    if (!service) {
+      return 0;
+    }
     const nowIso = new Date().toISOString();
 
     const { data: pending, error } = await service

@@ -102,6 +102,7 @@ export interface User {
   approvalReviewedAt?: string;
   approvalNotes?: string;
   counselorProfile?: CounselorProfileRecord;
+  documents?: CounselorDocument[];
 }
 
 export interface Patient extends User {

@@ -52,6 +52,7 @@ import { useResources } from '../../../../hooks/useResources';
 import { ResourcesApi } from '../../../../lib/api/resources';
 import { useAuth } from '../../../../components/auth/AuthProvider';
 import { toast } from 'sonner';
+import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
 
 /**
  * Admin Resources Review Page
@@ -340,7 +341,7 @@ export default function AdminResourcesReviewPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <Spinner variant="bars" size={40} className="text-primary" />
       </div>
     );
   }

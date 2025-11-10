@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { AdminApi, type AdminUser } from '../../../../lib/api/admin';
 import { toast } from 'sonner';
+import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -207,7 +208,7 @@ export default function AdminUsersPage() {
       {/* Users Table */}
       {loading ? (
         <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <Spinner variant="bars" size={36} className="text-primary" />
         </div>
       ) : (
       <AnimatedCard delay={0.5}>

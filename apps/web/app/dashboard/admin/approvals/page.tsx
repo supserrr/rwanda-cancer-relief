@@ -56,6 +56,7 @@ import {
 } from 'lucide-react';
 import { AdminApi, type AdminUser } from '../../../../lib/api/admin';
 import { toast } from 'sonner';
+import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
 
 export default function AdminApprovalsPage() {
   const [counselors, setCounselors] = useState<AdminUser[]>([]);
@@ -277,7 +278,7 @@ export default function AdminApprovalsPage() {
       {/* Applications Table */}
       {loading ? (
         <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <Spinner variant="bars" size={36} className="text-primary" />
         </div>
       ) : (
       <AnimatedCard delay={0.5}>
@@ -772,7 +773,7 @@ export default function AdminApprovalsPage() {
             >
               {isProcessing ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  <Spinner variant="bars" size={16} className="text-white mr-2" />
                   Processing...
                 </>
               ) : (
@@ -789,7 +790,7 @@ export default function AdminApprovalsPage() {
             >
               {isProcessing ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  <Spinner variant="bars" size={16} className="text-white mr-2" />
                   Processing...
                 </>
               ) : (

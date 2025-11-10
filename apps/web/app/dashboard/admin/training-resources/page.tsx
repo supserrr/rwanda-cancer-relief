@@ -59,6 +59,7 @@ import { Resource } from '@/lib/api/resources';
 import { useResources } from '../../../../hooks/useResources';
 import { ResourcesApi } from '../../../../lib/api/resources';
 import { toast } from 'sonner';
+import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
 
 export default function AdminTrainingResourcesPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -294,7 +295,7 @@ export default function AdminTrainingResourcesPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <Spinner variant="bars" size={40} className="text-primary" />
       </div>
     );
   }
@@ -796,7 +797,7 @@ export default function AdminTrainingResourcesPage() {
             >
               {isUploading ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  <Spinner variant="bars" size={16} className="text-white mr-2" />
                   {isEditing ? 'Updating...' : 'Uploading...'}
                 </>
               ) : (

@@ -1259,7 +1259,9 @@ export class AdminApi {
     };
   }
 
-  private static async getAccessToken(supabase: ReturnType<typeof createClient>): Promise<string> {
+  private static async getAccessToken(
+    supabase: NonNullable<ReturnType<typeof createClient>>,
+  ): Promise<string> {
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
     if (sessionError) {

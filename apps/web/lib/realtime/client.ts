@@ -64,6 +64,10 @@ export interface RealtimeProfile {
   specialty?: string | null;
   experience_years?: number | null;
   phone_number?: string | null;
+  visibility_settings?: Record<string, unknown> | null;
+  approval_status?: string | null;
+  approval_submitted_at?: string | null;
+  approval_reviewed_at?: string | null;
 }
 
 /**
@@ -236,7 +240,6 @@ export function subscribeToSession(
   const client = getSupabaseClient();
   const channelName = `sessions:${sessionId}`;
 
-  // Remove existing channel if any
   if (channels.has(channelName)) {
     channels.get(channelName)?.unsubscribe();
     channels.delete(channelName);
@@ -254,7 +257,7 @@ export function subscribeToSession(
       },
       (payload) => {
         onUpdate(payload.new as RealtimeSession);
-      }
+      },
     )
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
@@ -271,7 +274,6 @@ export function subscribeToSession(
 
   channels.set(channelName, channel);
 
-  // Return unsubscribe function
   return () => {
     channel.unsubscribe();
     channels.delete(channelName);
@@ -279,7 +281,7 @@ export function subscribeToSession(
 }
 
 /**
- * Subscribe to chat updates
+ * Subscribe to chat metadata updates
  */
 export function subscribeToChat(
   chatId: string,
@@ -289,7 +291,6 @@ export function subscribeToChat(
   const client = getSupabaseClient();
   const channelName = `chats:${chatId}`;
 
-  // Remove existing channel if any
   if (channels.has(channelName)) {
     channels.get(channelName)?.unsubscribe();
     channels.delete(channelName);
@@ -307,7 +308,7 @@ export function subscribeToChat(
       },
       (payload) => {
         onUpdate(payload.new as { id: string; updated_at: string });
-      }
+      },
     )
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
@@ -324,7 +325,6 @@ export function subscribeToChat(
 
   channels.set(channelName, channel);
 
-  // Return unsubscribe function
   return () => {
     channel.unsubscribe();
     channels.delete(channelName);
@@ -332,7 +332,7 @@ export function subscribeToChat(
 }
 
 /**
- * Subscribe to profile updates
+ * Subscribe to profile updates with optional filters
  */
 export function subscribeToProfiles(
   filters: { role?: string; ids?: string[] } | null,
@@ -340,7 +340,7 @@ export function subscribeToProfiles(
     profile: RealtimeProfile,
     context: { eventType: string; oldRecord: Record<string, unknown> | null },
   ) => void,
-  onError?: (error: Error) => void
+  onError?: (error: Error) => void,
 ): () => void {
   const client = getSupabaseClient();
   const filterKey = JSON.stringify(filters ?? {});
@@ -408,26 +408,9 @@ export function subscribeToProfiles(
 }
 
 /**
- * Unsubscribe from all channels
+ * Unsubscribe from all realtime channels
  */
 export function unsubscribeAll(): void {
-  channels.forEach((channel) => {
-    channel.unsubscribe();
-  });
+  channels.forEach((channel) => channel.unsubscribe());
   channels.clear();
 }
-
-/**
- * Realtime client utilities
- */
-export const realtimeClient = {
-  subscribeToMessages,
-  subscribeToNotifications,
-  subscribeToSession,
-  subscribeToChat,
-  unsubscribeAll,
-  getClient: getSupabaseClient,
-};
-
-export default realtimeClient;
-

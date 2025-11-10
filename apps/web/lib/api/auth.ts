@@ -7,6 +7,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import type { User, SignInCredentials, SignUpCredentials } from '../auth';
+import type {
+  VisibilitySettings,
+  CounselorProfileRecord,
+  CounselorApprovalStatus,
+  CounselorAvailabilityStatus,
+} from '../types';
 
 /**
  * Sign up response
@@ -61,6 +67,12 @@ export interface UserProfile {
   notificationPreferences?: Record<string, unknown>;
   securityPreferences?: Record<string, unknown>;
   supportPreferences?: Record<string, unknown>;
+  visibilitySettings?: VisibilitySettings;
+  approvalStatus?: CounselorApprovalStatus;
+  approvalSubmittedAt?: string;
+  approvalReviewedAt?: string;
+  approvalNotes?: string;
+  counselorProfile?: CounselorProfileRecord;
 }
 
 type ProfileTableRow = {
@@ -80,6 +92,11 @@ type ProfileTableRow = {
   notification_preferences?: Record<string, unknown> | null;
   security_preferences?: Record<string, unknown> | null;
   support_preferences?: Record<string, unknown> | null;
+  visibility_settings?: VisibilitySettings | null;
+  approval_status?: CounselorApprovalStatus | null;
+  approval_submitted_at?: string | null;
+  approval_reviewed_at?: string | null;
+  approval_notes?: string | null;
 };
 
 interface SyncProfileOptions {
@@ -98,6 +115,12 @@ interface SyncProfileOptions {
   notificationPreferences?: Record<string, unknown>;
   securityPreferences?: Record<string, unknown>;
   supportPreferences?: Record<string, unknown>;
+  visibilitySettings?: VisibilitySettings;
+  approvalStatus?: CounselorApprovalStatus;
+  approvalSubmittedAt?: string;
+  approvalReviewedAt?: string;
+  approvalReviewedBy?: string;
+  approvalNotes?: string;
 }
 
 const coerceStringValue = (value: unknown): string | undefined => {
@@ -146,6 +169,90 @@ const coerceRecordValue = (value: unknown): Record<string, unknown> | undefined 
   return undefined;
 };
 
+type CounselorProfileUpdate = Partial<Omit<CounselorProfileRecord, 'profileId' | 'createdAt' | 'updatedAt'>> & {
+  metadata?: Record<string, unknown>;
+};
+
+type CounselorProfileRow = {
+  profile_id: string;
+  practice_name: string | null;
+  practice_location: string | null;
+  service_regions: string[] | null;
+  primary_timezone: string | null;
+  supported_timezones: string[] | null;
+  accepting_new_patients: boolean | null;
+  waitlist_enabled: boolean | null;
+  availability_status: CounselorAvailabilityStatus | null;
+  session_modalities: string[] | null;
+  session_durations: number[] | null;
+  telehealth_offered: boolean | null;
+  in_person_offered: boolean | null;
+  languages: string[] | null;
+  specializations: string[] | null;
+  demographics_served: string[] | null;
+  approach_summary: string | null;
+  bio: string | null;
+  years_experience: number | null;
+  professional_highlights: string[] | null;
+  education_history: Record<string, unknown>[] | null;
+  license_number: string | null;
+  license_jurisdiction: string | null;
+  license_expiry: string | null;
+  license_document_url: string | null;
+  resume_url: string | null;
+  certification_documents: Record<string, unknown>[] | null;
+  cpd_status: string | null;
+  cpd_renewal_due_at: string | null;
+  professional_references: Record<string, unknown>[] | null;
+  motivation_statement: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};
+
+const mapCounselorProfileRow = (row: CounselorProfileRow): CounselorProfileRecord => {
+  return {
+    profileId: row.profile_id,
+    practiceName: row.practice_name ?? undefined,
+    practiceLocation: row.practice_location ?? undefined,
+    serviceRegions: row.service_regions ?? [],
+    primaryTimezone: row.primary_timezone ?? undefined,
+    supportedTimezones: row.supported_timezones ?? [],
+    acceptingNewPatients: row.accepting_new_patients ?? true,
+    waitlistEnabled: row.waitlist_enabled ?? false,
+    availabilityStatus: row.availability_status ?? 'available',
+    sessionModalities: row.session_modalities ?? ['chat', 'video', 'phone'],
+    sessionDurations: row.session_durations ?? [],
+    telehealthOffered: row.telehealth_offered ?? true,
+    inPersonOffered: row.in_person_offered ?? false,
+    languages: row.languages ?? [],
+    specializations: row.specializations ?? [],
+    demographicsServed: row.demographics_served ?? [],
+    approachSummary: row.approach_summary ?? undefined,
+    bio: row.bio ?? undefined,
+    yearsExperience: row.years_experience ?? undefined,
+    professionalHighlights: row.professional_highlights ?? [],
+    educationHistory: Array.isArray(row.education_history) ? row.education_history : [],
+    licenseNumber: row.license_number ?? undefined,
+    licenseJurisdiction: row.license_jurisdiction ?? undefined,
+    licenseExpiry: row.license_expiry ?? undefined,
+    licenseDocumentUrl: row.license_document_url ?? undefined,
+    resumeUrl: row.resume_url ?? undefined,
+    certificationDocuments: Array.isArray(row.certification_documents) ? row.certification_documents : [],
+    cpdStatus: row.cpd_status ?? undefined,
+    cpdRenewalDueAt: row.cpd_renewal_due_at ?? undefined,
+    professionalReferences: Array.isArray(row.professional_references) ? row.professional_references : [],
+    motivationStatement: row.motivation_statement ?? undefined,
+    emergencyContactName: row.emergency_contact_name ?? undefined,
+    emergencyContactPhone: row.emergency_contact_phone ?? undefined,
+    metadata: row.metadata ?? {},
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+};
+
 async function syncProfileRecord(
   supabase: SupabaseClient,
   userId: string,
@@ -154,10 +261,17 @@ async function syncProfileRecord(
   const { data: existingProfile, error: fetchError } = await supabase
     .from('profiles')
     .select(
-      'metadata, full_name, avatar_url, phone_number, languages, specialty, experience_years, availability, preferred_language, treatment_stage, contact_phone, emergency_contact_name, emergency_contact_phone, notification_preferences, security_preferences, support_preferences',
+      'metadata, full_name, avatar_url, phone_number, languages, specialty, experience_years, availability, preferred_language, treatment_stage, contact_phone, emergency_contact_name, emergency_contact_phone, notification_preferences, security_preferences, support_preferences, visibility_settings, approval_status, approval_submitted_at, approval_reviewed_at, approval_notes, approval_reviewed_by',
     )
     .eq('id', userId)
-    .maybeSingle<ProfileTableRow>();
+    .maybeSingle<ProfileTableRow & {
+      visibility_settings?: VisibilitySettings | null;
+      approval_status?: CounselorApprovalStatus | null;
+      approval_submitted_at?: string | null;
+      approval_reviewed_at?: string | null;
+      approval_notes?: string | null;
+      approval_reviewed_by?: string | null;
+    }>();
 
   if (fetchError) {
     throw new Error(fetchError.message || 'Failed to load profile record');
@@ -182,6 +296,45 @@ async function syncProfileRecord(
     id: userId,
     updated_at: new Date().toISOString(),
   };
+
+  if (options.visibilitySettings !== undefined) {
+    payload.visibility_settings = options.visibilitySettings;
+    mergedMetadata.visibilitySettings = options.visibilitySettings;
+  } else if (existingProfile?.visibility_settings) {
+    mergedMetadata.visibilitySettings = existingProfile.visibility_settings;
+  }
+
+  if (options.approvalStatus !== undefined) {
+    payload.approval_status = options.approvalStatus;
+    mergedMetadata.approvalStatus = options.approvalStatus;
+  } else if (existingProfile?.approval_status) {
+    mergedMetadata.approvalStatus = existingProfile.approval_status;
+  }
+
+  if (options.approvalSubmittedAt !== undefined) {
+    payload.approval_submitted_at = options.approvalSubmittedAt;
+    mergedMetadata.approvalSubmittedAt = options.approvalSubmittedAt;
+  } else if (existingProfile?.approval_submitted_at) {
+    mergedMetadata.approvalSubmittedAt = existingProfile.approval_submitted_at;
+  }
+
+  if (options.approvalReviewedAt !== undefined) {
+    payload.approval_reviewed_at = options.approvalReviewedAt;
+    mergedMetadata.approvalReviewedAt = options.approvalReviewedAt;
+  } else if (existingProfile?.approval_reviewed_at) {
+    mergedMetadata.approvalReviewedAt = existingProfile.approval_reviewed_at;
+  }
+
+  if (options.approvalNotes !== undefined) {
+    payload.approval_notes = options.approvalNotes;
+    mergedMetadata.approvalNotes = options.approvalNotes;
+  } else if (existingProfile?.approval_notes) {
+    mergedMetadata.approvalNotes = existingProfile.approval_notes;
+  }
+
+  if (options.approvalReviewedBy !== undefined) {
+    payload.approval_reviewed_by = options.approvalReviewedBy;
+  }
 
   if (Object.keys(mergedMetadata).length > 0) {
     payload.metadata = mergedMetadata;
@@ -463,6 +616,93 @@ async function syncProfileRecord(
   }
 }
 
+async function syncCounselorProfile(
+  supabase: SupabaseClient,
+  profileId: string,
+  input?: CounselorProfileUpdate | null,
+): Promise<void> {
+  if (!input || Object.keys(input).length === 0) {
+    return;
+  }
+
+  const payload: Record<string, unknown> = {
+    profile_id: profileId,
+  };
+
+  const assign = (key: string, value: unknown) => {
+    if (value !== undefined) {
+      payload[key] = value;
+    }
+  };
+
+  assign('practice_name', input.practiceName);
+  assign('practice_location', input.practiceLocation);
+  assign('service_regions', input.serviceRegions);
+  assign('primary_timezone', input.primaryTimezone);
+  assign('supported_timezones', input.supportedTimezones);
+  assign('accepting_new_patients', input.acceptingNewPatients);
+  assign('waitlist_enabled', input.waitlistEnabled);
+  assign('availability_status', input.availabilityStatus);
+  assign('session_modalities', input.sessionModalities);
+  assign('session_durations', input.sessionDurations);
+  assign('telehealth_offered', input.telehealthOffered);
+  assign('in_person_offered', input.inPersonOffered);
+  assign('languages', input.languages);
+  assign('specializations', input.specializations);
+  assign('demographics_served', input.demographicsServed);
+  assign('approach_summary', input.approachSummary);
+  assign('bio', input.bio);
+  assign('years_experience', input.yearsExperience);
+  assign('professional_highlights', input.professionalHighlights);
+  assign('education_history', input.educationHistory);
+  assign('license_number', input.licenseNumber);
+  assign('license_jurisdiction', input.licenseJurisdiction);
+  assign('license_expiry', input.licenseExpiry);
+  assign('license_document_url', input.licenseDocumentUrl);
+  assign('resume_url', input.resumeUrl);
+  assign('certification_documents', input.certificationDocuments);
+  assign('cpd_status', input.cpdStatus);
+  assign('cpd_renewal_due_at', input.cpdRenewalDueAt);
+  assign('professional_references', input.professionalReferences);
+  assign('motivation_statement', input.motivationStatement);
+  assign('emergency_contact_name', input.emergencyContactName);
+  assign('emergency_contact_phone', input.emergencyContactPhone);
+  assign('metadata', input.metadata);
+
+  if (Object.keys(payload).length <= 1) {
+    return;
+  }
+
+  const { data: existing, error: fetchError } = await supabase
+    .from('counselor_profiles')
+    .select('profile_id')
+    .eq('profile_id', profileId)
+    .maybeSingle();
+
+  if (fetchError) {
+    throw new Error(fetchError.message || 'Failed to load counselor profile');
+  }
+
+  if (existing) {
+    const { error: updateError } = await supabase
+      .from('counselor_profiles')
+      .update(payload)
+      .eq('profile_id', profileId);
+
+    if (updateError) {
+      throw new Error(updateError.message || 'Failed to update counselor profile');
+    }
+  } else {
+    const { error: insertError } = await supabase
+      .from('counselor_profiles')
+      .insert(payload);
+
+    if (insertError) {
+      throw new Error(insertError.message || 'Failed to create counselor profile');
+    }
+  }
+}
+
 /**
  * Authentication API service
  */
@@ -662,9 +902,16 @@ export class AuthApi {
     }
 
     const userMetadata = user.user_metadata || {};
+    const derivedRole = (userMetadata.role as User['role']) || 'patient';
     let mergedMetadata: Record<string, unknown> = { ...userMetadata };
     let displayName = (userMetadata.full_name as string | undefined) || user.email || '';
     let avatarUrl = (userMetadata.avatar_url as string | undefined) || undefined;
+    let visibilitySettings: VisibilitySettings | undefined;
+    let approvalStatus: CounselorApprovalStatus | undefined;
+    let approvalSubmittedAt: string | undefined;
+    let approvalReviewedAt: string | undefined;
+    let approvalNotes: string | undefined;
+    let counselorProfile: CounselorProfileRecord | undefined;
 
     if (user.last_sign_in_at) {
       mergedMetadata.lastSignInAt = user.last_sign_in_at;
@@ -687,12 +934,17 @@ export class AuthApi {
       notification_preferences?: Record<string, unknown> | null;
       security_preferences?: Record<string, unknown> | null;
       support_preferences?: Record<string, unknown> | null;
+      visibility_settings?: VisibilitySettings | null;
+      approval_status?: CounselorApprovalStatus | null;
+      approval_submitted_at?: string | null;
+      approval_reviewed_at?: string | null;
+      approval_notes?: string | null;
     };
 
     const { data: profileRow } = await supabase
       .from('profiles')
       .select(
-        'full_name, avatar_url, metadata, specialty, experience_years, availability, phone_number, languages, preferred_language, treatment_stage, contact_phone, emergency_contact_name, emergency_contact_phone, notification_preferences, security_preferences, support_preferences',
+        'full_name, avatar_url, metadata, specialty, experience_years, availability, phone_number, languages, preferred_language, treatment_stage, contact_phone, emergency_contact_name, emergency_contact_phone, notification_preferences, security_preferences, support_preferences, visibility_settings, approval_status, approval_submitted_at, approval_reviewed_at, approval_notes',
       )
       .eq('id', user.id)
       .maybeSingle<ProfileRow>();
@@ -752,6 +1004,43 @@ export class AuthApi {
       if (profileRow.support_preferences) {
         mergedMetadata.supportPreferences = profileRow.support_preferences;
       }
+      if (profileRow.visibility_settings) {
+        visibilitySettings = profileRow.visibility_settings;
+        mergedMetadata.visibilitySettings = profileRow.visibility_settings;
+      }
+      if (profileRow.approval_status) {
+        approvalStatus = profileRow.approval_status;
+        mergedMetadata.approvalStatus = profileRow.approval_status;
+      }
+      if (profileRow.approval_submitted_at) {
+        approvalSubmittedAt = profileRow.approval_submitted_at;
+        mergedMetadata.approvalSubmittedAt = profileRow.approval_submitted_at;
+      }
+      if (profileRow.approval_reviewed_at) {
+        approvalReviewedAt = profileRow.approval_reviewed_at;
+        mergedMetadata.approvalReviewedAt = profileRow.approval_reviewed_at;
+      }
+      if (profileRow.approval_notes) {
+        approvalNotes = profileRow.approval_notes;
+        mergedMetadata.approvalNotes = profileRow.approval_notes;
+      }
+    }
+
+    if (derivedRole === 'counselor') {
+      const { data: counselorProfileRow, error: counselorProfileError } = await supabase
+        .from('counselor_profiles')
+        .select('*')
+        .eq('profile_id', user.id)
+        .maybeSingle<CounselorProfileRow>();
+
+      if (counselorProfileError && process.env.NODE_ENV !== 'production') {
+        console.warn('[AuthApi.getCurrentUser] Failed to load counselor profile', counselorProfileError);
+      }
+
+      if (counselorProfileRow) {
+        counselorProfile = mapCounselorProfileRow(counselorProfileRow);
+        mergedMetadata.counselorProfile = counselorProfile;
+      }
     }
 
     const metadataAvatar =
@@ -781,13 +1070,25 @@ export class AuthApi {
       id: user.id,
       email: user.email || '',
       name: displayName,
-      role: (userMetadata.role as User['role']) || 'patient',
+      role: derivedRole,
       avatar: avatarUrl,
       isVerified: user.email_confirmed_at !== null,
       createdAt: new Date(user.created_at),
       updatedAt: new Date(user.updated_at || user.created_at),
       metadata: mergedMetadata,
+      visibilitySettings,
+      approvalStatus,
+      approvalSubmittedAt,
+      approvalReviewedAt,
     } as User & { metadata?: Record<string, unknown> };
+
+    if (approvalNotes) {
+      (userData as User & { approvalNotes?: string }).approvalNotes = approvalNotes;
+    }
+
+    if (counselorProfile) {
+      (userData as User & { counselorProfile?: CounselorProfileRecord }).counselorProfile = counselorProfile;
+    }
 
     return userData;
   }
@@ -829,6 +1130,13 @@ export class AuthApi {
     supportPreferences?: Record<string, unknown>;
     avatar?: string;
     metadata?: Record<string, unknown>;
+    visibilitySettings?: VisibilitySettings;
+    approvalStatus?: CounselorApprovalStatus;
+    approvalSubmittedAt?: string;
+    approvalReviewedAt?: string;
+    approvalReviewedBy?: string;
+    approvalNotes?: string;
+    counselorProfile?: CounselorProfileUpdate;
   }): Promise<User> {
     const supabase = createClient();
     if (!supabase) {
@@ -885,6 +1193,16 @@ export class AuthApi {
     if (data.avatar !== undefined) {
       updateData.avatar_url = data.avatar;
     }
+    if (data.visibilitySettings !== undefined) {
+      updateData.visibility_settings = data.visibilitySettings;
+      updateData.visibilitySettings = data.visibilitySettings;
+    }
+    if (data.approvalStatus !== undefined) {
+      updateData.approval_status = data.approvalStatus;
+    }
+    if (data.approvalNotes !== undefined) {
+      updateData.approval_notes = data.approvalNotes;
+    }
 
     const { data: { user }, error } = await supabase.auth.updateUser({
       data: updateData,
@@ -895,6 +1213,7 @@ export class AuthApi {
     }
 
     const userMetadata = user.user_metadata || {};
+    const derivedRole = (userMetadata.role as User['role']) || 'patient';
     const rawMetadata = (data.metadata ?? {}) as Record<string, unknown>;
 
     const getMetadataString = (...keys: string[]): string | undefined => {
@@ -987,14 +1306,14 @@ export class AuthApi {
           coerceRecordValue(userMetadata.support_preferences);
 
     try {
-    await syncProfileRecord(supabase, user.id, {
-      fullName: sanitizedFullName,
-      avatarUrl: sanitizedAvatar,
-      metadata: data.metadata,
-      userMetadata,
-      availability: sanitizedAvailability,
-      specialty: sanitizedSpecialty,
-      experienceYears: sanitizedExperience,
+      await syncProfileRecord(supabase, user.id, {
+        fullName: sanitizedFullName,
+        avatarUrl: sanitizedAvatar,
+        metadata: data.metadata,
+        userMetadata,
+        availability: sanitizedAvailability,
+        specialty: sanitizedSpecialty,
+        experienceYears: sanitizedExperience,
         preferredLanguage: sanitizedPreferredLanguage,
         treatmentStage: sanitizedTreatmentStage,
         contactPhone: sanitizedContactPhone,
@@ -1003,12 +1322,28 @@ export class AuthApi {
         notificationPreferences: sanitizedNotificationPreferences,
         securityPreferences: sanitizedSecurityPreferences,
         supportPreferences: sanitizedSupportPreferences,
+        visibilitySettings: data.visibilitySettings,
+        approvalStatus: data.approvalStatus,
+        approvalSubmittedAt: data.approvalSubmittedAt,
+        approvalReviewedAt: data.approvalReviewedAt,
+        approvalReviewedBy: data.approvalReviewedBy,
+        approvalNotes: data.approvalNotes,
       });
     } catch (syncError) {
       if (process.env.NODE_ENV !== 'production') {
         console.warn('[AuthApi.updateProfile] Failed to sync profile record', syncError);
       }
       // Continue without throwing so onboarding can complete even if profile sync fails
+    }
+
+    if (data.counselorProfile && derivedRole === 'counselor') {
+      try {
+        await syncCounselorProfile(supabase, user.id, data.counselorProfile);
+      } catch (counselorSyncError) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[AuthApi.updateProfile] Failed to sync counselor profile', counselorSyncError);
+        }
+      }
     }
 
     const mergedMetadata: Record<string, unknown> = {
@@ -1064,8 +1399,40 @@ export class AuthApi {
     } else if (coerceStringValue(userMetadata.avatar_url)) {
       mergedMetadata.avatar_url = coerceStringValue(userMetadata.avatar_url);
     }
+    if (data.visibilitySettings) {
+      mergedMetadata.visibilitySettings = data.visibilitySettings;
+    }
+    if (data.approvalStatus) {
+      mergedMetadata.approvalStatus = data.approvalStatus;
+    }
+    if (data.approvalSubmittedAt) {
+      mergedMetadata.approvalSubmittedAt = data.approvalSubmittedAt;
+    }
+    if (data.approvalReviewedAt) {
+      mergedMetadata.approvalReviewedAt = data.approvalReviewedAt;
+    }
+    if (data.approvalNotes) {
+      mergedMetadata.approvalNotes = data.approvalNotes;
+    }
+    if (data.counselorProfile) {
+      mergedMetadata.counselorProfile = data.counselorProfile;
+    }
 
     const finalAvatar = sanitizedAvatar || coerceStringValue(userMetadata.avatar_url) || undefined;
+
+    let counselorProfile: CounselorProfileRecord | undefined;
+    if (derivedRole === 'counselor') {
+      const { data: counselorProfileRow } = await supabase
+        .from('counselor_profiles')
+        .select('*')
+        .eq('profile_id', user.id)
+        .maybeSingle<CounselorProfileRow>();
+
+      if (counselorProfileRow) {
+        counselorProfile = mapCounselorProfileRow(counselorProfileRow);
+        mergedMetadata.counselorProfile = counselorProfile;
+      }
+    }
 
     const userData: User = {
       id: user.id,
@@ -1076,7 +1443,7 @@ export class AuthApi {
         coerceStringValue(userMetadata.name) ||
         user.email ||
         '',
-      role: (userMetadata.role as User['role']) || 'patient',
+      role: derivedRole,
       avatar: finalAvatar,
       isVerified: user.email_confirmed_at !== null,
       createdAt: new Date(user.created_at),
@@ -1120,6 +1487,39 @@ export class AuthApi {
     const supportPreferencesValue = coerceRecordValue(mergedMetadata.supportPreferences);
     if (supportPreferencesValue) {
       userData.supportPreferences = supportPreferencesValue;
+    }
+
+    const effectiveVisibilitySettings =
+      data.visibilitySettings ??
+      (coerceRecordValue(mergedMetadata.visibilitySettings) as VisibilitySettings | undefined);
+    if (effectiveVisibilitySettings) {
+      userData.visibilitySettings = effectiveVisibilitySettings;
+    }
+
+    const effectiveApprovalStatus =
+      data.approvalStatus ??
+      (coerceStringValue(mergedMetadata.approvalStatus) as CounselorApprovalStatus | undefined);
+    if (effectiveApprovalStatus) {
+      userData.approvalStatus = effectiveApprovalStatus;
+    }
+
+    const effectiveApprovalSubmittedAt = data.approvalSubmittedAt ?? coerceStringValue(mergedMetadata.approvalSubmittedAt);
+    if (effectiveApprovalSubmittedAt) {
+      userData.approvalSubmittedAt = effectiveApprovalSubmittedAt;
+    }
+
+    const effectiveApprovalReviewedAt = data.approvalReviewedAt ?? coerceStringValue(mergedMetadata.approvalReviewedAt);
+    if (effectiveApprovalReviewedAt) {
+      userData.approvalReviewedAt = effectiveApprovalReviewedAt;
+    }
+
+    const effectiveApprovalNotes = data.approvalNotes ?? coerceStringValue(mergedMetadata.approvalNotes);
+    if (effectiveApprovalNotes) {
+      userData.approvalNotes = effectiveApprovalNotes;
+    }
+
+    if (counselorProfile) {
+      userData.counselorProfile = counselorProfile;
     }
 
     return userData;

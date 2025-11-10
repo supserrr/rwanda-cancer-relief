@@ -1,195 +1,507 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from "@workspace/ui/components/button";
+import { Button } from '@workspace/ui/components/button';
 import { Input } from '@workspace/ui/components/input';
+import { Textarea } from '@workspace/ui/components/textarea';
+import { Switch } from '@workspace/ui/components/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@workspace/ui/components/ui/avatar';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@workspace/ui/components/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@workspace/ui/components/card';
 import { Badge } from '@workspace/ui/components/badge';
-import { ArrowRight, ArrowLeft, Upload, Award, GraduationCap, MessageCircle, Video, Phone } from 'lucide-react';
-import { FileTextIcon } from '@workspace/ui/components/file-text';
-import { UsersIcon } from '@workspace/ui/components/users';
-import { UploadIcon } from '@workspace/ui/components/upload';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Award,
+  Building,
+  Calendar,
+  CheckCircle,
+  ClipboardList,
+  Globe,
+  GraduationCap,
+  MessageCircle,
+  Phone,
+  ShieldCheck,
+  Upload,
+  Users,
+  Video,
+} from 'lucide-react';
 import { AuthApi } from '../../../lib/api/auth';
 import { toast } from 'sonner';
 import { useAuth } from '@/components/auth/AuthProvider';
+import type { VisibilitySurface, VisibilitySettings, CounselorAvailabilityStatus } from '../../../lib/types';
 
-/**
- * Counselor onboarding form data structure
- */
 interface CounselorOnboardingData {
-  // Professional Information
+  practiceName: string;
+  practiceLocation: string;
+  serviceRegionsNote: string;
+  serviceRegions: string[];
+  primaryTimezone: string;
+  supportedTimezones: string[];
+  contactPhone: string;
+  languages: string[];
+  bio: string;
+  approachSummary: string;
+  yearsExperience: string;
+  professionalHighlightsNote: string;
+  professionalHighlights: string[];
   licenseNumber: string;
+  licenseJurisdiction: string;
   licenseExpiry: string;
   issuingAuthority: string;
-  
-  // Education
   highestDegree: string;
   university: string;
   graduationYear: string;
-  additionalCertifications: string[];
-  
-  // Experience
-  yearsOfExperience: string;
-  previousEmployers: string;
-  specializations: string[];
-  
-  // Professional Details
-  languages: string[];
-  consultationTypes: string[];
-  availability: string;
-  
-  // Profile
-  profileImage: File | null;
-  profileImagePreview: string;
-  
-  // Documentation
   resumeFile: File | null;
   licenseFile: File | null;
-  certificationsFile: File | null;
-  
-  // Additional Information
-  motivation: string;
-  references: string;
-  emergencyContact: string;
+  certificationFiles: File[];
+  specializations: string[];
+  demographicsServed: string[];
+  sessionModalities: string[];
+  sessionDurations: number[];
+  availabilityStatus: CounselorAvailabilityStatus;
+  acceptingNewPatients: boolean;
+  waitlistEnabled: boolean;
+  telehealthOffered: boolean;
+  inPersonOffered: boolean;
+  supportedTimezonesNote: string;
+  cpdStatus: string;
+  cpdRenewalDueAt: string;
+  professionalReferencesNote: string;
+  motivationStatement: string;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
+  visibility: Record<VisibilitySurface, boolean>;
+  consentAcknowledged: boolean;
+  profileImage: File | null;
+  profileImagePreview: string;
 }
 
-/**
- * Counselor onboarding page component
- */
+const TOTAL_STEPS = 5;
+
+const LANGUAGE_OPTIONS = ['Kinyarwanda', 'English', 'French', 'Swahili'];
+
+const SPECIALIZATION_OPTIONS = [
+  'Cancer Support',
+  'Grief Counseling',
+  'Family Therapy',
+  'Anxiety Management',
+  'Depression Support',
+  'Trauma Therapy',
+  'Palliative Care',
+  'Spiritual Counseling',
+  'Peer Support',
+  'Child & Adolescent Therapy',
+  'Couples Counseling',
+];
+
+const DEMOGRAPHIC_OPTIONS = [
+  'Adults',
+  'Teens',
+  'Children',
+  'Caregivers',
+  'Families',
+  'Survivors',
+  'Newly Diagnosed',
+  'End-of-Life',
+];
+
+const TIMEZONE_OPTIONS = [
+  'Africa/Kigali',
+  'Africa/Nairobi',
+  'Africa/Johannesburg',
+  'UTC',
+];
+
+const SERVICE_REGION_SUGGESTIONS = [
+  'Kigali City',
+  'Northern Province',
+  'Southern Province',
+  'Eastern Province',
+  'Western Province',
+  'Remote / Telehealth',
+];
+
+const SESSION_MODALITY_OPTIONS: Array<{ value: string; label: string; icon: React.ComponentType<{ className?: string }> }> = [
+  { value: 'chat', label: 'Text Chat', icon: MessageCircle },
+  { value: 'video', label: 'Video Call', icon: Video },
+  { value: 'phone', label: 'Phone Call', icon: Phone },
+  { value: 'in_person', label: 'In-person', icon: Building },
+];
+
+const SESSION_DURATION_OPTIONS = [30, 45, 60, 90];
+
+const VISIBILITY_SURFACES: Array<{ key: VisibilitySurface; title: string; description: string }> = [
+  {
+    key: 'publicLanding',
+    title: 'Public Landing Page',
+    description: 'Appear on the public counselors page so patients can discover you before signing in.',
+  },
+  {
+    key: 'patientDirectory',
+    title: 'Patient Directory',
+    description: 'Be searchable by patients inside the app when they look for support.',
+  },
+  {
+    key: 'internal',
+    title: 'Internal Team Directory',
+    description: 'Allow admins and fellow counselors to view your profile for coordination.',
+  },
+];
+
+const AVAILABILITY_OPTIONS: Array<{ value: CounselorAvailabilityStatus; label: string; description: string }> = [
+  {
+    value: 'available',
+    label: 'Available',
+    description: 'Open to taking new patients immediately.',
+  },
+  {
+    value: 'limited',
+    label: 'Limited Availability',
+    description: 'Limited slots remaining each week.',
+  },
+  {
+    value: 'waitlist',
+    label: 'Waitlist Only',
+    description: 'Invite patients to join your waitlist for future openings.',
+  },
+  {
+    value: 'unavailable',
+    label: 'Temporarily Unavailable',
+    description: 'Not accepting new sessions until further notice.',
+  },
+];
+
+const createInitialFormData = (): CounselorOnboardingData => ({
+  practiceName: '',
+  practiceLocation: '',
+  serviceRegionsNote: '',
+  serviceRegions: [],
+  primaryTimezone: 'Africa/Kigali',
+  supportedTimezones: ['Africa/Kigali'],
+  contactPhone: '',
+  languages: [],
+  bio: '',
+  approachSummary: '',
+  yearsExperience: '',
+  professionalHighlightsNote: '',
+  professionalHighlights: [],
+  licenseNumber: '',
+  licenseJurisdiction: '',
+  licenseExpiry: '',
+  issuingAuthority: '',
+  highestDegree: '',
+  university: '',
+  graduationYear: '',
+  resumeFile: null,
+  licenseFile: null,
+  certificationFiles: [],
+  specializations: [],
+  demographicsServed: [],
+  sessionModalities: ['chat', 'video', 'phone'],
+  sessionDurations: [60],
+  availabilityStatus: 'available',
+  acceptingNewPatients: true,
+  waitlistEnabled: false,
+  telehealthOffered: true,
+  inPersonOffered: false,
+  supportedTimezonesNote: '',
+  cpdStatus: 'current',
+  cpdRenewalDueAt: '',
+  professionalReferencesNote: '',
+  motivationStatement: '',
+  emergencyContactName: '',
+  emergencyContactPhone: '',
+  visibility: {
+    publicLanding: true,
+    patientDirectory: true,
+    internal: true,
+  },
+  consentAcknowledged: false,
+  profileImage: null,
+  profileImagePreview: '',
+});
+
+const toVisibilitySettings = (visibility: Record<VisibilitySurface, boolean>): VisibilitySettings => ({
+  publicLanding: visibility.publicLanding,
+  patientDirectory: visibility.patientDirectory,
+  internal: visibility.internal,
+});
+
+const parseMultilineList = (value: string): string[] =>
+  value
+    .split('\n')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+
+const parseProfessionalReferences = (value: string) =>
+  parseMultilineList(value).map((line) => {
+    const [name, organization, email, phone] = line.split('|').map((part) => part.trim());
+    return {
+      name,
+      organization,
+      email,
+      phone,
+    };
+  });
+
+const toggleValue = <T,>(collection: T[], value: T): T[] =>
+  collection.includes(value)
+    ? collection.filter((item) => item !== value)
+    : [...collection, value];
+
 export default function CounselorOnboardingPage() {
   const router = useRouter();
+  const { checkAuth } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const profileFileInputRef = useRef<HTMLInputElement>(null);
   const resumeFileInputRef = useRef<HTMLInputElement>(null);
   const licenseFileInputRef = useRef<HTMLInputElement>(null);
-  const certificationsFileInputRef = useRef<HTMLInputElement>(null);
-  const { checkAuth } = useAuth();
-  const [formData, setFormData] = useState<CounselorOnboardingData>({
-    licenseNumber: '',
-    licenseExpiry: '',
-    issuingAuthority: '',
-    highestDegree: '',
-    university: '',
-    graduationYear: '',
-    additionalCertifications: [],
-    yearsOfExperience: '',
-    previousEmployers: '',
-    specializations: [],
-    languages: [],
-    consultationTypes: [],
-    availability: '',
-    profileImage: null,
-    profileImagePreview: '',
-    resumeFile: null,
-    licenseFile: null,
-    certificationsFile: null,
-    motivation: '',
-    references: '',
-    emergencyContact: ''
-  });
+  const certificationFileInputRef = useRef<HTMLInputElement>(null);
+  const [formData, setFormData] = useState<CounselorOnboardingData>(createInitialFormData);
 
-  const totalSteps = 5;
+  const progressPercent = useMemo(
+    () => Math.round((currentStep / TOTAL_STEPS) * 100),
+    [currentStep],
+  );
 
-  const handleInputChange = (field: keyof CounselorOnboardingData, value: string | string[] | File | null) => {
-    setFormData(prev => ({
+  const handleVisibilityToggle = (surface: VisibilitySurface, value: boolean) => {
+    setFormData((prev) => ({
       ...prev,
-      [field]: value
+      visibility: {
+        ...prev.visibility,
+        [surface]: value,
+      },
     }));
   };
 
-  const handleArrayToggle = (field: 'additionalCertifications' | 'specializations' | 'languages' | 'consultationTypes', value: string) => {
-    setFormData(prev => ({
+  const handleLanguagesToggle = (language: string) => {
+    setFormData((prev) => ({
       ...prev,
-      [field]: prev[field].includes(value)
-        ? prev[field].filter(item => item !== value)
-        : [...prev[field], value]
+      languages: toggleValue(prev.languages, language),
     }));
   };
 
-  const handleFileUpload = (field: 'resumeFile' | 'licenseFile' | 'certificationsFile', file: File | null) => {
-    setFormData(prev => ({
+  const handleSpecializationToggle = (specialization: string) => {
+    setFormData((prev) => ({
       ...prev,
-      [field]: file
+      specializations: toggleValue(prev.specializations, specialization),
+    }));
+  };
+
+  const handleDemographicsToggle = (demographic: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      demographicsServed: toggleValue(prev.demographicsServed, demographic),
+    }));
+  };
+
+  const handleModalityToggle = (modality: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      sessionModalities: toggleValue(prev.sessionModalities, modality),
+    }));
+  };
+
+  const handleDurationToggle = (duration: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      sessionDurations: prev.sessionDurations.includes(duration)
+        ? prev.sessionDurations.filter((value) => value !== duration)
+        : [...prev.sessionDurations, duration].sort((a, b) => a - b),
     }));
   };
 
   const handleProfileImageChange = (file: File | null) => {
     if (!file) {
-      setFormData(prev => ({ ...prev, profileImage: null, profileImagePreview: '' }));
+      setFormData((prev) => ({
+        ...prev,
+        profileImage: null,
+        profileImagePreview: '',
+      }));
       return;
     }
     const isImage = /image\/png|image\/jpeg|image\/jpg/.test(file.type);
     const isSmallEnough = file.size <= 2 * 1024 * 1024;
     if (!isImage || !isSmallEnough) {
-      alert('Please upload a JPG/PNG image up to 2MB.');
+      toast.error('Please upload a JPG or PNG image up to 2MB.');
       return;
     }
     const previewUrl = URL.createObjectURL(file);
-    setFormData(prev => ({ ...prev, profileImage: file, profileImagePreview: previewUrl }));
+    setFormData((prev) => ({
+      ...prev,
+      profileImage: file,
+      profileImagePreview: previewUrl,
+    }));
+  };
+
+  const handleFileListChange = (files: FileList | null, key: 'resumeFile' | 'licenseFile' | 'certificationFiles') => {
+    if (!files || files.length === 0) {
+      if (key === 'certificationFiles') {
+        setFormData((prev) => ({ ...prev, certificationFiles: [] }));
+      } else {
+        setFormData((prev) => ({ ...prev, [key]: null }));
+      }
+      return;
+    }
+
+    if (key === 'certificationFiles') {
+      setFormData((prev) => ({
+        ...prev,
+        certificationFiles: Array.from(files),
+      }));
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      [key]: files[0],
+    }));
   };
 
   const handleNext = async () => {
-    if (currentStep < totalSteps) {
-      setCurrentStep(currentStep + 1);
+    if (currentStep < TOTAL_STEPS) {
+      setCurrentStep((step) => step + 1);
     } else {
-      // Submit form and redirect to dashboard
       await handleSubmit();
     }
   };
 
+  const handlePrevious = () => {
+    if (currentStep > 1) {
+      setCurrentStep((step) => step - 1);
+    }
+  };
+
   const handleSubmit = async () => {
+    if (!formData.consentAcknowledged) {
+      toast.error('Please acknowledge that your information is accurate before submitting.');
+      return;
+    }
+
     setIsSubmitting(true);
+    const submittedAt = new Date().toISOString();
+
     try {
-      // Upload profile image if provided
       let avatarUrl: string | undefined;
       if (formData.profileImage) {
         try {
           const uploadResult = await AuthApi.uploadProfileImage(formData.profileImage);
           avatarUrl = uploadResult.url;
           toast.success('Profile image uploaded successfully');
-        } catch (error) {
-          console.error('Error uploading profile image:', error);
+        } catch (uploadError) {
+          console.error('Error uploading profile image:', uploadError);
           toast.error('Failed to upload profile image. Continuing without image...');
         }
       }
 
-      // Update profile with onboarding data
-      const profileData: Record<string, unknown> = {
+      const visibilitySettings = toVisibilitySettings(formData.visibility);
+
+      const counselorProfilePayload = {
+        practiceName: formData.practiceName.trim() || undefined,
+        practiceLocation: formData.practiceLocation.trim() || undefined,
+        serviceRegions: formData.serviceRegions,
+        primaryTimezone: formData.primaryTimezone,
+        supportedTimezones: formData.supportedTimezones,
+        acceptingNewPatients: formData.acceptingNewPatients,
+        waitlistEnabled: formData.waitlistEnabled,
+        availabilityStatus: formData.availabilityStatus,
+        sessionModalities: formData.sessionModalities,
+        sessionDurations: formData.sessionDurations,
+        telehealthOffered: formData.telehealthOffered,
+        inPersonOffered: formData.inPersonOffered,
+        languages: formData.languages,
+        specializations: formData.specializations,
+        demographicsServed: formData.demographicsServed,
+        approachSummary: formData.approachSummary.trim() || undefined,
+        bio: formData.bio.trim() || undefined,
+        yearsExperience: formData.yearsExperience ? Number.parseInt(formData.yearsExperience, 10) : undefined,
+        professionalHighlights: formData.professionalHighlights,
+        licenseNumber: formData.licenseNumber.trim() || undefined,
+        licenseJurisdiction: formData.licenseJurisdiction.trim() || undefined,
+        licenseExpiry: formData.licenseExpiry || undefined,
+        certificationDocuments: formData.certificationFiles.map((file) => ({
+          name: file.name,
+          issuedAt: undefined,
+          expiresAt: undefined,
+          url: undefined,
+        })),
+        cpdStatus: formData.cpdStatus.trim() || undefined,
+        cpdRenewalDueAt: formData.cpdRenewalDueAt || undefined,
+        professionalReferences: parseProfessionalReferences(formData.professionalReferencesNote),
+        motivationStatement: formData.motivationStatement.trim() || undefined,
+        emergencyContactName: formData.emergencyContactName.trim() || undefined,
+        emergencyContactPhone: formData.emergencyContactPhone.trim() || undefined,
+        metadata: {
+          certificationFileNames: formData.certificationFiles.map((file) => file.name),
+          resumeFileName: formData.resumeFile?.name,
+          licenseFileName: formData.licenseFile?.name,
+        },
+      };
+
+      const metadata: Record<string, unknown> = {
+        practiceName: formData.practiceName,
+        practiceLocation: formData.practiceLocation,
+        serviceRegions: formData.serviceRegions,
+        primaryTimezone: formData.primaryTimezone,
+        supportedTimezones: formData.supportedTimezones,
+        contactPhone: formData.contactPhone,
+        languages: formData.languages,
+        bio: formData.bio,
+        approachSummary: formData.approachSummary,
+        yearsOfExperience: formData.yearsExperience,
+        professionalHighlights: formData.professionalHighlights,
         licenseNumber: formData.licenseNumber,
+        licenseJurisdiction: formData.licenseJurisdiction,
         licenseExpiry: formData.licenseExpiry,
         issuingAuthority: formData.issuingAuthority,
         highestDegree: formData.highestDegree,
         university: formData.university,
         graduationYear: formData.graduationYear,
-        additionalCertifications: formData.additionalCertifications,
-        yearsOfExperience: formData.yearsOfExperience,
-        previousEmployers: formData.previousEmployers,
         specializations: formData.specializations,
-        languages: formData.languages,
-        consultationTypes: formData.consultationTypes,
-        availability: formData.availability,
-        motivation: formData.motivation,
-        references: formData.references,
-        emergencyContact: formData.emergencyContact,
-        onboarding_completed: true, // Mark onboarding as complete
-        onboarding_completed_at: new Date().toISOString(),
+        demographicsServed: formData.demographicsServed,
+        sessionModalities: formData.sessionModalities,
+        sessionDurations: formData.sessionDurations,
+        availabilityStatus: formData.availabilityStatus,
+        acceptingNewPatients: formData.acceptingNewPatients,
+        waitlistEnabled: formData.waitlistEnabled,
+        telehealthOffered: formData.telehealthOffered,
+        inPersonOffered: formData.inPersonOffered,
+        cpdStatus: formData.cpdStatus,
+        cpdRenewalDueAt: formData.cpdRenewalDueAt,
+        professionalReferencesRaw: formData.professionalReferencesNote,
+        motivation: formData.motivationStatement,
+        emergencyContactName: formData.emergencyContactName,
+        emergencyContactPhone: formData.emergencyContactPhone,
+        visibilitySettings,
+        onboarding_completed: true,
+        onboarding_completed_at: submittedAt,
       };
 
-      if (avatarUrl) {
-        profileData.avatar_url = avatarUrl;
-      }
+      const updatePayload = {
+        contactPhone: formData.contactPhone.trim() || undefined,
+        emergencyContactName: formData.emergencyContactName.trim() || undefined,
+        emergencyContactPhone: formData.emergencyContactPhone.trim() || undefined,
+        metadata,
+        avatar: avatarUrl,
+        visibilitySettings,
+        approvalStatus: 'pending' as const,
+        approvalSubmittedAt: submittedAt,
+        counselorProfile: counselorProfilePayload,
+      };
 
-      await AuthApi.updateProfile({
-        metadata: profileData,
-      });
-
+      await AuthApi.updateProfile(updatePayload);
       await checkAuth();
 
-      toast.success('Onboarding completed! Your application is under review. Redirecting to your dashboard...');
-      router.push('/dashboard/counselor');
+      toast.success('Thanks! Your application is submitted for review. We will notify you as soon as it is approved.');
+      router.push('/dashboard/counselor/pending');
     } catch (error) {
       console.error('Error submitting onboarding:', error);
       toast.error('Failed to complete onboarding. Please try again.');
@@ -198,73 +510,174 @@ export default function CounselorOnboardingPage() {
     }
   };
 
-  const handlePrevious = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
   const renderStep1 = () => (
     <div className="space-y-6">
-        <div className="text-center mb-6 sm:mb-8">
+      <div className="text-center mb-6 sm:mb-8">
         <div className="w-16 h-16 sm:w-20 sm:h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Award className="w-10 h-10 text-primary" />
+          <Users className="w-10 h-10 text-primary" />
         </div>
-        <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2">Professional License</h2>
-        <p className="text-sm sm:text-base text-muted-foreground">Verify your professional credentials (optional)</p>
+        <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2">Account Basics</h2>
+        <p className="text-sm sm:text-base text-muted-foreground">
+          Introduce yourself, describe your practice, and upload a profile photo so patients recognize you.
+        </p>
       </div>
 
-      <div className="bg-muted/20 border border-border rounded-lg p-4 mb-6">
-        <div className="flex items-start gap-3">
-          <div className="w-5 h-5 bg-primary/10 rounded-full flex items-center justify-center mt-0.5">
-            <div className="w-2 h-2 bg-primary rounded-full"></div>
-          </div>
-          <div>
-            <h4 className="font-medium text-foreground mb-1">Don't have a professional license?</h4>
-            <p className="text-sm text-muted-foreground">
-              No problem! Many qualified counselors work without formal licensing. You can skip this section and continue with your application.
-            </p>
-          </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Practice or Organization Name</label>
+          <Input
+            type="text"
+            placeholder="Rwanda Cancer Relief Counseling Center"
+            value={formData.practiceName}
+            onChange={(event) => setFormData((prev) => ({ ...prev, practiceName: event.target.value }))}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Primary Contact Phone</label>
+          <Input
+            type="tel"
+            placeholder="e.g., +250 700 000 000"
+            value={formData.contactPhone}
+            onChange={(event) => setFormData((prev) => ({ ...prev, contactPhone: event.target.value }))}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Primary Practice Location</label>
+          <Input
+            type="text"
+            placeholder="City, facility, or telehealth"
+            value={formData.practiceLocation}
+            onChange={(event) => setFormData((prev) => ({ ...prev, practiceLocation: event.target.value }))}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Primary Timezone</label>
+          <select
+            className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground"
+            value={formData.primaryTimezone}
+            onChange={(event) => setFormData((prev) => ({ ...prev, primaryTimezone: event.target.value }))}
+          >
+            {TIMEZONE_OPTIONS.map((timezone) => (
+              <option key={timezone} value={timezone}>
+                {timezone}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-2">Regions You Serve</label>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {SERVICE_REGION_SUGGESTIONS.map((region) => (
+            <Badge
+              key={region}
+              variant={formData.serviceRegions.includes(region) ? 'default' : 'outline'}
+              className="cursor-pointer"
+              onClick={() =>
+                setFormData((prev) => ({
+                  ...prev,
+                  serviceRegions: toggleValue(prev.serviceRegions, region),
+                }))
+              }
+            >
+              {region}
+            </Badge>
+          ))}
+        </div>
+        <Textarea
+          placeholder="Add any additional regions (one per line)"
+          value={formData.serviceRegionsNote}
+          onChange={(event) => {
+            const note = event.target.value;
+            const additionalRegions = parseMultilineList(note);
+            setFormData((prev) => ({
+              ...prev,
+              serviceRegionsNote: note,
+              serviceRegions: Array.from(
+                new Set([...prev.serviceRegions.filter((region) => SERVICE_REGION_SUGGESTIONS.includes(region)), ...additionalRegions]),
+              ),
+            }));
+          }}
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-2">Languages You Provide Support In</label>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {LANGUAGE_OPTIONS.map((language) => (
+            <button
+              key={language}
+              type="button"
+              onClick={() => handleLanguagesToggle(language)}
+              className={`p-3 rounded-lg border text-center transition-all ${
+                formData.languages.includes(language)
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border hover:border-primary/30'
+              }`}
+            >
+              {language}
+            </button>
+          ))}
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-2">License Number</label>
-          <Input
-            type="text"
-            placeholder="Enter your professional license number"
-            value={formData.licenseNumber}
-            onChange={(e) => handleInputChange('licenseNumber', e.target.value)}
+          <label className="block text-sm font-medium text-foreground mb-2">Short Bio</label>
+          <Textarea
+            placeholder="Share your background, years of service, and what inspires your work."
+            value={formData.bio}
+            onChange={(event) => setFormData((prev) => ({ ...prev, bio: event.target.value }))}
+            className="min-h-[120px]"
           />
         </div>
-
         <div>
-          <label className="block text-sm font-medium text-foreground mb-2">License Expiry Date</label>
-          <Input
-            type="date"
-            value={formData.licenseExpiry}
-            onChange={(e) => handleInputChange('licenseExpiry', e.target.value)}
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-foreground mb-2">Issuing Authority</label>
-          <Input
-            type="text"
-            placeholder="e.g., Rwanda Medical Council, Ministry of Health"
-            value={formData.issuingAuthority}
-            onChange={(e) => handleInputChange('issuingAuthority', e.target.value)}
+          <label className="block text-sm font-medium text-foreground mb-2">Your Therapeutic Approach</label>
+          <Textarea
+            placeholder="Focus areas, methodologies, and what patients can expect in sessions."
+            value={formData.approachSummary}
+            onChange={(event) => setFormData((prev) => ({ ...prev, approachSummary: event.target.value }))}
+            className="min-h-[120px]"
           />
         </div>
       </div>
 
-        <div className="flex flex-col items-center gap-4 pt-4 border-t border-border">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Years of Professional Experience</label>
+          <Input
+            type="number"
+            min={0}
+            placeholder="e.g., 5"
+            value={formData.yearsExperience}
+            onChange={(event) => setFormData((prev) => ({ ...prev, yearsExperience: event.target.value }))}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Professional Highlights (optional)</label>
+          <Textarea
+            placeholder="Add awards or recognitions (one per line)"
+            value={formData.professionalHighlightsNote}
+            onChange={(event) => {
+              const note = event.target.value;
+              setFormData((prev) => ({
+                ...prev,
+                professionalHighlightsNote: note,
+                professionalHighlights: parseMultilineList(note),
+              }));
+            }}
+            className="min-h-[100px]"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-col items-center gap-4 pt-4 border-t border-border">
         <Avatar className="h-24 w-24">
           {formData.profileImagePreview ? (
             <AvatarImage src={formData.profileImagePreview} alt="Profile preview" />
           ) : (
-            <AvatarFallback>PI</AvatarFallback>
+            <AvatarFallback>CP</AvatarFallback>
           )}
         </Avatar>
         <div className="flex items-center gap-3">
@@ -274,14 +687,9 @@ export default function CounselorOnboardingPage() {
             type="file"
             accept="image/png,image/jpeg"
             className="hidden"
-            onChange={(e) => handleProfileImageChange(e.target.files?.[0] || null)}
+            onChange={(event) => handleProfileImageChange(event.target.files?.[0] || null)}
           />
-          <Button 
-            variant="outline" 
-            size="sm"
-            type="button"
-            onClick={() => profileFileInputRef.current?.click()}
-          >
+          <Button variant="outline" size="sm" type="button" onClick={() => profileFileInputRef.current?.click()}>
             Upload Photo
           </Button>
           {formData.profileImage && (
@@ -302,234 +710,89 @@ export default function CounselorOnboardingPage() {
 
   const renderStep2 = () => (
     <div className="space-y-6">
-        <div className="text-center mb-6 sm:mb-8">
+      <div className="text-center mb-6 sm:mb-8">
         <div className="w-16 h-16 sm:w-20 sm:h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
           <GraduationCap className="w-10 h-10 text-primary" />
         </div>
-        <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2">Education & Certifications</h2>
-        <p className="text-sm sm:text-base text-muted-foreground">Tell us about your educational background</p>
+        <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2">Professional Credentials</h2>
+        <p className="text-sm sm:text-base text-muted-foreground">
+          Share your education and licensing so we can verify compliance before activating your account.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-2">Highest Degree</label>
-          <select
-            className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground"
-            value={formData.highestDegree}
-            onChange={(e) => handleInputChange('highestDegree', e.target.value)}
-          >
-            <option value="">Select degree</option>
-            <option value="bachelor">Bachelor's Degree</option>
-            <option value="master">Master's Degree</option>
-            <option value="phd">PhD/Doctorate</option>
-            <option value="md">Medical Doctor (MD)</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">University/Institution</label>
+          <label className="block text-sm font-medium text-foreground mb-2">License Number</label>
           <Input
             type="text"
-            placeholder="Name of university or institution"
-            value={formData.university}
-            onChange={(e) => handleInputChange('university', e.target.value)}
+            placeholder="e.g., RCR-2025-1234"
+            value={formData.licenseNumber}
+            onChange={(event) => setFormData((prev) => ({ ...prev, licenseNumber: event.target.value }))}
           />
         </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Issuing Authority</label>
+          <Input
+            type="text"
+            placeholder="Rwanda Medical Council"
+            value={formData.issuingAuthority}
+            onChange={(event) => setFormData((prev) => ({ ...prev, issuingAuthority: event.target.value }))}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">License Jurisdiction</label>
+          <Input
+            type="text"
+            placeholder="Province, country, or licensing board"
+            value={formData.licenseJurisdiction}
+            onChange={(event) => setFormData((prev) => ({ ...prev, licenseJurisdiction: event.target.value }))}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">License Expiry Date</label>
+          <Input
+            type="date"
+            value={formData.licenseExpiry}
+            onChange={(event) => setFormData((prev) => ({ ...prev, licenseExpiry: event.target.value }))}
+          />
+        </div>
+      </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Highest Degree</label>
+          <Input
+            type="text"
+            placeholder="e.g., Master of Counseling"
+            value={formData.highestDegree}
+            onChange={(event) => setFormData((prev) => ({ ...prev, highestDegree: event.target.value }))}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Institution</label>
+          <Input
+            type="text"
+            placeholder="University or training center"
+            value={formData.university}
+            onChange={(event) => setFormData((prev) => ({ ...prev, university: event.target.value }))}
+          />
+        </div>
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">Graduation Year</label>
           <Input
             type="number"
-            placeholder="Year of graduation"
+            min={1950}
+            max={new Date().getFullYear()}
+            placeholder="e.g., 2018"
             value={formData.graduationYear}
-            onChange={(e) => handleInputChange('graduationYear', e.target.value)}
+            onChange={(event) => setFormData((prev) => ({ ...prev, graduationYear: event.target.value }))}
           />
         </div>
+      </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-2">Years of Experience</label>
-          <select
-            className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground"
-            value={formData.yearsOfExperience}
-            onChange={(e) => handleInputChange('yearsOfExperience', e.target.value)}
-          >
-            <option value="">Select experience level</option>
-            <option value="0-1">0-1 years</option>
-            <option value="2-5">2-5 years</option>
-            <option value="6-10">6-10 years</option>
-            <option value="11-15">11-15 years</option>
-            <option value="16+">16+ years</option>
-          </select>
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-foreground mb-4">Additional Certifications (Select all that apply)</label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {[
-            'None',
-            'Licensed Clinical Psychologist',
-            'Licensed Social Worker',
-            'Certified Grief Counselor',
-            'Oncology Social Work Specialist',
-            'Mental Health Counselor',
-            'Family Therapist',
-            'Trauma Specialist',
-            'Palliative Care Specialist',
-            'Cancer Support Specialist',
-            'Peer Support Certification'
-          ].map((cert) => (
-            <button
-              key={cert}
-              type="button"
-              onClick={() => {
-                if (cert === 'None') {
-                  // If "None" is selected, clear all other selections
-                  handleInputChange('additionalCertifications', ['None']);
-                } else {
-                  // If any other option is selected, remove "None" and toggle the option
-                  const currentCerts = formData.additionalCertifications.filter(c => c !== 'None');
-                  if (currentCerts.includes(cert)) {
-                    handleInputChange('additionalCertifications', currentCerts.filter(c => c !== cert));
-                  } else {
-                    handleInputChange('additionalCertifications', [...currentCerts, cert]);
-                  }
-                }
-              }}
-              className={`p-3 rounded-lg border text-left transition-all ${
-                formData.additionalCertifications.includes(cert)
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-border hover:border-primary/30'
-              }`}
-            >
-              {cert}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderStep3 = () => (
-    <div className="space-y-6">
-        <div className="text-center mb-6 sm:mb-8">
-        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-          <UsersIcon size={40} className="text-primary" />
-        </div>
-        <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2">Specializations & Languages</h2>
-        <p className="text-sm sm:text-base text-muted-foreground">Define your areas of expertise</p>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-foreground mb-4">Specializations (Select all that apply)</label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {[
-            'None',
-            'Cancer Support',
-            'Grief Counseling',
-            'Family Therapy',
-            'Anxiety Management',
-            'Depression Support',
-            'Trauma Therapy',
-            'Palliative Care',
-            'End-of-Life Counseling',
-            'Peer Support',
-            'Spiritual Counseling',
-            'Child & Adolescent Therapy',
-            'Couples Counseling'
-          ].map((spec) => (
-            <button
-              key={spec}
-              type="button"
-              onClick={() => {
-                if (spec === 'None') {
-                  // If "None" is selected, clear all other selections
-                  handleInputChange('specializations', ['None']);
-                } else {
-                  // If any other option is selected, remove "None" and toggle the option
-                  const currentSpecs = formData.specializations.filter(s => s !== 'None');
-                  if (currentSpecs.includes(spec)) {
-                    handleInputChange('specializations', currentSpecs.filter(s => s !== spec));
-                  } else {
-                    handleInputChange('specializations', [...currentSpecs, spec]);
-                  }
-                }
-              }}
-              className={`p-3 rounded-lg border text-left transition-all ${
-                formData.specializations.includes(spec)
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-border hover:border-primary/30'
-              }`}
-            >
-              {spec}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-foreground mb-4">Languages (Select all that apply)</label>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {['Kinyarwanda', 'English', 'French', 'Swahili'].map((lang) => (
-            <button
-              key={lang}
-              type="button"
-              onClick={() => handleArrayToggle('languages', lang)}
-              className={`p-3 rounded-lg border text-center transition-all ${
-                formData.languages.includes(lang)
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-border hover:border-primary/30'
-              }`}
-            >
-              {lang}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-foreground mb-4">Consultation Types (Select all that apply)</label>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {[
-            { type: 'chat', label: 'Text Chat', icon: MessageCircle },
-            { type: 'video', label: 'Video Call', icon: Video },
-            { type: 'phone', label: 'Phone Call', icon: Phone }
-          ].map(({ type, label, icon: IconComponent }) => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => handleArrayToggle('consultationTypes', type)}
-              className={`p-4 rounded-lg border text-center transition-all ${
-                formData.consultationTypes.includes(type)
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-border hover:border-primary/30'
-              }`}
-            >
-              <div className="flex justify-center mb-2">
-                <IconComponent className="w-6 h-6" />
-              </div>
-              <div className="font-medium">{label}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderStep4 = () => (
-    <div className="space-y-6">
-        <div className="text-center mb-6 sm:mb-8">
-        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-          <UploadIcon size={40} className="text-primary" />
-        </div>
-        <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2">Document Upload</h2>
-        <p className="text-sm sm:text-base text-muted-foreground">Upload required documents for verification</p>
-      </div>
-
-      <div className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">Resume/CV (PDF)</label>
+          <label className="block text-sm font-medium text-foreground mb-2">Upload Resume/CV (PDF)</label>
           <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
             <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
             <p className="text-sm text-muted-foreground mb-2">
@@ -539,23 +802,17 @@ export default function CounselorOnboardingPage() {
               ref={resumeFileInputRef}
               type="file"
               accept=".pdf"
-              onChange={(e) => handleFileUpload('resumeFile', e.target.files?.[0] || null)}
+              onChange={(event) => handleFileListChange(event.target.files, 'resumeFile')}
               className="hidden"
               id="resume-upload"
             />
-            <Button 
-              variant="outline" 
-              size="sm"
-              type="button"
-              onClick={() => resumeFileInputRef.current?.click()}
-            >
+            <Button variant="outline" size="sm" type="button" onClick={() => resumeFileInputRef.current?.click()}>
               Choose File
             </Button>
           </div>
         </div>
-
         <div>
-          <label className="block text-sm font-medium text-foreground mb-2">Professional License (PDF/Image)</label>
+          <label className="block text-sm font-medium text-foreground mb-2">Upload License (PDF/Image)</label>
           <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
             <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
             <p className="text-sm text-muted-foreground mb-2">
@@ -565,115 +822,375 @@ export default function CounselorOnboardingPage() {
               ref={licenseFileInputRef}
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
-              onChange={(e) => handleFileUpload('licenseFile', e.target.files?.[0] || null)}
+              onChange={(event) => handleFileListChange(event.target.files, 'licenseFile')}
               className="hidden"
               id="license-upload"
             />
-            <Button 
-              variant="outline" 
-              size="sm"
-              type="button"
-              onClick={() => licenseFileInputRef.current?.click()}
-            >
+            <Button variant="outline" size="sm" type="button" onClick={() => licenseFileInputRef.current?.click()}>
               Choose File
             </Button>
           </div>
         </div>
-
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">Certifications (PDF/Image)</label>
           <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
             <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
             <p className="text-sm text-muted-foreground mb-2">
-              {formData.certificationsFile ? formData.certificationsFile.name : 'Click to upload or drag and drop'}
+              {formData.certificationFiles.length > 0
+                ? `${formData.certificationFiles.length} file(s) selected`
+                : 'Click to upload or drag and drop'}
             </p>
             <input
-              ref={certificationsFileInputRef}
+              ref={certificationFileInputRef}
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
-              onChange={(e) => handleFileUpload('certificationsFile', e.target.files?.[0] || null)}
+              multiple
+              onChange={(event) => handleFileListChange(event.target.files, 'certificationFiles')}
               className="hidden"
               id="certifications-upload"
             />
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               type="button"
-              onClick={() => certificationsFileInputRef.current?.click()}
+              onClick={() => certificationFileInputRef.current?.click()}
             >
-              Choose File
+              Choose File(s)
             </Button>
           </div>
         </div>
+      </div>
+
+      <div className="bg-muted/10 border border-border rounded-lg p-4 flex items-start gap-3">
+        <ShieldCheck className="w-5 h-5 text-primary mt-0.5" />
+        <div>
+          <p className="text-sm text-muted-foreground">
+            Uploading documents now speeds up approval, but you can also add missing items later from your settings.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderStep3 = () => (
+    <div className="space-y-6">
+      <div className="text-center mb-6 sm:mb-8">
+        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <ClipboardList className="w-10 h-10 text-primary" />
+        </div>
+        <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2">Practice Details</h2>
+        <p className="text-sm sm:text-base text-muted-foreground">
+          Help patients understand who you serve and the areas you specialize in.
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-2">Specializations</label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {SPECIALIZATION_OPTIONS.map((specialization) => (
+            <button
+              key={specialization}
+              type="button"
+              onClick={() => handleSpecializationToggle(specialization)}
+              className={`p-3 rounded-lg border text-left transition-all ${
+                formData.specializations.includes(specialization)
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border hover:border-primary/30'
+              }`}
+            >
+              {specialization}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-2">Populations You Serve</label>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {DEMOGRAPHIC_OPTIONS.map((demographic) => (
+            <button
+              key={demographic}
+              type="button"
+              onClick={() => handleDemographicsToggle(demographic)}
+              className={`p-3 rounded-lg border text-center transition-all ${
+                formData.demographicsServed.includes(demographic)
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border hover:border-primary/30'
+              }`}
+            >
+              {demographic}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Motivation to Join RCR</label>
+          <Textarea
+            placeholder="What inspires you to support cancer patients and families?"
+            value={formData.motivationStatement}
+            onChange={(event) => setFormData((prev) => ({ ...prev, motivationStatement: event.target.value }))}
+            className="min-h-[120px]"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Professional References</label>
+          <Textarea
+            placeholder="Format: Name | Organization | Email | Phone (one per line)"
+            value={formData.professionalReferencesNote}
+            onChange={(event) => setFormData((prev) => ({ ...prev, professionalReferencesNote: event.target.value }))}
+            className="min-h-[120px]"
+          />
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderStep4 = () => (
+    <div className="space-y-6">
+      <div className="text-center mb-6 sm:mb-8">
+        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Globe className="w-10 h-10 text-primary" />
+        </div>
+        <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2">Care Delivery & Availability</h2>
+        <p className="text-sm sm:text-base text-muted-foreground">
+          Tell us how you deliver care so patients can find the right support quickly.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Session Modalities</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {SESSION_MODALITY_OPTIONS.map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => handleModalityToggle(value)}
+                className={`p-3 rounded-lg border text-left transition-all ${
+                  formData.sessionModalities.includes(value)
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border hover:border-primary/30'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Icon className="w-5 h-5" />
+                  <span>{label}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Typical Session Durations</label>
+          <div className="flex flex-wrap gap-3">
+            {SESSION_DURATION_OPTIONS.map((duration) => (
+              <button
+                key={duration}
+                type="button"
+                onClick={() => handleDurationToggle(duration)}
+                className={`px-4 py-2 rounded-full border transition-all ${
+                  formData.sessionDurations.includes(duration)
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border hover:border-primary/30'
+                }`}
+              >
+                {duration} min
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+        <div className="space-y-3 rounded-lg border border-border p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-foreground">Accepting New Patients</p>
+              <p className="text-xs text-muted-foreground">Toggle off if you are currently full.</p>
+            </div>
+            <Switch
+              checked={formData.acceptingNewPatients}
+              onCheckedChange={(value) => setFormData((prev) => ({ ...prev, acceptingNewPatients: value }))}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-foreground">Enable Waitlist</p>
+              <p className="text-xs text-muted-foreground">Let patients request a spot when you are full.</p>
+            </div>
+            <Switch
+              checked={formData.waitlistEnabled}
+              onCheckedChange={(value) => setFormData((prev) => ({ ...prev, waitlistEnabled: value }))}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-foreground">Offer Telehealth</p>
+              <p className="text-xs text-muted-foreground">Provide video or phone sessions.</p>
+            </div>
+            <Switch
+              checked={formData.telehealthOffered}
+              onCheckedChange={(value) => setFormData((prev) => ({ ...prev, telehealthOffered: value }))}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-foreground">Offer In-person Sessions</p>
+              <p className="text-xs text-muted-foreground">Let patients know if they can meet you on site.</p>
+            </div>
+            <Switch
+              checked={formData.inPersonOffered}
+              onCheckedChange={(value) => setFormData((prev) => ({ ...prev, inPersonOffered: value }))}
+            />
+          </div>
+        </div>
+        <div className="space-y-3 rounded-lg border border-border p-4">
+          <p className="font-medium text-foreground">Availability Status</p>
+          <div className="space-y-2">
+            {AVAILABILITY_OPTIONS.map(({ value, label, description }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, availabilityStatus: value }))}
+                className={`w-full text-left rounded-lg border p-3 transition-all ${
+                  formData.availabilityStatus === value
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border hover:border-primary/30'
+                }`}
+              >
+                <p className="font-medium">{label}</p>
+                <p className="text-xs text-muted-foreground">{description}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-2">Additional Timezones You Cover</label>
+        <div className="flex flex-wrap gap-3 mb-3">
+          {TIMEZONE_OPTIONS.filter((tz) => tz !== 'Africa/Kigali').map((timezone) => (
+            <Badge
+              key={timezone}
+              variant={formData.supportedTimezones.includes(timezone) ? 'default' : 'outline'}
+              className="cursor-pointer"
+              onClick={() =>
+                setFormData((prev) => ({
+                  ...prev,
+                  supportedTimezones: toggleValue(prev.supportedTimezones, timezone),
+                }))
+              }
+            >
+              {timezone}
+            </Badge>
+          ))}
+        </div>
+        <Textarea
+          placeholder="Add any other timezones (one per line)"
+          value={formData.supportedTimezonesNote}
+          onChange={(event) => {
+            const note = event.target.value;
+            const additionalZones = parseMultilineList(note);
+            setFormData((prev) => ({
+              ...prev,
+              supportedTimezonesNote: note,
+              supportedTimezones: Array.from(new Set([...prev.supportedTimezones.filter((tz) => TIMEZONE_OPTIONS.includes(tz)), ...additionalZones])),
+            }));
+          }}
+          className="min-h-[100px]"
+        />
       </div>
     </div>
   );
 
   const renderStep5 = () => (
     <div className="space-y-6">
-        <div className="text-center mb-6 sm:mb-8">
+      <div className="text-center mb-6 sm:mb-8">
         <div className="w-16 h-16 sm:w-20 sm:h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-          <FileTextIcon size={40} className="text-primary" />
+          <Award className="w-10 h-10 text-primary" />
         </div>
-        <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2">Additional Information</h2>
-        <p className="text-sm sm:text-base text-muted-foreground">Help us understand your motivation and background</p>
+        <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2">Compliance & Visibility</h2>
+        <p className="text-sm sm:text-base text-muted-foreground">
+          Confirm your compliance status and decide where your profile should be visible.
+        </p>
       </div>
 
-      <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-2">Previous Employers/Experience</label>
-          <textarea
-            className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground min-h-[100px]"
-            placeholder="List your previous employers, hospitals, clinics, or organizations where you've worked..."
-            value={formData.previousEmployers}
-            onChange={(e) => handleInputChange('previousEmployers', e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">Availability</label>
-          <select
-            className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground"
-            value={formData.availability}
-            onChange={(e) => handleInputChange('availability', e.target.value)}
-          >
-            <option value="">Select availability</option>
-            <option value="full-time">Full-time (40+ hours/week)</option>
-            <option value="part-time">Part-time (20-39 hours/week)</option>
-            <option value="flexible">Flexible hours</option>
-            <option value="weekends">Weekends only</option>
-            <option value="evenings">Evenings only</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">Motivation to Join RCR</label>
-          <textarea
-            className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground min-h-[100px]"
-            placeholder="Why do you want to join Rwanda Cancer Relief? What drives your passion for helping cancer patients and their families?"
-            value={formData.motivation}
-            onChange={(e) => handleInputChange('motivation', e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">Professional References</label>
-          <textarea
-            className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground min-h-[100px]"
-            placeholder="Provide contact information for 2-3 professional references (name, title, organization, email, phone)..."
-            value={formData.references}
-            onChange={(e) => handleInputChange('references', e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">Emergency Contact</label>
+          <label className="block text-sm font-medium text-foreground mb-2">Continuing Professional Development Status</label>
           <Input
             type="text"
-            placeholder="Name, relationship, phone number"
-            value={formData.emergencyContact}
-            onChange={(e) => handleInputChange('emergencyContact', e.target.value)}
+            placeholder="e.g., Current, Renewal in progress"
+            value={formData.cpdStatus}
+            onChange={(event) => setFormData((prev) => ({ ...prev, cpdStatus: event.target.value }))}
           />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Next Renewal Date</label>
+          <Input
+            type="date"
+            value={formData.cpdRenewalDueAt}
+            onChange={(event) => setFormData((prev) => ({ ...prev, cpdRenewalDueAt: event.target.value }))}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <p className="font-medium text-foreground">Profile Visibility</p>
+        <div className="grid grid-cols-1 gap-3">
+          {VISIBILITY_SURFACES.map(({ key, title, description }) => (
+            <div key={key} className="flex items-start justify-between rounded-lg border border-border p-4">
+              <div className="pr-4">
+                <p className="font-medium text-foreground">{title}</p>
+                <p className="text-xs text-muted-foreground">{description}</p>
+              </div>
+              <Switch
+                checked={formData.visibility[key]}
+                onCheckedChange={(value) => handleVisibilityToggle(key, value)}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Emergency Contact Name</label>
+          <Input
+            type="text"
+            placeholder="Name of emergency contact"
+            value={formData.emergencyContactName}
+            onChange={(event) => setFormData((prev) => ({ ...prev, emergencyContactName: event.target.value }))}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Emergency Contact Phone</label>
+          <Input
+            type="tel"
+            placeholder="e.g., +250 700 000 000"
+            value={formData.emergencyContactPhone}
+            onChange={(event) => setFormData((prev) => ({ ...prev, emergencyContactPhone: event.target.value }))}
+          />
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-border p-4">
+        <div className="flex items-start gap-3">
+          <CheckCircle className="w-5 h-5 text-primary mt-1" />
+          <div className="flex-1">
+            <p className="text-sm text-muted-foreground">
+              By toggling this control, you confirm that all information provided is accurate and that you understand your profile must be approved before accessing the counselor dashboard.
+            </p>
+            <div className="flex items-center gap-3 mt-3">
+              <Switch
+                checked={formData.consentAcknowledged}
+                onCheckedChange={(value) => setFormData((prev) => ({ ...prev, consentAcknowledged: value }))}
+              />
+              <span className="text-sm text-foreground">I confirm the information above is accurate.</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -681,12 +1198,18 @@ export default function CounselorOnboardingPage() {
 
   const renderCurrentStep = () => {
     switch (currentStep) {
-      case 1: return renderStep1();
-      case 2: return renderStep2();
-      case 3: return renderStep3();
-      case 4: return renderStep4();
-      case 5: return renderStep5();
-      default: return renderStep1();
+      case 1:
+        return renderStep1();
+      case 2:
+        return renderStep2();
+      case 3:
+        return renderStep3();
+      case 4:
+        return renderStep4();
+      case 5:
+        return renderStep5();
+      default:
+        return renderStep1();
     }
   };
 
@@ -694,68 +1217,55 @@ export default function CounselorOnboardingPage() {
     <div className="min-h-screen w-full bg-background flex items-center justify-center py-4 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl w-full">
         <Card className="w-full bg-gradient-to-br from-primary/5 via-background to-primary/10 rounded-3xl border-primary/20">
-        <CardHeader className="text-center relative">
-          {/* Decorative gradient blob */}
-          <div className="absolute top-0 right-0 w-48 h-48 bg-primary/10 rounded-full blur-3xl -z-0"></div>
-          <CardTitle className="text-2xl sm:text-3xl font-bold text-foreground relative z-10">
-            Counselor Application
-          </CardTitle>
-          <CardDescription className="text-base sm:text-lg relative z-10">
-            Complete your professional profile to join our counselor network
-          </CardDescription>
-          
-          {/* Progress Bar */}
-          <div className="mt-6 relative z-10">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm text-muted-foreground">Step {currentStep} of {totalSteps}</span>
-              <span className="text-sm text-muted-foreground">{Math.round((currentStep / totalSteps) * 100)}% Complete</span>
+          <CardHeader className="text-center relative">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-primary/10 rounded-full blur-3xl -z-0" />
+            <CardTitle className="text-2xl sm:text-3xl font-bold text-foreground relative z-10">
+              Counselor Application
+            </CardTitle>
+            <CardDescription className="text-base sm:text-lg relative z-10">
+              Complete your professional profile to join our counselor network
+            </CardDescription>
+            <div className="mt-6 relative z-10">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-muted-foreground">Step {currentStep} of {TOTAL_STEPS}</span>
+                <span className="text-sm text-muted-foreground">{progressPercent}% Complete</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2">
+                <div
+                  className="bg-primary h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
             </div>
-            <div className="w-full bg-muted rounded-full h-2">
-              <div 
-                className="bg-primary h-2 rounded-full transition-all duration-300"
-                style={{ width: `${(currentStep / totalSteps) * 100}%` }}
-              />
-            </div>
-          </div>
-        </CardHeader>
-
-        <CardContent className="space-y-6 relative z-10">
-          {renderCurrentStep()}
-
-          {/* Navigation Buttons */}
-          <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-0 pt-6">
-            <Button
-              variant="outline"
-              onClick={handlePrevious}
-              disabled={currentStep === 1}
-              className="flex items-center justify-center gap-2 w-full sm:w-auto order-2 sm:order-1"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Previous
-            </Button>
-
-            <div className="flex flex-col sm:flex-row gap-3 order-1 sm:order-2">
-              {currentStep === 1 && (
+          </CardHeader>
+          <CardContent className="space-y-6 relative z-10">
+            {renderCurrentStep()}
+            <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-0 pt-6">
+              <Button
+                variant="outline"
+                onClick={handlePrevious}
+                disabled={currentStep === 1 || isSubmitting}
+                className="flex items-center justify-center gap-2 w-full sm:w-auto order-2 sm:order-1"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Previous
+              </Button>
+              <div className="flex flex-col sm:flex-row gap-3 order-1 sm:order-2">
                 <Button
-                  variant="ghost"
                   onClick={handleNext}
+                  disabled={isSubmitting || (currentStep === TOTAL_STEPS && !formData.consentAcknowledged)}
                   className="flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
-                  Skip License
-                  <ArrowRight className="w-4 h-4" />
+                  {isSubmitting
+                    ? 'Submitting...'
+                    : currentStep === TOTAL_STEPS
+                        ? 'Submit for Review'
+                        : 'Next'}
+                  {!isSubmitting && <ArrowRight className="w-4 h-4" />}
                 </Button>
-              )}
-              <Button
-                onClick={handleNext}
-                disabled={isSubmitting}
-                className="flex items-center justify-center gap-2 w-full sm:w-auto"
-              >
-                {isSubmitting ? 'Saving...' : currentStep === totalSteps ? 'Submit Application' : 'Next'}
-                {!isSubmitting && <ArrowRight className="w-4 h-4" />}
-              </Button>
+              </div>
             </div>
-          </div>
-        </CardContent>
+          </CardContent>
         </Card>
       </div>
     </div>

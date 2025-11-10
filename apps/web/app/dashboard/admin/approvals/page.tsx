@@ -55,8 +55,24 @@ import {
   Heart
 } from 'lucide-react';
 import { AdminApi, type AdminUser } from '../../../../lib/api/admin';
+import type { CounselorApprovalStatus } from '../../../../lib/types';
 import { toast } from 'sonner';
 import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
+
+const getApprovalBadgeStyles = (status: CounselorApprovalStatus) => {
+  switch (status) {
+    case 'approved':
+      return { label: 'Approved', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300' };
+    case 'needs_more_info':
+      return { label: 'Needs More Info', className: 'bg-blue-100 text-blue-800 dark:bg-blue-400/10 dark:text-blue-300' };
+    case 'rejected':
+      return { label: 'Rejected', className: 'bg-red-100 text-red-700 dark:bg-red-400/10 dark:text-red-300' };
+    case 'suspended':
+      return { label: 'Suspended', className: 'bg-slate-200 text-slate-700 dark:bg-slate-400/10 dark:text-slate-300' };
+    default:
+      return { label: 'Pending Approval', className: 'bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300' };
+  }
+};
 
 export default function AdminApprovalsPage() {
   const [counselors, setCounselors] = useState<AdminUser[]>([]);
@@ -73,12 +89,9 @@ export default function AdminApprovalsPage() {
     const loadCounselors = async () => {
       try {
         setLoading(true);
-        // Note: Backend would need to add a filter for pending counselors
-        // For now, we'll load all counselors and filter for pending ones
         const response = await AdminApi.listUsers({ role: 'counselor' });
-        // Filter for pending counselors (would need to check status in backend)
-        // For now, show all counselors as pending approvals would be a separate status
-        setCounselors(response.users);
+        const pending = response.users.filter((counselor) => counselor.approvalStatus !== 'approved');
+        setCounselors(pending);
       } catch (error) {
         console.error('Error loading counselors:', error);
         toast.error('Failed to load pending counselors');
@@ -121,9 +134,9 @@ export default function AdminApprovalsPage() {
   const handleApprove = async (counselorId: string) => {
     setIsProcessing(true);
     try {
-      // Note: Backend would need an endpoint to approve pending counselors
-      // For now, we'll update the role or status
-      await AdminApi.updateUserRole(counselorId, { role: 'counselor' });
+      await AdminApi.updateCounselorApproval(counselorId, {
+        approvalStatus: 'approved',
+      });
       toast.success('Counselor approved successfully!');
       // Remove approved counselor from list
       setCounselors(prev => prev.filter(c => c.id !== counselorId));
@@ -139,14 +152,36 @@ export default function AdminApprovalsPage() {
   const handleReject = async (counselorId: string) => {
     setIsProcessing(true);
     try {
-      // Note: Backend would need an endpoint to reject pending counselors
-      // For now, we'll just remove from the list
-      setCounselors(prev => prev.filter(c => c.id !== counselorId));
+      const notes = window.prompt('Share a short note to send with the rejection (optional):', selectedCounselor?.approvalNotes ?? '') || undefined;
+      await AdminApi.updateCounselorApproval(counselorId, {
+        approvalStatus: 'rejected',
+        approvalNotes: notes,
+      });
       toast.success('Counselor application rejected.');
+      setCounselors((prev) => prev.filter((c) => c.id !== counselorId));
       handleCloseModal();
     } catch (error) {
       console.error('Error rejecting counselor:', error);
       toast.error('Failed to reject counselor. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRequestInfo = async (counselorId: string) => {
+    setIsProcessing(true);
+    try {
+      const notes = window.prompt('What information do you need from this counselor?', selectedCounselor?.approvalNotes ?? '') || undefined;
+      await AdminApi.updateCounselorApproval(counselorId, {
+        approvalStatus: 'needs_more_info',
+        approvalNotes: notes,
+      });
+      toast.success('Requested additional information from the counselor.');
+      setCounselors((prev) => prev.filter((c) => c.id !== counselorId));
+      handleCloseModal();
+    } catch (error) {
+      console.error('Error requesting more information:', error);
+      toast.error('Failed to request more information. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -157,6 +192,19 @@ export default function AdminApprovalsPage() {
     if (experience <= 5) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
     if (experience <= 10) return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
     return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+  };
+
+  const getApprovalBadgeStyles = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return { className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', label: 'Approved' };
+      case 'rejected':
+        return { className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', label: 'Rejected' };
+      case 'needs_more_info':
+        return { className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', label: 'Needs More Info' };
+      default:
+        return { className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', label: 'Pending Approval' };
+    }
   };
 
   return (
@@ -762,44 +810,54 @@ export default function AdminApprovalsPage() {
             </div>
           )}
 
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={handleCloseModal}>
-              Close
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => selectedCounselor && handleReject(selectedCounselor.id)}
-              disabled={isProcessing}
-            >
-              {isProcessing ? (
-                <>
-                  <Spinner variant="bars" size={16} className="text-white mr-2" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Reject
-                </>
-              )}
-            </Button>
-            <Button
-              onClick={() => selectedCounselor && handleApprove(selectedCounselor.id)}
-              disabled={isProcessing}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {isProcessing ? (
-                <>
-                  <Spinner variant="bars" size={16} className="text-white mr-2" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Approve
-                </>
-              )}
-            </Button>
+          <DialogFooter className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+            <div className="text-sm text-muted-foreground">
+              <p>Verify credentials and supporting documents before approval.</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                variant="outline"
+                disabled={isProcessing || !selectedCounselor}
+                onClick={() => selectedCounselor && handleRequestInfo(selectedCounselor.id)}
+              >
+                Request More Info
+              </Button>
+              <Button
+                variant="outline"
+                className="text-red-600 border-red-200 hover:bg-red-50"
+                disabled={isProcessing || !selectedCounselor}
+                onClick={() => selectedCounselor && handleReject(selectedCounselor.id)}
+              >
+                {isProcessing ? (
+                  <>
+                    <Spinner variant="bars" size={16} className="text-white mr-2" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Reject
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={() => selectedCounselor && handleApprove(selectedCounselor.id)}
+                disabled={isProcessing}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {isProcessing ? (
+                  <>
+                    <Spinner variant="bars" size={16} className="text-white mr-2" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Approve
+                  </>
+                )}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

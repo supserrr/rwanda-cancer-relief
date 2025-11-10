@@ -1,5 +1,82 @@
 export type UserRole = 'patient' | 'counselor' | 'admin' | 'guest';
 
+export type VisibilitySurface = 'publicLanding' | 'patientDirectory' | 'internal';
+
+export type CounselorApprovalStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'needs_more_info'
+  | 'suspended';
+
+export type CounselorAvailabilityStatus =
+  | 'available'
+  | 'limited'
+  | 'waitlist'
+  | 'unavailable';
+
+export interface VisibilitySettings {
+  publicLanding: boolean;
+  patientDirectory: boolean;
+  internal: boolean;
+  [surface: string]: boolean;
+}
+
+export interface CounselorDocument {
+  id: string;
+  profileId: string;
+  documentType: 'license' | 'resume' | 'certification' | 'background_check' | 'insurance' | 'other';
+  storagePath: string;
+  displayName?: string;
+  issuedAt?: string;
+  expiresAt?: string;
+  status: 'submitted' | 'approved' | 'rejected' | 'expired';
+  reviewedAt?: string;
+  reviewedBy?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CounselorProfileRecord {
+  profileId: string;
+  practiceName?: string;
+  practiceLocation?: string;
+  serviceRegions: string[];
+  primaryTimezone?: string;
+  supportedTimezones: string[];
+  acceptingNewPatients: boolean;
+  waitlistEnabled: boolean;
+  availabilityStatus: CounselorAvailabilityStatus;
+  sessionModalities: string[];
+  sessionDurations: number[];
+  telehealthOffered: boolean;
+  inPersonOffered: boolean;
+  languages: string[];
+  specializations: string[];
+  demographicsServed: string[];
+  approachSummary?: string;
+  bio?: string;
+  yearsExperience?: number;
+  professionalHighlights: string[];
+  educationHistory: Array<{ degree?: string; institution?: string; graduationYear?: number }>;
+  licenseNumber?: string;
+  licenseJurisdiction?: string;
+  licenseExpiry?: string;
+  licenseDocumentUrl?: string;
+  resumeUrl?: string;
+  certificationDocuments: Array<{ name?: string; url?: string; issuedAt?: string; expiresAt?: string }>;
+  cpdStatus?: string;
+  cpdRenewalDueAt?: string;
+  professionalReferences: Array<{ name?: string; organization?: string; email?: string; phone?: string }>;
+  motivationStatement?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface NavigationItem {
   id: string;
   label: string;
@@ -17,6 +94,13 @@ export interface User {
   avatar?: string;
   createdAt: Date;
   lastLogin?: Date;
+  metadata?: Record<string, unknown>;
+  visibilitySettings?: VisibilitySettings;
+  approvalStatus?: CounselorApprovalStatus;
+  approvalSubmittedAt?: string;
+  approvalReviewedAt?: string;
+  approvalNotes?: string;
+  counselorProfile?: CounselorProfileRecord;
 }
 
 export interface Patient extends User {
@@ -50,6 +134,12 @@ export interface Counselor extends User {
   timezone?: string;
   profileImage?: string;
   location?: string;
+  visibilitySettings?: VisibilitySettings;
+  approvalStatus?: CounselorApprovalStatus;
+  availabilityStatus?: CounselorAvailabilityStatus;
+  sessionModalities?: string[];
+  acceptingNewPatients?: boolean;
+  telehealthOffered?: boolean;
 }
 
 export interface Admin extends User {

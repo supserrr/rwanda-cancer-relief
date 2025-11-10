@@ -61,7 +61,11 @@ const sanitizeAvailability = (
   return 'available';
 };
 
-const adminUserToLandingCounselor = (user: AdminUser): Counselor => {
+const adminUserToLandingCounselor = (user: AdminUser): Counselor | null => {
+  if (user.visibilitySettings && user.visibilitySettings.publicLanding === false) {
+    return null;
+  }
+
   const metadata = (user.metadata ?? {}) as Record<string, unknown>;
 
   const name =
@@ -321,9 +325,10 @@ export default function CounselorsPage() {
       try {
         setLoading(true);
         const response = await AdminApi.listUsers({ role: 'counselor' });
-        const mapped = response.users.map(adminUserToLandingCounselor).sort((a, b) =>
-          a.name.localeCompare(b.name),
-        );
+        const mapped = response.users
+          .map(adminUserToLandingCounselor)
+          .filter((counselor): counselor is Counselor => counselor !== null)
+          .sort((a, b) => a.name.localeCompare(b.name));
         setCounselors(mapped);
       } catch (error) {
         console.error('Failed to load counselors:', error);
@@ -351,15 +356,18 @@ export default function CounselorsPage() {
       const counselor = adminUserToLandingCounselor(adminUser);
 
       setCounselors((previous) => {
-        const existingIndex = previous.findIndex((c) => c.id === counselor.id);
+        const existingIndex = previous.findIndex((c) => c.id === adminUser.id);
 
         if (eventType === 'DELETE') {
-          if (existingIndex === -1) {
-            return previous;
-          }
-          const next = [...previous];
-          next.splice(existingIndex, 1);
-          return next;
+          return existingIndex === -1
+            ? previous
+            : previous.filter((counselorItem) => counselorItem.id !== adminUser.id);
+        }
+
+        if (!counselor) {
+          return existingIndex === -1
+            ? previous
+            : previous.filter((counselorItem) => counselorItem.id !== adminUser.id);
         }
 
         if (existingIndex === -1) {

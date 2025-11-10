@@ -9,6 +9,11 @@
  */
 
 import { AuthApi } from './api/auth';
+import type {
+  VisibilitySettings,
+  CounselorApprovalStatus,
+  CounselorProfileRecord,
+} from './types';
 
 export type UserRole = 'patient' | 'counselor' | 'admin' | 'guest'
 
@@ -31,6 +36,12 @@ export interface User {
   notificationPreferences?: Record<string, unknown>
   securityPreferences?: Record<string, unknown>
   supportPreferences?: Record<string, unknown>
+  visibilitySettings?: VisibilitySettings
+  approvalStatus?: CounselorApprovalStatus
+  approvalSubmittedAt?: string | null
+  approvalReviewedAt?: string | null
+  approvalNotes?: string | null
+  counselorProfile?: CounselorProfileRecord | null
 }
 
 export interface AuthState {

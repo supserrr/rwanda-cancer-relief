@@ -6,6 +6,13 @@
  */
 
 import { createClient } from '@/lib/supabase/client';
+import { NotificationService } from './notifications';
+import type {
+  VisibilitySettings,
+  CounselorApprovalStatus,
+  CounselorProfileRecord,
+  CounselorAvailabilityStatus,
+} from '../types';
 
 /**
  * Admin user interface
@@ -28,6 +35,12 @@ export interface AdminUser {
   languages?: string[];
   bio?: string;
   credentials?: string | string[];
+  visibilitySettings?: VisibilitySettings;
+  approvalStatus?: CounselorApprovalStatus;
+  approvalSubmittedAt?: string;
+  approvalReviewedAt?: string;
+  approvalNotes?: string;
+  counselorProfile?: CounselorProfileRecord;
 }
 
 /**
@@ -413,6 +426,9 @@ export class AdminApi {
       const trimmed = value.trim();
       return trimmed.length > 0 ? trimmed : undefined;
     }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value);
+    }
     return undefined;
   };
 
@@ -423,6 +439,25 @@ export class AdminApi {
     if (typeof value === 'string') {
       const parsed = Number.parseFloat(value);
       return Number.isNaN(parsed) ? undefined : parsed;
+    }
+    return undefined;
+  };
+
+  const toBoolean = (value: unknown): boolean | undefined => {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'number') {
+      return value !== 0;
+    }
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (['true', 't', '1', 'yes', 'y'].includes(normalized)) {
+        return true;
+      }
+      if (['false', 'f', '0', 'no', 'n'].includes(normalized)) {
+        return false;
+      }
     }
     return undefined;
   };
@@ -440,6 +475,110 @@ export class AdminApi {
       return trimmed.length > 0 ? [trimmed] : undefined;
     }
     return undefined;
+  };
+
+  const toNumberArray = (value: unknown): number[] | undefined => {
+    if (Array.isArray(value)) {
+      const normalized = value
+        .map((item) => toNumber(item))
+        .filter((item): item is number => typeof item === 'number');
+      return normalized.length > 0 ? normalized : undefined;
+    }
+    return undefined;
+  };
+
+  const toRecord = (value: unknown): Record<string, unknown> | undefined => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+    return undefined;
+  };
+
+  const mapCounselorProfile = (raw: any): CounselorProfileRecord | undefined => {
+    if (!raw || typeof raw !== 'object') {
+      return undefined;
+    }
+
+    const profileId = toString((raw as any).profile_id ?? (raw as any).profileId);
+    if (!profileId) {
+      return undefined;
+    }
+
+    const serviceRegions = toStringArray(raw.service_regions ?? raw.serviceRegions) ?? [];
+    const supportedTimezones =
+      toStringArray(raw.supported_timezones ?? raw.supportedTimezones) ?? [];
+    const sessionModalities =
+      toStringArray(raw.session_modalities ?? raw.sessionModalities) ?? ['chat', 'video', 'phone'];
+    const sessionDurations = toNumberArray(raw.session_durations ?? raw.sessionDurations) ?? [];
+    const specializations = toStringArray(raw.specializations) ?? [];
+    const languages = toStringArray(raw.languages) ?? [];
+    const demographicsServed = toStringArray(raw.demographics_served ?? raw.demographicsServed) ?? [];
+    const highlights = toStringArray(raw.professional_highlights ?? raw.professionalHighlights) ?? [];
+    const educationHistory = Array.isArray(raw.education_history ?? raw.educationHistory)
+      ? (raw.education_history ?? raw.educationHistory)
+      : [];
+    const certificationDocuments = Array.isArray(raw.certification_documents ?? raw.certificationDocuments)
+      ? (raw.certification_documents ?? raw.certificationDocuments)
+      : [];
+    const professionalReferences = Array.isArray(raw.professional_references ?? raw.professionalReferences)
+      ? (raw.professional_references ?? raw.professionalReferences)
+      : [];
+
+    const availabilityRaw =
+      toString(raw.availability_status ?? raw.availabilityStatus) ?? 'available';
+    const allowedAvailability: CounselorAvailabilityStatus[] = [
+      'available',
+      'limited',
+      'waitlist',
+      'unavailable',
+    ];
+    const availabilityStatus: CounselorAvailabilityStatus = allowedAvailability.includes(
+      availabilityRaw as CounselorAvailabilityStatus,
+    )
+      ? (availabilityRaw as CounselorAvailabilityStatus)
+      : 'available';
+
+    return {
+      profileId,
+      practiceName: toString(raw.practice_name ?? raw.practiceName),
+      practiceLocation: toString(raw.practice_location ?? raw.practiceLocation),
+      serviceRegions,
+      primaryTimezone: toString(raw.primary_timezone ?? raw.primaryTimezone),
+      supportedTimezones,
+      acceptingNewPatients:
+        toBoolean(raw.accepting_new_patients ?? raw.acceptingNewPatients) ?? true,
+      waitlistEnabled: toBoolean(raw.waitlist_enabled ?? raw.waitlistEnabled) ?? false,
+      availabilityStatus,
+      sessionModalities,
+      sessionDurations,
+      telehealthOffered: toBoolean(raw.telehealth_offered ?? raw.telehealthOffered) ?? true,
+      inPersonOffered: toBoolean(raw.in_person_offered ?? raw.inPersonOffered) ?? false,
+      languages,
+      specializations,
+      demographicsServed,
+      approachSummary: toString(raw.approach_summary ?? raw.approachSummary),
+      bio: toString(raw.bio),
+      yearsExperience: toNumber(raw.years_experience ?? raw.yearsExperience),
+      professionalHighlights: highlights,
+      educationHistory,
+      licenseNumber: toString(raw.license_number ?? raw.licenseNumber),
+      licenseJurisdiction: toString(raw.license_jurisdiction ?? raw.licenseJurisdiction),
+      licenseExpiry: toString(raw.license_expiry ?? raw.licenseExpiry),
+      licenseDocumentUrl: toString(raw.license_document_url ?? raw.licenseDocumentUrl),
+      resumeUrl: toString(raw.resume_url ?? raw.resumeUrl),
+      certificationDocuments,
+      cpdStatus: toString(raw.cpd_status ?? raw.cpdStatus),
+      cpdRenewalDueAt: toString(raw.cpd_renewal_due_at ?? raw.cpdRenewalDueAt),
+      professionalReferences,
+      motivationStatement: toString(raw.motivation_statement ?? raw.motivationStatement),
+      emergencyContactName: toString(raw.emergency_contact_name ?? raw.emergencyContactName),
+      emergencyContactPhone: toString(raw.emergency_contact_phone ?? raw.emergencyContactPhone),
+      metadata: toRecord(raw.metadata) ?? {},
+      createdAt:
+        toString(raw.created_at ?? raw.createdAt) ?? new Date().toISOString(),
+      updatedAt:
+        toString(raw.updated_at ?? raw.updatedAt) ?? new Date().toISOString(),
+    };
   };
 
   const mapToAdminUser = (raw: any): AdminUser => {
@@ -515,6 +654,27 @@ export class AdminApi {
       toString(metadata.contact_email) ??
       '';
 
+    const visibilitySettings =
+      (raw?.visibilitySettings as VisibilitySettings | undefined) ??
+      (raw?.visibility_settings as VisibilitySettings | undefined) ??
+      (metadata.visibilitySettings as VisibilitySettings | undefined);
+
+    const approvalStatus =
+      (toString(raw?.approvalStatus ?? raw?.approval_status) as CounselorApprovalStatus | undefined) ??
+      (toString(metadata.approvalStatus) as CounselorApprovalStatus | undefined);
+
+    const approvalSubmittedAt =
+      toString(raw?.approval_submitted_at ?? raw?.approvalSubmittedAt ?? metadata.approvalSubmittedAt);
+
+    const approvalReviewedAt =
+      toString(raw?.approval_reviewed_at ?? raw?.approvalReviewedAt ?? metadata.approvalReviewedAt);
+
+    const approvalNotes =
+      toString(raw?.approval_notes ?? raw?.approvalNotes ?? metadata.approvalNotes);
+
+    const counselorProfile =
+      mapCounselorProfile(raw?.counselor_profile ?? raw?.counselor_profiles ?? metadata.counselorProfile);
+
     const createdAt =
       toString(raw?.createdAt) ??
       toString(raw?.created_at) ??
@@ -544,6 +704,12 @@ export class AdminApi {
       languages,
       bio,
       credentials: credentials,
+      visibilitySettings,
+      approvalStatus,
+      approvalSubmittedAt,
+      approvalReviewedAt,
+      approvalNotes,
+      counselorProfile,
     };
   };
 
@@ -590,7 +756,7 @@ export class AdminApi {
     let profileQuery = supabase
       .from('profiles')
       .select(
-        'id,full_name,role,is_verified,metadata,specialty,experience_years,availability,avatar_url,assigned_counselor_id,created_at,updated_at',
+        'id,full_name,role,is_verified,metadata,specialty,experience_years,availability,avatar_url,assigned_counselor_id,created_at,updated_at,visibility_settings,approval_status,approval_submitted_at,approval_reviewed_at,approval_notes,counselor_profiles(*)',
         { count: 'exact' },
       );
 
@@ -622,12 +788,12 @@ export class AdminApi {
     return {
       users: (profiles || []).map((profile) =>
         mapToAdminUser({
-        id: profile.id,
-        email:
-          (profile.metadata?.email as string | undefined) ||
-          (profile.metadata?.contact_email as string | undefined) ||
-          '',
-        fullName: profile.full_name || '',
+          id: profile.id,
+          email:
+            (profile.metadata?.email as string | undefined) ||
+            (profile.metadata?.contact_email as string | undefined) ||
+            '',
+          fullName: profile.full_name || '',
           role: profile.role,
           isVerified: profile.is_verified,
           createdAt: profile.created_at,
@@ -637,6 +803,14 @@ export class AdminApi {
           experience: profile.experience_years,
           availability: profile.availability,
           avatarUrl: profile.avatar_url,
+          visibility_settings: profile.visibility_settings,
+          approval_status: profile.approval_status,
+          approval_submitted_at: profile.approval_submitted_at,
+          approval_reviewed_at: profile.approval_reviewed_at,
+          approval_notes: profile.approval_notes,
+          counselor_profiles: Array.isArray(profile.counselor_profiles)
+            ? profile.counselor_profiles[0]
+            : profile.counselor_profiles,
         }),
       ),
       total: count ?? (profiles?.length ?? 0),
@@ -712,6 +886,96 @@ export class AdminApi {
     // The Edge Function returns { success: true, data: null }
     if (!data || !data.success) {
       throw new Error(data?.error?.message || 'Failed to delete user');
+    }
+  }
+
+  static async updateCounselorApproval(
+    counselorId: string,
+    input: {
+      approvalStatus: CounselorApprovalStatus;
+      approvalNotes?: string;
+      visibilitySettings?: VisibilitySettings;
+    },
+  ): Promise<void> {
+    const supabase = createClient();
+    if (!supabase) {
+      throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+    }
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) {
+      throw new Error(authError.message || 'Failed to load current user');
+    }
+
+    if (!user) {
+      throw new Error('You must be signed in as an administrator to change approval status.');
+    }
+
+    const payload: Record<string, unknown> = {
+      approval_status: input.approvalStatus,
+      approval_reviewed_at: new Date().toISOString(),
+      approval_reviewed_by: user.id,
+      approval_notes: input.approvalNotes ?? null,
+    };
+
+    if (input.visibilitySettings) {
+      payload.visibility_settings = input.visibilitySettings;
+    }
+
+    const { error } = await supabase.from('profiles').update(payload).eq('id', counselorId);
+
+    if (error) {
+      throw new Error(error.message || 'Failed to update counselor approval status');
+    }
+
+    const approvalMessages: Record<CounselorApprovalStatus, { title: string; message: string }> = {
+      approved: {
+        title: 'Your counselor profile has been approved',
+        message: 'Congratulations! Your counselor profile is live and you can now access the full dashboard.',
+      },
+      pending: {
+        title: 'Your counselor profile is still under review',
+        message: 'Our team is still reviewing your submission. We will notify you once a decision has been made.',
+      },
+      needs_more_info: {
+        title: 'More information requested for your counselor profile',
+        message: input.approvalNotes
+          ? input.approvalNotes
+          : 'We need a little more detail before we can approve your profile. Please review your application and update the requested information.',
+      },
+      rejected: {
+        title: 'Your counselor profile could not be approved',
+        message: input.approvalNotes
+          ? input.approvalNotes
+          : 'We were unable to approve your counselor profile at this time. Please contact support for more details.',
+      },
+      suspended: {
+        title: 'Your counselor profile has been suspended',
+        message: input.approvalNotes
+          ? input.approvalNotes
+          : 'Your counselor access has been suspended. Please reach out to the admin team for further assistance.',
+      },
+    };
+
+    const notification = approvalMessages[input.approvalStatus];
+
+    try {
+      await NotificationService.enqueue({
+        userId: counselorId,
+        typeKey: 'counselor_approval',
+        title: notification.title,
+        message: notification.message,
+        channels: ['email', 'in_app'],
+        metadata: {
+          approvalStatus: input.approvalStatus,
+        },
+      });
+    } catch (notificationError) {
+      console.warn('[AdminApi.updateCounselorApproval] Failed to enqueue approval notification', notificationError);
     }
   }
   private static mapSystemHealthFromDb(row: Record<string, unknown>): SystemHealthStatus {

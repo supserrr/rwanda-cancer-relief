@@ -19,6 +19,7 @@ import { Search, Filter, Star } from 'lucide-react';
 import { AdminApi, type AdminUser } from '../../../../lib/api/admin';
 import { ProfileViewModal } from '@workspace/ui/components/profile-view-modal';
 import { useAuth } from '../../../../components/auth/AuthProvider';
+import type { VisibilitySettings, CounselorApprovalStatus } from '../../../../lib/types';
 import { toast } from 'sonner';
 import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
 import type { Counselor } from '@workspace/ui/lib/types';
@@ -32,6 +33,8 @@ type CounselorProfile = Counselor & {
   languages?: string[];
   bio?: string;
   credentials?: string;
+  visibilitySettings?: VisibilitySettings;
+  approvalStatus?: CounselorApprovalStatus;
 };
 
 const toString = (value: unknown): string | undefined => {
@@ -320,6 +323,8 @@ const mapAdminUserToCounselor = (user: AdminUser): CounselorProfile => {
     languages,
     bio,
     credentials: credentialText ?? undefined,
+    visibilitySettings: user.visibilitySettings,
+    approvalStatus: user.approvalStatus,
   };
 };
 
@@ -365,7 +370,24 @@ const mapProfileRecordToAdminUser = (profile: RealtimeProfile): AdminUser => {
       : undefined,
     bio: typeof metadata.bio === 'string' ? metadata.bio : undefined,
     credentials: (metadata.credentials ?? metadata.certifications ?? metadata.licenses) as string | string[] | undefined,
+    visibilitySettings: (profile.visibility_settings as VisibilitySettings | undefined) ?? (metadata.visibilitySettings as VisibilitySettings | undefined),
+    approvalStatus: (profile.approval_status as CounselorApprovalStatus | undefined) ?? (metadata.approvalStatus as CounselorApprovalStatus | undefined),
   };
+};
+
+const canDisplayCounselorToPatient = (adminUser: AdminUser, viewerId?: string): boolean => {
+  const visibility = adminUser.visibilitySettings;
+  if (!visibility || visibility.patientDirectory !== false) {
+    return true;
+  }
+
+  if (!viewerId) {
+    return false;
+  }
+
+  const metadata = (adminUser.metadata ?? {}) as Record<string, unknown>;
+  const patients = toStringArray(metadata.patients);
+  return Array.isArray(patients) ? patients.includes(viewerId) : false;
 };
 
 export default function PatientCounselorsPage() {
@@ -386,7 +408,9 @@ export default function PatientCounselorsPage() {
       try {
         setLoading(true);
         const response = await AdminApi.listUsers({ role: 'counselor' });
-        const mapped = response.users.map(mapAdminUserToCounselor);
+        const mapped = response.users
+          .filter((adminUser) => canDisplayCounselorToPatient(adminUser, user?.id))
+          .map(mapAdminUserToCounselor);
         if (typeof window !== 'undefined') {
           (window as unknown as { __RCR_counselors?: unknown }).__RCR_counselors = {
             raw: response.users,
@@ -411,69 +435,35 @@ export default function PatientCounselorsPage() {
     loadCounselors();
   }, []);
 
-  const handleProfileRealtimeUpdate = useCallback(
+  const handleRealtimeProfileUpdate = useCallback(
     (profile: RealtimeProfile, { eventType }: { eventType: string; oldRecord: Record<string, unknown> | null }) => {
-      if (!profile || !profile.id) {
+      if (!profile?.id) {
         return;
       }
 
       const adminUser = mapProfileRecordToAdminUser(profile);
-      const counselorProfile = mapAdminUserToCounselor(adminUser);
+      const shouldDisplay = canDisplayCounselorToPatient(adminUser, user?.id);
+      const counselor = mapAdminUserToCounselor(adminUser);
 
       setCounselors((previous) => {
-        const existingIndex = previous.findIndex((c) => c.id === counselorProfile.id);
+        const existingIndex = previous.findIndex((c) => c.id === counselor.id);
 
-        if (eventType === 'DELETE') {
-          if (existingIndex === -1) {
-            return previous;
-          }
-          const next = [...previous];
-          next.splice(existingIndex, 1);
-          if (typeof window !== 'undefined') {
-            (window as unknown as { __RCR_counselors?: unknown }).__RCR_counselors = {
-              raw: null,
-              mapped: next,
-            };
-          }
-          return next;
+        if (eventType === 'DELETE' || !shouldDisplay) {
+          return existingIndex === -1
+            ? previous
+            : previous.filter((counselorItem) => counselorItem.id !== counselor.id);
         }
 
         if (existingIndex === -1) {
-          const next = [...previous, counselorProfile].sort((a, b) =>
-            a.name.localeCompare(b.name),
-          );
-          if (typeof window !== 'undefined') {
-            (window as unknown as { __RCR_counselors?: unknown }).__RCR_counselors = {
-              raw: null,
-              mapped: next,
-            };
-          }
-          return next;
+          return [...previous, counselor].sort((a, b) => a.name.localeCompare(b.name));
         }
 
         const next = [...previous];
-        const current = next[existingIndex];
-        if (!current) {
-          return next;
-        }
-
-        next[existingIndex] = {
-          ...current,
-          ...counselorProfile,
-          metadata: counselorProfile.metadata ?? current.metadata,
-        };
-
-        if (typeof window !== 'undefined') {
-          (window as unknown as { __RCR_counselors?: unknown }).__RCR_counselors = {
-            raw: null,
-            mapped: next,
-          };
-        }
-
+        next[existingIndex] = counselor;
         return next;
       });
     },
-    [],
+    [user?.id],
   );
 
   const profileSubscriptionFilters = useMemo(
@@ -483,7 +473,7 @@ export default function PatientCounselorsPage() {
 
   useProfileUpdates(
     profileSubscriptionFilters,
-    handleProfileRealtimeUpdate,
+    handleRealtimeProfileUpdate,
     (error) => {
       console.error('Realtime counselor subscription error:', error);
     },

@@ -23,6 +23,22 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   }, [isLoading, user, router, pathname]);
 
+  useEffect(() => {
+    if (isLoading || !user || user.role !== 'counselor') {
+      return;
+    }
+
+    const isPendingRoute = pathname === '/dashboard/counselor/pending';
+
+    if (user.approvalStatus !== 'approved' && !isPendingRoute) {
+      router.replace('/dashboard/counselor/pending');
+    }
+
+    if (user.approvalStatus === 'approved' && isPendingRoute) {
+      router.replace('/dashboard/counselor');
+    }
+  }, [isLoading, user, pathname, router]);
+
   // Show loading state while checking authentication
   if (isLoading) {
     return (
@@ -59,7 +75,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     name: user.name,
     email: user.email,
     role: user.role,
-    avatar: user.avatar || undefined
+    avatar: user.avatar || undefined,
   };
 
   switch (user.role) {

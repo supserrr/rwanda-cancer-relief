@@ -22,6 +22,15 @@ export interface User {
   createdAt: Date
   updatedAt: Date
   metadata?: Record<string, unknown>
+  phoneNumber?: string
+  preferredLanguage?: string
+  treatmentStage?: string
+  contactPhone?: string
+  emergencyContactName?: string
+  emergencyContactPhone?: string
+  notificationPreferences?: Record<string, unknown>
+  securityPreferences?: Record<string, unknown>
+  supportPreferences?: Record<string, unknown>
 }
 
 export interface AuthState {

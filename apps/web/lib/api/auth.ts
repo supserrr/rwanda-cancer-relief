@@ -53,6 +53,14 @@ export interface UserProfile {
   updatedAt?: string;
   metadata?: Record<string, unknown>;
   onboardingCompleted?: boolean;
+  preferredLanguage?: string;
+  treatmentStage?: string;
+  contactPhone?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  notificationPreferences?: Record<string, unknown>;
+  securityPreferences?: Record<string, unknown>;
+  supportPreferences?: Record<string, unknown>;
 }
 
 type ProfileTableRow = {
@@ -64,6 +72,14 @@ type ProfileTableRow = {
   specialty?: string | null;
   experience_years?: number | null;
   availability?: string | null;
+  preferred_language?: string | null;
+  treatment_stage?: string | null;
+  contact_phone?: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
+  notification_preferences?: Record<string, unknown> | null;
+  security_preferences?: Record<string, unknown> | null;
+  support_preferences?: Record<string, unknown> | null;
 };
 
 interface SyncProfileOptions {
@@ -74,6 +90,14 @@ interface SyncProfileOptions {
   specialty?: string;
   experienceYears?: number;
   availability?: string;
+  preferredLanguage?: string;
+  treatmentStage?: string;
+  contactPhone?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  notificationPreferences?: Record<string, unknown>;
+  securityPreferences?: Record<string, unknown>;
+  supportPreferences?: Record<string, unknown>;
 }
 
 const coerceStringValue = (value: unknown): string | undefined => {
@@ -115,6 +139,13 @@ const coerceStringArrayValue = (value: unknown): string[] | undefined => {
   return undefined;
 };
 
+const coerceRecordValue = (value: unknown): Record<string, unknown> | undefined => {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return undefined;
+};
+
 async function syncProfileRecord(
   supabase: SupabaseClient,
   userId: string,
@@ -123,7 +154,7 @@ async function syncProfileRecord(
   const { data: existingProfile, error: fetchError } = await supabase
     .from('profiles')
     .select(
-      'metadata, full_name, avatar_url, phone_number, languages, specialty, experience_years, availability',
+      'metadata, full_name, avatar_url, phone_number, languages, specialty, experience_years, availability, preferred_language, treatment_stage, contact_phone, emergency_contact_name, emergency_contact_phone, notification_preferences, security_preferences, support_preferences',
     )
     .eq('id', userId)
     .maybeSingle<ProfileTableRow>();
@@ -174,6 +205,47 @@ async function syncProfileRecord(
   const fallbackExperience = coerceNumberValue(
     userMeta['experience'] ?? userMeta['experienceYears'] ?? userMeta['experience_years'],
   );
+  const fallbackPreferredLanguage =
+    coerceStringValue(options.metadata?.preferredLanguage) ??
+    coerceStringValue(options.metadata?.language) ??
+    coerceStringValue(userMeta['preferredLanguage']) ??
+    coerceStringValue(userMeta['language']) ??
+    coerceStringValue(existingProfile?.preferred_language);
+  const fallbackTreatmentStage =
+    coerceStringValue(options.metadata?.treatmentStage) ??
+    coerceStringValue(userMeta['treatmentStage']) ??
+    coerceStringValue(existingProfile?.treatment_stage);
+  const fallbackContactPhone =
+    coerceStringValue(options.contactPhone) ??
+    coerceStringValue(options.metadata?.contactPhone) ??
+    coerceStringValue(options.metadata?.phoneNumber) ??
+    coerceStringValue(userMeta['contactPhone']) ??
+    coerceStringValue(userMeta['phoneNumber']) ??
+    coerceStringValue(existingProfile?.contact_phone) ??
+    coerceStringValue(existingProfile?.phone_number);
+  const fallbackEmergencyContactName =
+    coerceStringValue(options.metadata?.emergencyContactName) ??
+    coerceStringValue(userMeta['emergencyContactName']) ??
+    coerceStringValue(existingProfile?.emergency_contact_name);
+  const fallbackEmergencyContactPhone =
+    coerceStringValue(options.metadata?.emergencyContactPhone) ??
+    coerceStringValue(userMeta['emergencyContactPhone']) ??
+    coerceStringValue(existingProfile?.emergency_contact_phone);
+  const fallbackNotificationPreferences =
+    coerceRecordValue(options.metadata?.notificationPreferences) ??
+    coerceRecordValue(userMeta['notificationPreferences']) ??
+    coerceRecordValue(userMeta['notification_preferences']) ??
+    coerceRecordValue(existingProfile?.notification_preferences ?? undefined);
+  const fallbackSecurityPreferences =
+    coerceRecordValue(options.metadata?.securityPreferences) ??
+    coerceRecordValue(userMeta['securityPreferences']) ??
+    coerceRecordValue(userMeta['security_preferences']) ??
+    coerceRecordValue(existingProfile?.security_preferences ?? undefined);
+  const fallbackSupportPreferences =
+    coerceRecordValue(options.metadata?.supportPreferences) ??
+    coerceRecordValue(userMeta['supportPreferences']) ??
+    coerceRecordValue(userMeta['support_preferences']) ??
+    coerceRecordValue(existingProfile?.support_preferences ?? undefined);
 
   const assignWithFallback = (
     key: string,
@@ -198,6 +270,23 @@ async function syncProfileRecord(
   const explicitAvailability = coerceStringValue(options.availability);
   const explicitSpecialty = coerceStringValue(options.specialty);
   const explicitExperience = coerceNumberValue(options.experienceYears);
+  const explicitPreferredLanguage = coerceStringValue(options.preferredLanguage);
+  const explicitTreatmentStage = coerceStringValue(options.treatmentStage);
+  const explicitContactPhone = coerceStringValue(options.contactPhone);
+  const explicitEmergencyContactName = coerceStringValue(options.emergencyContactName);
+  const explicitEmergencyContactPhone = coerceStringValue(options.emergencyContactPhone);
+  const explicitNotificationPreferences =
+    options.notificationPreferences !== undefined
+      ? coerceRecordValue(options.notificationPreferences) ?? {}
+      : undefined;
+  const explicitSecurityPreferences =
+    options.securityPreferences !== undefined
+      ? coerceRecordValue(options.securityPreferences) ?? {}
+      : undefined;
+  const explicitSupportPreferences =
+    options.supportPreferences !== undefined
+      ? coerceRecordValue(options.supportPreferences) ?? {}
+      : undefined;
 
   assignWithFallback('full_name', explicitFullName, fallbackFullName, existingProfile?.full_name);
   assignWithFallback('avatar_url', explicitAvatar, fallbackAvatar, existingProfile?.avatar_url);
@@ -219,6 +308,141 @@ async function syncProfileRecord(
     fallbackExperience,
     existingProfile?.experience_years,
   );
+  assignWithFallback(
+    'preferred_language',
+    explicitPreferredLanguage,
+    fallbackPreferredLanguage,
+    existingProfile?.preferred_language,
+  );
+  assignWithFallback(
+    'treatment_stage',
+    explicitTreatmentStage,
+    fallbackTreatmentStage,
+    existingProfile?.treatment_stage,
+  );
+  assignWithFallback(
+    'contact_phone',
+    explicitContactPhone,
+    fallbackContactPhone,
+    existingProfile?.contact_phone,
+  );
+  assignWithFallback(
+    'emergency_contact_name',
+    explicitEmergencyContactName,
+    fallbackEmergencyContactName,
+    existingProfile?.emergency_contact_name,
+  );
+  assignWithFallback(
+    'emergency_contact_phone',
+    explicitEmergencyContactPhone,
+    fallbackEmergencyContactPhone,
+    existingProfile?.emergency_contact_phone,
+  );
+
+  const isEmptyObject = (value?: Record<string, unknown> | null): boolean =>
+    !value || Object.keys(value).length === 0;
+
+  const assignJsonColumn = (
+    key: 'notification_preferences' | 'security_preferences' | 'support_preferences',
+    explicit?: Record<string, unknown>,
+    fallback?: Record<string, unknown>,
+    existing?: Record<string, unknown> | null,
+  ) => {
+    if (explicit !== undefined) {
+      payload[key] = explicit;
+      return;
+    }
+    if ((existing === null || existing === undefined || isEmptyObject(existing)) && fallback) {
+      payload[key] = fallback;
+    }
+  };
+
+  assignJsonColumn(
+    'notification_preferences',
+    explicitNotificationPreferences,
+    fallbackNotificationPreferences,
+    existingProfile?.notification_preferences ?? null,
+  );
+  assignJsonColumn(
+    'security_preferences',
+    explicitSecurityPreferences,
+    fallbackSecurityPreferences,
+    existingProfile?.security_preferences ?? null,
+  );
+  assignJsonColumn(
+    'support_preferences',
+    explicitSupportPreferences,
+    fallbackSupportPreferences,
+    existingProfile?.support_preferences ?? null,
+  );
+
+  const effectivePreferredLanguage =
+    explicitPreferredLanguage ?? fallbackPreferredLanguage ?? existingProfile?.preferred_language;
+  if (effectivePreferredLanguage) {
+    mergedMetadata.preferredLanguage = effectivePreferredLanguage;
+  }
+
+  const effectiveTreatmentStage =
+    explicitTreatmentStage ?? fallbackTreatmentStage ?? existingProfile?.treatment_stage;
+  if (effectiveTreatmentStage) {
+    mergedMetadata.treatmentStage = effectiveTreatmentStage;
+  }
+
+  const effectiveContactPhone =
+    explicitContactPhone ?? fallbackContactPhone ?? existingProfile?.contact_phone;
+  if (effectiveContactPhone) {
+    mergedMetadata.contactPhone = effectiveContactPhone;
+    mergedMetadata.phoneNumber = effectiveContactPhone;
+  }
+
+  const effectiveEmergencyContactName =
+    explicitEmergencyContactName ??
+    fallbackEmergencyContactName ??
+    existingProfile?.emergency_contact_name;
+  if (effectiveEmergencyContactName) {
+    mergedMetadata.emergencyContactName = effectiveEmergencyContactName;
+  }
+
+  const effectiveEmergencyContactPhone =
+    explicitEmergencyContactPhone ??
+    fallbackEmergencyContactPhone ??
+    existingProfile?.emergency_contact_phone;
+  if (effectiveEmergencyContactPhone) {
+    mergedMetadata.emergencyContactPhone = effectiveEmergencyContactPhone;
+  }
+
+  const effectiveNotificationPreferences =
+    explicitNotificationPreferences ??
+    payload.notification_preferences ??
+    fallbackNotificationPreferences ??
+    (isEmptyObject(existingProfile?.notification_preferences)
+      ? undefined
+      : (existingProfile?.notification_preferences ?? undefined));
+  if (effectiveNotificationPreferences !== undefined) {
+    mergedMetadata.notificationPreferences = effectiveNotificationPreferences;
+  }
+
+  const effectiveSecurityPreferences =
+    explicitSecurityPreferences ??
+    payload.security_preferences ??
+    fallbackSecurityPreferences ??
+    (isEmptyObject(existingProfile?.security_preferences)
+      ? undefined
+      : (existingProfile?.security_preferences ?? undefined));
+  if (effectiveSecurityPreferences !== undefined) {
+    mergedMetadata.securityPreferences = effectiveSecurityPreferences;
+  }
+
+  const effectiveSupportPreferences =
+    explicitSupportPreferences ??
+    payload.support_preferences ??
+    fallbackSupportPreferences ??
+    (isEmptyObject(existingProfile?.support_preferences)
+      ? undefined
+      : (existingProfile?.support_preferences ?? undefined));
+  if (effectiveSupportPreferences !== undefined) {
+    mergedMetadata.supportPreferences = effectiveSupportPreferences;
+  }
 
   const payloadKeys = Object.keys(payload).filter((key) => key !== 'id' && key !== 'updated_at');
   const hasMeaningfulUpdate =
@@ -442,6 +666,10 @@ export class AuthApi {
     let displayName = (userMetadata.full_name as string | undefined) || user.email || '';
     let avatarUrl = (userMetadata.avatar_url as string | undefined) || undefined;
 
+    if (user.last_sign_in_at) {
+      mergedMetadata.lastSignInAt = user.last_sign_in_at;
+    }
+
     type ProfileRow = {
       full_name?: string | null;
       avatar_url?: string | null;
@@ -451,12 +679,20 @@ export class AuthApi {
       availability?: string | null;
       phone_number?: string | null;
       languages?: string[] | null;
+      preferred_language?: string | null;
+      treatment_stage?: string | null;
+      contact_phone?: string | null;
+      emergency_contact_name?: string | null;
+      emergency_contact_phone?: string | null;
+      notification_preferences?: Record<string, unknown> | null;
+      security_preferences?: Record<string, unknown> | null;
+      support_preferences?: Record<string, unknown> | null;
     };
 
     const { data: profileRow } = await supabase
       .from('profiles')
       .select(
-      'full_name, avatar_url, metadata, specialty, experience_years, availability, phone_number, languages',
+      'full_name, avatar_url, metadata, specialty, experience_years, availability, phone_number, languages, preferred_language, treatment_stage, contact_phone, emergency_contact_name, emergency_contact_phone, notification_preferences, security_preferences, support_preferences',
       )
       .eq('id', user.id)
       .maybeSingle<ProfileRow>();
@@ -489,6 +725,32 @@ export class AuthApi {
       }
       if (Array.isArray(profileRow.languages) && profileRow.languages.length > 0) {
         mergedMetadata.languages = profileRow.languages;
+      }
+      if (profileRow.preferred_language) {
+        mergedMetadata.preferredLanguage = profileRow.preferred_language;
+        mergedMetadata.language = profileRow.preferred_language;
+      }
+      if (profileRow.treatment_stage) {
+        mergedMetadata.treatmentStage = profileRow.treatment_stage;
+      }
+      if (profileRow.contact_phone) {
+        mergedMetadata.contactPhone = profileRow.contact_phone;
+        mergedMetadata.phoneNumber = profileRow.contact_phone;
+      }
+      if (profileRow.emergency_contact_name) {
+        mergedMetadata.emergencyContactName = profileRow.emergency_contact_name;
+      }
+      if (profileRow.emergency_contact_phone) {
+        mergedMetadata.emergencyContactPhone = profileRow.emergency_contact_phone;
+      }
+      if (profileRow.notification_preferences) {
+        mergedMetadata.notificationPreferences = profileRow.notification_preferences;
+      }
+      if (profileRow.security_preferences) {
+        mergedMetadata.securityPreferences = profileRow.security_preferences;
+      }
+      if (profileRow.support_preferences) {
+        mergedMetadata.supportPreferences = profileRow.support_preferences;
       }
     }
 
@@ -557,6 +819,14 @@ export class AuthApi {
   static async updateProfile(data: {
     fullName?: string;
     phoneNumber?: string;
+    contactPhone?: string;
+    emergencyContactName?: string;
+    emergencyContactPhone?: string;
+    preferredLanguage?: string;
+    treatmentStage?: string;
+    notificationPreferences?: Record<string, unknown>;
+    securityPreferences?: Record<string, unknown>;
+    supportPreferences?: Record<string, unknown>;
     avatar?: string;
     metadata?: Record<string, unknown>;
   }): Promise<User> {
@@ -573,11 +843,48 @@ export class AuthApi {
 
     const updateData: Record<string, unknown> = {
       ...currentUser.user_metadata,
-      ...(data.fullName ? { full_name: data.fullName } : {}),
-      ...(data.phoneNumber ? { phone_number: data.phoneNumber } : {}),
-      ...(data.avatar ? { avatar_url: data.avatar } : {}),
-      ...(data.metadata ? { ...data.metadata } : {}),
+      ...(data.metadata ?? {}),
     };
+
+    if (data.fullName !== undefined) {
+      updateData.full_name = data.fullName;
+    }
+    if (data.phoneNumber !== undefined) {
+      updateData.phone_number = data.phoneNumber;
+    }
+    if (data.contactPhone !== undefined) {
+      updateData.contact_phone = data.contactPhone;
+      updateData.contactPhone = data.contactPhone;
+    }
+    if (data.emergencyContactName !== undefined) {
+      updateData.emergency_contact_name = data.emergencyContactName;
+      updateData.emergencyContactName = data.emergencyContactName;
+    }
+    if (data.emergencyContactPhone !== undefined) {
+      updateData.emergency_contact_phone = data.emergencyContactPhone;
+      updateData.emergencyContactPhone = data.emergencyContactPhone;
+    }
+    if (data.preferredLanguage !== undefined) {
+      updateData.preferred_language = data.preferredLanguage;
+      updateData.preferredLanguage = data.preferredLanguage;
+      updateData.language = data.preferredLanguage;
+    }
+    if (data.treatmentStage !== undefined) {
+      updateData.treatment_stage = data.treatmentStage;
+      updateData.treatmentStage = data.treatmentStage;
+    }
+    if (data.notificationPreferences !== undefined) {
+      updateData.notificationPreferences = data.notificationPreferences;
+    }
+    if (data.securityPreferences !== undefined) {
+      updateData.securityPreferences = data.securityPreferences;
+    }
+    if (data.supportPreferences !== undefined) {
+      updateData.supportPreferences = data.supportPreferences;
+    }
+    if (data.avatar !== undefined) {
+      updateData.avatar_url = data.avatar;
+    }
 
     const { data: { user }, error } = await supabase.auth.updateUser({
       data: updateData,
@@ -639,6 +946,45 @@ export class AuthApi {
     const sanitizedLanguages =
       getMetadataStringArray('languages', 'language_preferences') ??
       coerceStringArrayValue(userMetadata.languages);
+    const sanitizedPreferredLanguage =
+      coerceStringValue(data.preferredLanguage) ??
+      getMetadataString('preferredLanguage', 'language') ??
+      coerceStringValue(userMetadata.preferred_language) ??
+      coerceStringValue(userMetadata.language);
+    const sanitizedTreatmentStage =
+      coerceStringValue(data.treatmentStage) ??
+      getMetadataString('treatmentStage') ??
+      coerceStringValue(userMetadata.treatment_stage);
+    const sanitizedContactPhone =
+      coerceStringValue(data.contactPhone) ??
+      getMetadataString('contactPhone', 'phoneNumber', 'contact_phone', 'phone') ??
+      sanitizedPhoneNumber;
+    const sanitizedEmergencyContactName =
+      coerceStringValue(data.emergencyContactName) ??
+      getMetadataString('emergencyContactName') ??
+      coerceStringValue(userMetadata.emergency_contact_name);
+    const sanitizedEmergencyContactPhone =
+      coerceStringValue(data.emergencyContactPhone) ??
+      getMetadataString('emergencyContactPhone') ??
+      coerceStringValue(userMetadata.emergency_contact_phone);
+    const sanitizedNotificationPreferences =
+      data.notificationPreferences !== undefined
+        ? coerceRecordValue(data.notificationPreferences) ?? {}
+        : coerceRecordValue(rawMetadata.notificationPreferences) ??
+          coerceRecordValue(userMetadata.notificationPreferences) ??
+          coerceRecordValue(userMetadata.notification_preferences);
+    const sanitizedSecurityPreferences =
+      data.securityPreferences !== undefined
+        ? coerceRecordValue(data.securityPreferences) ?? {}
+        : coerceRecordValue(rawMetadata.securityPreferences) ??
+          coerceRecordValue(userMetadata.securityPreferences) ??
+          coerceRecordValue(userMetadata.security_preferences);
+    const sanitizedSupportPreferences =
+      data.supportPreferences !== undefined
+        ? coerceRecordValue(data.supportPreferences) ?? {}
+        : coerceRecordValue(rawMetadata.supportPreferences) ??
+          coerceRecordValue(userMetadata.supportPreferences) ??
+          coerceRecordValue(userMetadata.support_preferences);
 
     try {
       await syncProfileRecord(supabase, user.id, {
@@ -649,6 +995,14 @@ export class AuthApi {
         availability: sanitizedAvailability,
         specialty: sanitizedSpecialty,
         experienceYears: sanitizedExperience,
+        preferredLanguage: sanitizedPreferredLanguage,
+        treatmentStage: sanitizedTreatmentStage,
+        contactPhone: sanitizedContactPhone,
+        emergencyContactName: sanitizedEmergencyContactName,
+        emergencyContactPhone: sanitizedEmergencyContactPhone,
+        notificationPreferences: sanitizedNotificationPreferences,
+        securityPreferences: sanitizedSecurityPreferences,
+        supportPreferences: sanitizedSupportPreferences,
       });
     } catch (syncError) {
       if (process.env.NODE_ENV !== 'production') {
@@ -679,6 +1033,32 @@ export class AuthApi {
       mergedMetadata.languages = sanitizedLanguages;
       mergedMetadata.language_preferences = sanitizedLanguages;
     }
+    if (sanitizedPreferredLanguage) {
+      mergedMetadata.preferredLanguage = sanitizedPreferredLanguage;
+      mergedMetadata.language = sanitizedPreferredLanguage;
+    }
+    if (sanitizedTreatmentStage) {
+      mergedMetadata.treatmentStage = sanitizedTreatmentStage;
+    }
+    if (sanitizedContactPhone) {
+      mergedMetadata.contactPhone = sanitizedContactPhone;
+      mergedMetadata.phoneNumber = sanitizedContactPhone;
+    }
+    if (sanitizedEmergencyContactName) {
+      mergedMetadata.emergencyContactName = sanitizedEmergencyContactName;
+    }
+    if (sanitizedEmergencyContactPhone) {
+      mergedMetadata.emergencyContactPhone = sanitizedEmergencyContactPhone;
+    }
+    if (sanitizedNotificationPreferences !== undefined) {
+      mergedMetadata.notificationPreferences = sanitizedNotificationPreferences;
+    }
+    if (sanitizedSecurityPreferences !== undefined) {
+      mergedMetadata.securityPreferences = sanitizedSecurityPreferences;
+    }
+    if (sanitizedSupportPreferences !== undefined) {
+      mergedMetadata.supportPreferences = sanitizedSupportPreferences;
+    }
     if (sanitizedAvatar) {
       mergedMetadata.avatar_url = sanitizedAvatar;
     } else if (coerceStringValue(userMetadata.avatar_url)) {
@@ -703,6 +1083,44 @@ export class AuthApi {
       updatedAt: new Date(user.updated_at || user.created_at),
       metadata: mergedMetadata,
     } as User & { metadata?: Record<string, unknown> };
+
+    const preferredLanguageValue = coerceStringValue(mergedMetadata.preferredLanguage);
+    if (preferredLanguageValue) {
+      userData.preferredLanguage = preferredLanguageValue;
+    }
+    const treatmentStageValue = coerceStringValue(mergedMetadata.treatmentStage);
+    if (treatmentStageValue) {
+      userData.treatmentStage = treatmentStageValue;
+    }
+    const contactPhoneValue = coerceStringValue(
+      mergedMetadata.contactPhone ?? mergedMetadata.phoneNumber,
+    );
+    if (contactPhoneValue) {
+      userData.contactPhone = contactPhoneValue;
+      userData.phoneNumber = contactPhoneValue;
+    }
+    const emergencyContactNameValue = coerceStringValue(mergedMetadata.emergencyContactName);
+    if (emergencyContactNameValue) {
+      userData.emergencyContactName = emergencyContactNameValue;
+    }
+    const emergencyContactPhoneValue = coerceStringValue(mergedMetadata.emergencyContactPhone);
+    if (emergencyContactPhoneValue) {
+      userData.emergencyContactPhone = emergencyContactPhoneValue;
+    }
+    const notificationPreferencesValue = coerceRecordValue(
+      mergedMetadata.notificationPreferences,
+    );
+    if (notificationPreferencesValue) {
+      userData.notificationPreferences = notificationPreferencesValue;
+    }
+    const securityPreferencesValue = coerceRecordValue(mergedMetadata.securityPreferences);
+    if (securityPreferencesValue) {
+      userData.securityPreferences = securityPreferencesValue;
+    }
+    const supportPreferencesValue = coerceRecordValue(mergedMetadata.supportPreferences);
+    if (supportPreferencesValue) {
+      userData.supportPreferences = supportPreferencesValue;
+    }
 
     return userData;
   }

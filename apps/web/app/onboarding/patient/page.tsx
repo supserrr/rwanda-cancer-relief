@@ -23,6 +23,9 @@ interface PatientOnboardingData {
   age: string;
   gender: string;
   location: string;
+  contactPhone: string;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
   profileImage: File | null;
   profileImagePreview: string;
   
@@ -39,7 +42,6 @@ interface PatientOnboardingData {
   
   // Preferences
   consultationType: string[];
-  availability: string;
   specialRequests: string;
 }
 
@@ -56,6 +58,9 @@ export default function PatientOnboardingPage() {
     age: '',
     gender: '',
     location: '',
+    contactPhone: '',
+    emergencyContactName: '',
+    emergencyContactPhone: '',
     profileImage: null,
     profileImagePreview: '',
     cancerType: '',
@@ -66,7 +71,6 @@ export default function PatientOnboardingPage() {
     preferredLanguage: '',
     familySupport: '',
     consultationType: [],
-    availability: '',
     specialRequests: ''
   });
 
@@ -125,6 +129,22 @@ export default function PatientOnboardingPage() {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
+      const contactPhone = formData.contactPhone.trim();
+      const emergencyContactName = formData.emergencyContactName.trim();
+      const emergencyContactPhone = formData.emergencyContactPhone.trim();
+
+      if (!contactPhone) {
+        toast.error('Please provide your primary contact phone number.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!emergencyContactName || !emergencyContactPhone) {
+        toast.error('Please provide your emergency contact\'s name and phone number.');
+        setIsSubmitting(false);
+        return;
+      }
+
       // Upload profile image if provided
       let avatarUrl: string | undefined;
       if (formData.profileImage) {
@@ -143,6 +163,9 @@ export default function PatientOnboardingPage() {
         age: formData.age,
         gender: formData.gender,
         location: formData.location,
+        contactPhone,
+        emergencyContactName,
+        emergencyContactPhone,
         cancerType: formData.cancerType,
         diagnosisDate: formData.diagnosisDate,
         currentTreatment: formData.currentTreatment,
@@ -151,7 +174,6 @@ export default function PatientOnboardingPage() {
         preferredLanguage: formData.preferredLanguage,
         familySupport: formData.familySupport,
         consultationType: formData.consultationType,
-        availability: formData.availability,
         specialRequests: formData.specialRequests,
         onboarding_completed: true, // Mark onboarding as complete
         onboarding_completed_at: new Date().toISOString(),
@@ -162,6 +184,12 @@ export default function PatientOnboardingPage() {
       }
 
       await AuthApi.updateProfile({
+        phoneNumber: contactPhone,
+        contactPhone,
+        emergencyContactName,
+        emergencyContactPhone,
+        preferredLanguage: formData.preferredLanguage || undefined,
+        treatmentStage: formData.treatmentStage || undefined,
         metadata: profileData,
       });
 
@@ -266,6 +294,19 @@ export default function PatientOnboardingPage() {
             value={formData.location}
             onChange={(e) => handleInputChange('location', e.target.value)}
           />
+        </div>
+
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-foreground mb-2">Primary Contact Phone</label>
+          <Input
+            type="tel"
+            placeholder="e.g., +250 7XX XXX XXX"
+            value={formData.contactPhone}
+            onChange={(e) => handleInputChange('contactPhone', e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            We will use this number to reach you for important updates about your care.
+          </p>
         </div>
       </div>
     </div>
@@ -424,6 +465,30 @@ export default function PatientOnboardingPage() {
           </select>
         </div>
       </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Emergency Contact Name</label>
+          <Input
+            type="text"
+            placeholder="Full name of your emergency contact"
+            value={formData.emergencyContactName}
+            onChange={(e) => handleInputChange('emergencyContactName', e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Emergency Contact Phone</label>
+          <Input
+            type="tel"
+            placeholder="e.g., +250 7XX XXX XXX"
+            value={formData.emergencyContactPhone}
+            onChange={(e) => handleInputChange('emergencyContactPhone', e.target.value)}
+          />
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Your emergency contact will be notified only if we cannot reach you directly.
+      </p>
     </div>
   );
 
@@ -462,21 +527,6 @@ export default function PatientOnboardingPage() {
             </button>
           ))}
         </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-foreground mb-2">Availability</label>
-        <select
-          className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground"
-          value={formData.availability}
-          onChange={(e) => handleInputChange('availability', e.target.value)}
-        >
-          <option value="">Select availability</option>
-          <option value="morning">Morning (6 AM - 12 PM)</option>
-          <option value="afternoon">Afternoon (12 PM - 6 PM)</option>
-          <option value="evening">Evening (6 PM - 10 PM)</option>
-          <option value="flexible">Flexible</option>
-        </select>
       </div>
 
       <div>

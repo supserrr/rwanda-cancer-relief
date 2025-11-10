@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { Input } from '@workspace/ui/components/input';
@@ -48,34 +48,74 @@ import {
   Edit,
   Tag
 } from 'lucide-react';
-import { dummySupportTickets, dummyUsers } from '../../../../lib/dummy-data';
-import { SupportTicket } from '../../../../lib/types';
+import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
+import {
+  SupportApi,
+  SupportTicketPriority,
+  SupportTicketStatus,
+  SupportTicketWithProfile,
+} from '../../../../lib/api/support';
+import { toast } from 'sonner';
 
 export default function AdminSupportPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'open' | 'in_progress' | 'resolved' | 'closed'>('all');
   const [selectedPriority, setSelectedPriority] = useState<'all' | 'low' | 'medium' | 'high' | 'urgent'>('all');
-  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
+  const [selectedTicket, setSelectedTicket] = useState<SupportTicketWithProfile | null>(null);
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [isReplying, setIsReplying] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [tickets, setTickets] = useState<SupportTicketWithProfile[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const filteredTickets = dummySupportTickets.filter(ticket => {
-    const matchesSearch = ticket.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ticket.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ticket.title.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = selectedStatus === 'all' || ticket.status === selectedStatus;
-    const matchesPriority = selectedPriority === 'all' || ticket.priority === selectedPriority;
-    
-    return matchesSearch && matchesStatus && matchesPriority;
-  });
+  const selectedProfileMetadata = (selectedTicket?.profile?.metadata ??
+    undefined) as Record<string, unknown> | undefined;
+  const selectedProfileEmail =
+    typeof selectedProfileMetadata?.email === 'string' ? selectedProfileMetadata.email : undefined;
+  const selectedProfilePhone =
+    typeof selectedProfileMetadata?.contactPhone === 'string'
+      ? selectedProfileMetadata.contactPhone
+      : undefined;
 
-  const getUserInfo = (userId: string) => {
-    return dummyUsers.find(user => user.id === userId);
+  const loadTickets = async () => {
+    setIsLoading(true);
+    try {
+      const data = await SupportApi.listAllTickets();
+      setTickets(data);
+    } catch (error) {
+      console.error('Failed to load support tickets:', error);
+      toast.error('Failed to load support tickets.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleViewTicket = (ticket: SupportTicket) => {
+  useEffect(() => {
+    loadTickets();
+    const channel = SupportApi.subscribeToTickets(() => {
+      // Refresh list on every change to keep admin view in sync
+      loadTickets();
+    });
+    return () => {
+      channel.unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const filteredTickets = useMemo(() => {
+    return tickets.filter((ticket) => {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch =
+        ticket.subject.toLowerCase().includes(searchLower) ||
+        ticket.description.toLowerCase().includes(searchLower);
+      const matchesStatus = selectedStatus === 'all' || ticket.status === selectedStatus;
+      const matchesPriority = selectedPriority === 'all' || ticket.priority === selectedPriority;
+      return matchesSearch && matchesStatus && matchesPriority;
+    });
+  }, [tickets, searchTerm, selectedStatus, selectedPriority]);
+
+  const handleViewTicket = (ticket: SupportTicketWithProfile) => {
     setSelectedTicket(ticket);
     setIsTicketModalOpen(true);
     setReplyText('');
@@ -92,66 +132,80 @@ export default function AdminSupportPage() {
 
     setIsReplying(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log('Replying to ticket:', selectedTicket.id, replyText);
-      
-      // In a real app, this would update the ticket with the reply
-      alert('Reply sent successfully!');
+      const updated = await SupportApi.updateTicket(selectedTicket.id, {
+        admin_notes: replyText.trim(),
+      });
+      const mergedProfile = selectedTicket.profile;
+      setSelectedTicket({ ...updated, profile: mergedProfile });
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket.id === updated.id ? { ...updated, profile: ticket.profile ?? mergedProfile } : ticket,
+        ),
+      );
+      toast.success('Reply saved successfully.');
       setReplyText('');
     } catch (error) {
       console.error('Error replying to ticket:', error);
-      alert('Failed to send reply. Please try again.');
+      toast.error('Failed to save reply. Please try again.');
     } finally {
       setIsReplying(false);
     }
   };
 
-  const handleUpdateTicketStatus = async (newStatus: SupportTicket['status']) => {
+  const handleUpdateTicketStatus = async (newStatus: SupportTicketStatus) => {
     if (!selectedTicket) return;
 
     setIsUpdatingStatus(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      console.log('Updating ticket status:', selectedTicket.id, newStatus);
-      
-      // In a real app, this would update the ticket status
-      setSelectedTicket({ ...selectedTicket, status: newStatus });
-      alert('Ticket status updated successfully!');
+      const updated = await SupportApi.updateTicket(selectedTicket.id, {
+        status: newStatus,
+        resolved_at: newStatus === 'resolved' || newStatus === 'closed' ? new Date().toISOString() : null,
+      });
+      const mergedProfile = selectedTicket.profile;
+      setSelectedTicket({ ...updated, profile: mergedProfile });
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket.id === updated.id ? { ...updated, profile: ticket.profile ?? mergedProfile } : ticket,
+        ),
+      );
+      toast.success('Ticket status updated successfully.');
     } catch (error) {
       console.error('Error updating ticket status:', error);
-      alert('Failed to update status. Please try again.');
+      toast.error('Failed to update status. Please try again.');
     } finally {
       setIsUpdatingStatus(false);
     }
   };
 
-  const handleUpdateTicketPriority = async (newPriority: SupportTicket['priority']) => {
+  const handleUpdateTicketPriority = async (newPriority: SupportTicketPriority) => {
     if (!selectedTicket) return;
 
     setIsUpdatingStatus(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      console.log('Updating ticket priority:', selectedTicket.id, newPriority);
-      
-      // In a real app, this would update the ticket priority
-      setSelectedTicket({ ...selectedTicket, priority: newPriority });
-      alert('Ticket priority updated successfully!');
+      const updated = await SupportApi.updateTicket(selectedTicket.id, {
+        priority: newPriority,
+      });
+      const mergedProfile = selectedTicket.profile;
+      setSelectedTicket({ ...updated, profile: mergedProfile });
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket.id === updated.id ? { ...updated, profile: ticket.profile ?? mergedProfile } : ticket,
+        ),
+      );
+      toast.success('Ticket priority updated successfully.');
     } catch (error) {
       console.error('Error updating ticket priority:', error);
-      alert('Failed to update priority. Please try again.');
+      toast.error('Failed to update priority. Please try again.');
     } finally {
       setIsUpdatingStatus(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: SupportTicketStatus) => {
     switch (status) {
       case 'open':
         return 'bg-blue-100 text-blue-800';
-      case 'in-progress':
+      case 'in_progress':
         return 'bg-yellow-100 text-yellow-800';
       case 'resolved':
         return 'bg-green-100 text-green-800';
@@ -162,7 +216,7 @@ export default function AdminSupportPage() {
     }
   };
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityColor = (priority: SupportTicketPriority) => {
     switch (priority) {
       case 'urgent':
         return 'bg-red-100 text-red-800';
@@ -177,11 +231,11 @@ export default function AdminSupportPage() {
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: SupportTicketStatus) => {
     switch (status) {
       case 'open':
         return <AlertCircle className="h-4 w-4" />;
-      case 'in-progress':
+      case 'in_progress':
         return <Clock className="h-4 w-4" />;
       case 'resolved':
         return <CheckCircle className="h-4 w-4" />;
@@ -208,7 +262,7 @@ export default function AdminSupportPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {dummySupportTickets.filter(t => t.status === 'open').length}
+              {tickets.filter(t => t.status === 'open').length}
             </div>
             <p className="text-xs text-muted-foreground">
               Need attention
@@ -223,7 +277,7 @@ export default function AdminSupportPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-               {dummySupportTickets.filter(t => t.status === 'in_progress').length}
+               {tickets.filter(t => t.status === 'in_progress').length}
             </div>
             <p className="text-xs text-muted-foreground">
               Being worked on
@@ -238,7 +292,7 @@ export default function AdminSupportPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {dummySupportTickets.filter(t => t.status === 'resolved').length}
+              {tickets.filter(t => t.status === 'resolved').length}
             </div>
             <p className="text-xs text-muted-foreground">
               This month
@@ -253,7 +307,7 @@ export default function AdminSupportPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {dummySupportTickets.filter(t => t.priority === 'urgent').length}
+              {tickets.filter(t => t.priority === 'urgent').length}
             </div>
             <p className="text-xs text-muted-foreground">
               High priority
@@ -325,10 +379,32 @@ export default function AdminSupportPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-            {filteredTickets.map((ticket) => {
-              const user = getUserInfo(ticket.userId);
-              
-              return (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={7}>
+                  <div className="flex items-center justify-center py-10 text-muted-foreground">
+                    <Spinner variant="bars" size={28} className="text-primary mr-3" />
+                    Loading tickets…
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : filteredTickets.length > 0 ? (
+              filteredTickets.map((ticket) => {
+                const profile = ticket.profile;
+                const metadata = (profile?.metadata ?? {}) as Record<string, unknown>;
+                const fallbackInitials =
+                  typeof profile?.full_name === 'string' && profile.full_name.trim().length > 0
+                    ? profile.full_name
+                        .split(' ')
+                        .map((part) => part[0])
+                        .join('')
+                        .toUpperCase()
+                    : 'U';
+                const supportEmail =
+                  (metadata.email as string | undefined) ??
+                  (metadata.contactEmail as string | undefined) ??
+                  undefined;
+                return (
                 <TableRow key={ticket.id}>
                   <TableCell>
                     <div>
@@ -341,14 +417,14 @@ export default function AdminSupportPage() {
                   <TableCell>
                     <div className="flex items-center space-x-2">
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={user?.avatar} alt={user?.name} />
-                        <AvatarFallback>
-                          {user?.name?.split(' ').map(n => n[0]).join('') || 'U'}
-                        </AvatarFallback>
+                        <AvatarImage src={profile?.avatar_url ?? undefined} alt={profile?.full_name ?? undefined} />
+                        <AvatarFallback>{fallbackInitials}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="text-sm font-medium">{user?.name || 'Unknown User'}</p>
-                        <p className="text-xs text-muted-foreground">{user?.email}</p>
+                        <p className="text-sm font-medium">{profile?.full_name || 'Unknown User'}</p>
+                        {supportEmail && (
+                          <p className="text-xs text-muted-foreground">{supportEmail}</p>
+                        )}
                       </div>
                     </div>
                   </TableCell>
@@ -356,7 +432,7 @@ export default function AdminSupportPage() {
                     <Badge className={getStatusColor(ticket.status)}>
                       <div className="flex items-center gap-1">
                         {getStatusIcon(ticket.status)}
-                        {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
+                        {ticket.status.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                       </div>
                     </Badge>
                   </TableCell>
@@ -367,17 +443,17 @@ export default function AdminSupportPage() {
                   </TableCell>
                   <TableCell>
                     <div>
-                      <p className="text-sm">{ticket.createdAt.toLocaleDateString()}</p>
+                      <p className="text-sm">{new Date(ticket.created_at).toLocaleDateString()}</p>
                       <p className="text-xs text-muted-foreground">
-                        {ticket.createdAt.toLocaleTimeString()}
+                        {new Date(ticket.created_at).toLocaleTimeString()}
                       </p>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div>
-                      <p className="text-sm">{ticket.updatedAt.toLocaleDateString()}</p>
+                      <p className="text-sm">{new Date(ticket.updated_at).toLocaleDateString()}</p>
                       <p className="text-xs text-muted-foreground">
-                        {ticket.updatedAt.toLocaleTimeString()}
+                        {new Date(ticket.updated_at).toLocaleTimeString()}
                       </p>
                     </div>
                   </TableCell>
@@ -395,7 +471,17 @@ export default function AdminSupportPage() {
                   </TableCell>
                 </TableRow>
               );
-            })}
+            })
+            ) : (
+              <TableRow>
+                <TableCell colSpan={7}>
+                  <div className="text-center py-12 text-muted-foreground">
+                    <MessageCircle className="h-10 w-10 mx-auto mb-3" />
+                    <p>No support tickets found for the current filters.</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
             </TableBody>
           </Table>
         </CardContent>
@@ -404,7 +490,7 @@ export default function AdminSupportPage() {
       {/* Results Summary */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Showing {filteredTickets.length} of {dummySupportTickets.length} tickets
+          Showing {filteredTickets.length} of {tickets.length} tickets
         </p>
         <div className="flex items-center space-x-2">
           <Button variant="outline" size="sm">
@@ -433,12 +519,16 @@ export default function AdminSupportPage() {
               {selectedTicket && (
                 <div className="flex items-center gap-3 mt-2">
                   <Badge className={getStatusColor(selectedTicket.status)}>
-                    {selectedTicket.status === 'in_progress' ? 'In Progress' : selectedTicket.status.charAt(0).toUpperCase() + selectedTicket.status.slice(1)}
+                    {selectedTicket.status === 'in_progress'
+                      ? 'In Progress'
+                      : selectedTicket.status.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                   </Badge>
                   <Badge className={getPriorityColor(selectedTicket.priority)}>
                     {selectedTicket.priority.charAt(0).toUpperCase() + selectedTicket.priority.slice(1)} Priority
                   </Badge>
-                  <Badge variant="outline">{selectedTicket.category}</Badge>
+                  <Badge variant="outline">
+                    {selectedTicket.category.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                  </Badge>
                 </div>
               )}
             </DialogDescription>
@@ -452,14 +542,25 @@ export default function AdminSupportPage() {
                   <Label className="text-sm font-medium text-muted-foreground">Created By</Label>
                   <div className="flex items-center gap-2">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={getUserInfo(selectedTicket.userId)?.avatar} />
+                      <AvatarImage src={selectedTicket.profile?.avatar_url ?? undefined} />
                       <AvatarFallback>
-                        {getUserInfo(selectedTicket.userId)?.name?.split(' ').map(n => n[0]).join('') || 'U'}
+                        {selectedTicket.profile?.full_name
+                          ? selectedTicket.profile.full_name
+                              .split(' ')
+                              .map((n) => n[0])
+                              .join('')
+                              .toUpperCase()
+                          : 'U'}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium">{getUserInfo(selectedTicket.userId)?.name || 'Unknown User'}</p>
-                      <p className="text-sm text-muted-foreground">{getUserInfo(selectedTicket.userId)?.email}</p>
+                      <p className="font-medium">{selectedTicket.profile?.full_name || 'Unknown User'}</p>
+                      {selectedProfileEmail && (
+                        <p className="text-sm text-muted-foreground">{selectedProfileEmail}</p>
+                      )}
+                      {selectedProfilePhone && (
+                        <p className="text-xs text-muted-foreground">{selectedProfilePhone}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -468,16 +569,22 @@ export default function AdminSupportPage() {
                   <div className="space-y-1 text-sm">
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span>Created: {selectedTicket.createdAt.toLocaleDateString()} at {selectedTicket.createdAt.toLocaleTimeString()}</span>
+                      <span>
+                        Created: {new Date(selectedTicket.created_at).toLocaleDateString()} at{' '}
+                        {new Date(selectedTicket.created_at).toLocaleTimeString()}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span>Updated: {selectedTicket.updatedAt.toLocaleDateString()} at {selectedTicket.updatedAt.toLocaleTimeString()}</span>
+                      <span>
+                        Updated: {new Date(selectedTicket.updated_at).toLocaleDateString()} at{' '}
+                        {new Date(selectedTicket.updated_at).toLocaleTimeString()}
+                      </span>
                     </div>
-                    {selectedTicket.resolvedAt && (
+                    {selectedTicket.resolved_at && (
                       <div className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span>Resolved: {selectedTicket.resolvedAt.toLocaleDateString()}</span>
+                        <span>Resolved: {new Date(selectedTicket.resolved_at).toLocaleDateString()}</span>
                       </div>
                     )}
                   </div>
@@ -496,9 +603,9 @@ export default function AdminSupportPage() {
               <div className="grid gap-4 md:grid-cols-2 border-t pt-4">
                 <div className="space-y-2">
                   <Label>Status</Label>
-                  <Select 
-                    value={selectedTicket.status} 
-                    onValueChange={(value) => handleUpdateTicketStatus(value as SupportTicket['status'])}
+                  <Select
+                    value={selectedTicket.status}
+                    onValueChange={(value) => handleUpdateTicketStatus(value as SupportTicketStatus)}
                     disabled={isUpdatingStatus}
                   >
                     <SelectTrigger>
@@ -514,9 +621,9 @@ export default function AdminSupportPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Priority</Label>
-                  <Select 
-                    value={selectedTicket.priority} 
-                    onValueChange={(value) => handleUpdateTicketPriority(value as SupportTicket['priority'])}
+                  <Select
+                    value={selectedTicket.priority}
+                    onValueChange={(value) => handleUpdateTicketPriority(value as SupportTicketPriority)}
                     disabled={isUpdatingStatus}
                   >
                     <SelectTrigger>
@@ -539,11 +646,11 @@ export default function AdminSupportPage() {
                   id="reply"
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
-                  placeholder="Type your reply here..."
+                  placeholder="Add internal notes or a response to share with the patient..."
                   className="min-h-[120px] resize-none"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Your reply will be sent to the user via email.
+                  Saved replies are visible to the patient in real time.
                 </p>
               </div>
             </div>
@@ -560,13 +667,13 @@ export default function AdminSupportPage() {
             >
               {isReplying ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                  Sending...
+                  <Spinner variant="bars" size={16} className="text-white mr-2" />
+                  Saving...
                 </>
               ) : (
                 <>
                   <Send className="h-4 w-4 mr-2" />
-                  Send Reply
+                  Save Notes
                 </>
               )}
             </Button>

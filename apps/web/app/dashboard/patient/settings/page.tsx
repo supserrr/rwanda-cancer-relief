@@ -51,6 +51,12 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../../components/auth/AuthProvider';
 import { AuthApi } from '../../../../lib/api/auth';
+import {
+  SupportApi,
+  SupportTicketRecord,
+  SupportTicketCategory,
+  SupportTicketPriority,
+} from '../../../../lib/api/support';
 import { toast } from 'sonner';
 import { Textarea } from '@workspace/ui/components/textarea';
 import { useEffect } from 'react';
@@ -69,13 +75,13 @@ export default function PatientSettingsPage() {
   const [isCreatingTicket, setIsCreatingTicket] = useState(false);
   const [ticketForm, setTicketForm] = useState({
     subject: '',
-    category: '',
-    priority: 'medium',
+    category: 'technical' as SupportTicketCategory,
+    priority: 'medium' as SupportTicketPriority,
     description: ''
   });
 
-  // Support tickets - placeholder for now (no API endpoint yet)
-  const myTickets: any[] = [];
+  const [myTickets, setMyTickets] = useState<SupportTicketRecord[]>([]);
+  const [isLoadingTickets, setIsLoadingTickets] = useState(false);
 
   const [notifications, setNotifications] = useState({
     email: true,
@@ -84,20 +90,33 @@ export default function PatientSettingsPage() {
     sessionReminders: true,
     patientMessages: true,
     resourceUpdates: true,
-    systemAlerts: true
+    systemAlerts: true,
+  });
+
+  const [sessionPreferences, setSessionPreferences] = useState({
+    sessionDuration: '60',
+    sessionType: 'video',
+    reminderLeadTime: '24', // hours
+  });
+
+  const [securityPreferences, setSecurityPreferences] = useState({
+    mfaEnabled: false,
+    loginAlerts: false,
+    lastRevokeRequest: '',
   });
 
   const [profile, setProfile] = useState({
     name: user?.name || '',
     email: user?.email || '',
-    phoneNumber: '',
-    emergencyContact: '',
+    contactPhone: '',
+    emergencyContactName: '',
+    emergencyContactPhone: '',
     dateOfBirth: new Date(),
     medicalHistory: '',
-    currentModule: '',
-    language: 'en',
+    preferredLanguage: '',
     timezone: 'Africa/Kigali',
-    languages: ['English', 'Kinyarwanda'],
+    additionalLanguages: [] as string[],
+  lastSignInAt: '',
     // Onboarding data
     age: '',
     gender: '',
@@ -107,10 +126,8 @@ export default function PatientSettingsPage() {
     currentTreatment: '',
     treatmentStage: '',
     supportNeeds: [] as string[],
-    preferredLanguage: '',
     familySupport: '',
     consultationType: [] as string[],
-    availability: '',
     specialRequests: '',
     avatar_url: user?.avatar || ''
   });
@@ -133,34 +150,170 @@ export default function PatientSettingsPage() {
         }
         const metadata = currentUser.metadata || {};
         
-        setProfile(prev => ({
+        const contactPhone =
+          (typeof currentUser.contactPhone === 'string' && currentUser.contactPhone.length > 0
+            ? currentUser.contactPhone
+            : undefined) ??
+          (typeof metadata.contactPhone === 'string' ? metadata.contactPhone : undefined) ??
+          (typeof metadata.phoneNumber === 'string' ? metadata.phoneNumber : undefined) ??
+          (typeof (currentUser as any).phoneNumber === 'string'
+            ? ((currentUser as any).phoneNumber as string)
+            : undefined);
+        const emergencyContactName =
+          (typeof currentUser.emergencyContactName === 'string'
+            ? currentUser.emergencyContactName
+            : undefined) ??
+          (typeof metadata.emergencyContactName === 'string'
+            ? metadata.emergencyContactName
+            : undefined);
+        const emergencyContactPhone =
+          (typeof currentUser.emergencyContactPhone === 'string'
+            ? currentUser.emergencyContactPhone
+            : undefined) ??
+          (typeof metadata.emergencyContactPhone === 'string'
+            ? metadata.emergencyContactPhone
+            : undefined) ??
+          (typeof metadata.emergencyContact === 'string'
+            ? metadata.emergencyContact
+            : undefined);
+        const preferredLanguage =
+          (typeof currentUser.preferredLanguage === 'string'
+            ? currentUser.preferredLanguage
+            : undefined) ??
+          (typeof metadata.preferredLanguage === 'string'
+            ? metadata.preferredLanguage
+            : undefined) ??
+          (typeof metadata.language === 'string' ? metadata.language : undefined) ??
+          'kinyarwanda';
+        const treatmentStage =
+          (typeof currentUser.treatmentStage === 'string'
+            ? currentUser.treatmentStage
+            : undefined) ??
+          (typeof metadata.treatmentStage === 'string' ? metadata.treatmentStage : undefined) ??
+          '';
+        const rawLanguages = Array.isArray(metadata.languages)
+          ? metadata.languages
+          : Array.isArray(metadata.language_preferences)
+            ? metadata.language_preferences
+            : [];
+        const additionalLanguages = rawLanguages
+          .filter((lang): lang is string => typeof lang === 'string' && lang.trim().length > 0)
+          .filter((lang) => lang.toLowerCase() !== preferredLanguage.toLowerCase());
+
+        setProfile((prev) => ({
           ...prev,
           name: currentUser.name,
           email: currentUser.email,
-          phoneNumber: (typeof metadata.phoneNumber === 'string' ? metadata.phoneNumber : (currentUser as any).phoneNumber) || '',
-          emergencyContact: (typeof metadata.emergencyContact === 'string' ? metadata.emergencyContact : '') || '',
-          dateOfBirth: (typeof metadata.dateOfBirth === 'string' ? new Date(metadata.dateOfBirth) : (metadata.dateOfBirth instanceof Date ? metadata.dateOfBirth : new Date())),
+          contactPhone: contactPhone || '',
+          emergencyContactName: emergencyContactName || '',
+          emergencyContactPhone: emergencyContactPhone || '',
+          dateOfBirth:
+            typeof metadata.dateOfBirth === 'string'
+              ? new Date(metadata.dateOfBirth)
+              : metadata.dateOfBirth instanceof Date
+                ? metadata.dateOfBirth
+                : new Date(),
           medicalHistory: (typeof metadata.medicalHistory === 'string' ? metadata.medicalHistory : '') || '',
-          currentModule: (typeof metadata.currentModule === 'string' ? metadata.currentModule : '') || '',
-          language: (typeof metadata.language === 'string' ? metadata.language : (typeof metadata.preferredLanguage === 'string' ? metadata.preferredLanguage : 'en')) || 'en',
+          preferredLanguage: preferredLanguage || '',
           timezone: (typeof metadata.timezone === 'string' ? metadata.timezone : 'Africa/Kigali') || 'Africa/Kigali',
-          languages: Array.isArray(metadata.languages) ? metadata.languages : (typeof metadata.preferredLanguage === 'string' ? [metadata.preferredLanguage] : ['English', 'Kinyarwanda']),
-          // Onboarding data from metadata
-          age: (typeof metadata.age === 'string' ? metadata.age : (typeof metadata.age === 'number' ? String(metadata.age) : '')) || '',
+          additionalLanguages,
+          lastSignInAt:
+            typeof metadata.lastSignInAt === 'string'
+              ? metadata.lastSignInAt
+              : prev.lastSignInAt,
+          age:
+            (typeof metadata.age === 'string'
+              ? metadata.age
+              : typeof metadata.age === 'number'
+                ? String(metadata.age)
+                : '') || '',
           gender: (typeof metadata.gender === 'string' ? metadata.gender : '') || '',
           location: (typeof metadata.location === 'string' ? metadata.location : '') || '',
           cancerType: (typeof metadata.cancerType === 'string' ? metadata.cancerType : '') || '',
           diagnosisDate: (typeof metadata.diagnosisDate === 'string' ? metadata.diagnosisDate : '') || '',
           currentTreatment: (typeof metadata.currentTreatment === 'string' ? metadata.currentTreatment : '') || '',
-          treatmentStage: (typeof metadata.treatmentStage === 'string' ? metadata.treatmentStage : '') || '',
+          treatmentStage,
           supportNeeds: Array.isArray(metadata.supportNeeds) ? metadata.supportNeeds : [],
-          preferredLanguage: (typeof metadata.preferredLanguage === 'string' ? metadata.preferredLanguage : '') || '',
           familySupport: (typeof metadata.familySupport === 'string' ? metadata.familySupport : '') || '',
           consultationType: Array.isArray(metadata.consultationType) ? metadata.consultationType : [],
-          availability: (typeof metadata.availability === 'string' ? metadata.availability : '') || '',
           specialRequests: (typeof metadata.specialRequests === 'string' ? metadata.specialRequests : '') || '',
-          avatar_url: (typeof currentUser.avatar === 'string' ? currentUser.avatar : (typeof metadata.avatar_url === 'string' ? metadata.avatar_url : '')) || ''
+          avatar_url:
+            (typeof currentUser.avatar === 'string'
+              ? currentUser.avatar
+              : typeof metadata.avatar_url === 'string'
+                ? metadata.avatar_url
+                : '') || ''
         }));
+
+        const notificationPrefs =
+          (currentUser.notificationPreferences as Record<string, unknown> | undefined) ??
+          (metadata.notificationPreferences as Record<string, unknown> | undefined);
+        if (notificationPrefs) {
+          setNotifications((prev) => ({
+            ...prev,
+            email:
+              notificationPrefs.email !== undefined ? Boolean(notificationPrefs.email) : prev.email,
+            push:
+              notificationPrefs.push !== undefined ? Boolean(notificationPrefs.push) : prev.push,
+            sms: notificationPrefs.sms !== undefined ? Boolean(notificationPrefs.sms) : prev.sms,
+            sessionReminders:
+              notificationPrefs.sessionReminders !== undefined
+                ? Boolean(notificationPrefs.sessionReminders)
+                : prev.sessionReminders,
+            patientMessages:
+              notificationPrefs.patientMessages !== undefined
+                ? Boolean(notificationPrefs.patientMessages)
+                : prev.patientMessages,
+            resourceUpdates:
+              notificationPrefs.resourceUpdates !== undefined
+                ? Boolean(notificationPrefs.resourceUpdates)
+                : prev.resourceUpdates,
+            systemAlerts:
+              notificationPrefs.systemAlerts !== undefined
+                ? Boolean(notificationPrefs.systemAlerts)
+                : prev.systemAlerts,
+          }));
+        }
+
+        const supportPrefs =
+          (currentUser.supportPreferences as Record<string, unknown> | undefined) ??
+          (metadata.supportPreferences as Record<string, unknown> | undefined);
+        if (supportPrefs) {
+          setSessionPreferences((prev) => ({
+            sessionDuration:
+              supportPrefs.sessionDuration !== undefined
+                ? String(supportPrefs.sessionDuration)
+                : prev.sessionDuration,
+            sessionType:
+              typeof supportPrefs.sessionType === 'string'
+                ? supportPrefs.sessionType
+                : prev.sessionType,
+            reminderLeadTime:
+              supportPrefs.reminderLeadTime !== undefined
+                ? String(supportPrefs.reminderLeadTime)
+                : prev.reminderLeadTime,
+          }));
+        }
+
+        const securityPrefs =
+          (currentUser.securityPreferences as Record<string, unknown> | undefined) ??
+          (metadata.securityPreferences as Record<string, unknown> | undefined);
+        if (securityPrefs) {
+          setSecurityPreferences((prev) => ({
+            mfaEnabled:
+              securityPrefs.mfaEnabled !== undefined
+                ? Boolean(securityPrefs.mfaEnabled)
+                : prev.mfaEnabled,
+            loginAlerts:
+              securityPrefs.loginAlerts !== undefined
+                ? Boolean(securityPrefs.loginAlerts)
+                : prev.loginAlerts,
+            lastRevokeRequest:
+              typeof securityPrefs.lastRevokeRequest === 'string'
+                ? securityPrefs.lastRevokeRequest
+                : prev.lastRevokeRequest,
+          }));
+        }
       } catch (error) {
         console.error('Error loading profile:', error);
         // Use auth user data as fallback
@@ -176,6 +329,51 @@ export default function PatientSettingsPage() {
     loadProfile();
   }, [user]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    let isMounted = true;
+
+    const fetchTickets = async () => {
+      setIsLoadingTickets(true);
+      try {
+        const data = await SupportApi.listMyTickets();
+        if (isMounted) {
+          setMyTickets(data);
+        }
+      } catch (error) {
+        console.error('Error loading support tickets:', error);
+        toast.error('Failed to load support tickets.');
+      } finally {
+        if (isMounted) {
+          setIsLoadingTickets(false);
+        }
+      }
+    };
+
+    fetchTickets();
+
+    const channel = SupportApi.subscribeToTickets((ticket) => {
+      if (ticket.user_id !== user.id) {
+        return;
+      }
+
+      setMyTickets((prev) => {
+        const existingIndex = prev.findIndex((existing) => existing.id === ticket.id);
+        if (existingIndex >= 0) {
+          const clone = [...prev];
+          clone[existingIndex] = ticket;
+          return clone;
+        }
+        return [ticket, ...prev];
+      });
+    });
+
+    return () => {
+      isMounted = false;
+      channel.unsubscribe();
+    };
+  }, [user?.id]);
+
   const handleSaveProfile = async () => {
     if (!user?.id) {
       toast.error('User not authenticated');
@@ -184,20 +382,39 @@ export default function PatientSettingsPage() {
 
     setIsSaving(true);
     try {
+      if (!profile.contactPhone.trim()) {
+        toast.error('Please provide your primary contact phone number.');
+        setIsSaving(false);
+        return;
+      }
+
+      if (!profile.emergencyContactName.trim() || !profile.emergencyContactPhone.trim()) {
+        toast.error('Please provide both an emergency contact name and phone number.');
+        setIsSaving(false);
+        return;
+      }
+
       // Update profile with all fields including onboarding data
       await AuthApi.updateProfile({
         fullName: profile.name,
-        phoneNumber: profile.phoneNumber,
+        phoneNumber: profile.contactPhone,
+        contactPhone: profile.contactPhone,
+        emergencyContactName: profile.emergencyContactName,
+        emergencyContactPhone: profile.emergencyContactPhone,
+        preferredLanguage: profile.preferredLanguage || undefined,
+        treatmentStage: profile.treatmentStage || undefined,
         metadata: {
-          // Basic profile fields
-          phoneNumber: profile.phoneNumber,
-          emergencyContact: profile.emergencyContact,
+          contactPhone: profile.contactPhone,
+          phoneNumber: profile.contactPhone,
+          emergencyContactName: profile.emergencyContactName,
+          emergencyContactPhone: profile.emergencyContactPhone,
           dateOfBirth: profile.dateOfBirth instanceof Date ? profile.dateOfBirth.toISOString() : profile.dateOfBirth,
           medicalHistory: profile.medicalHistory,
-          currentModule: profile.currentModule,
-          language: profile.language,
+          language: profile.preferredLanguage,
+          preferredLanguage: profile.preferredLanguage,
           timezone: profile.timezone,
-          languages: profile.languages,
+          languages: profile.additionalLanguages,
+          additionalLanguages: profile.additionalLanguages,
           // Onboarding data
           age: profile.age,
           gender: profile.gender,
@@ -207,10 +424,8 @@ export default function PatientSettingsPage() {
           currentTreatment: profile.currentTreatment,
           treatmentStage: profile.treatmentStage,
           supportNeeds: profile.supportNeeds,
-          preferredLanguage: profile.preferredLanguage,
           familySupport: profile.familySupport,
           consultationType: profile.consultationType,
-          availability: profile.availability,
           specialRequests: profile.specialRequests,
           avatar_url: profile.avatar_url
         }
@@ -283,23 +498,95 @@ export default function PatientSettingsPage() {
     }
   };
 
-  const handleNotificationChange = (key: string, value: boolean) => {
-    setNotifications(prev => ({
-      ...prev,
-      [key]: value
-    }));
+  const handleNotificationChange = async (key: keyof typeof notifications, value: boolean) => {
+    const updated = { ...notifications, [key]: value };
+    setNotifications(updated);
+    try {
+      await AuthApi.updateProfile({
+        notificationPreferences: updated,
+      });
+    } catch (error) {
+      console.error('Failed to update notification preferences:', error);
+      toast.error('Failed to update notification preferences. Please try again.');
+      setNotifications(prev => ({ ...prev, [key]: !value }));
+    }
+  };
+
+  const handleSessionPreferenceChange = async (
+    key: keyof typeof sessionPreferences,
+    value: string,
+  ) => {
+    const previousValue = sessionPreferences[key];
+    const updated = { ...sessionPreferences, [key]: value };
+    setSessionPreferences(updated);
+    try {
+      await AuthApi.updateProfile({
+        supportPreferences: updated,
+      });
+    } catch (error) {
+      console.error('Failed to update session preferences:', error);
+      toast.error('Failed to update session preferences. Please try again.');
+      setSessionPreferences((prev) => ({ ...prev, [key]: previousValue }));
+    }
+  };
+
+  const handleSecurityPreferenceChange = async (
+    key: keyof typeof securityPreferences,
+    value: boolean,
+  ) => {
+    const previousValue = securityPreferences[key];
+    const updated = { ...securityPreferences, [key]: value };
+    setSecurityPreferences(updated);
+    try {
+      await AuthApi.updateProfile({
+        securityPreferences: updated,
+      });
+    } catch (error) {
+      console.error('Failed to update security preferences:', error);
+      toast.error('Failed to update security preferences. Please try again.');
+      setSecurityPreferences((prev) => ({ ...prev, [key]: previousValue }));
+    }
+  };
+
+  const handleSignOutOtherSessions = async () => {
+    const timestamp = new Date().toISOString();
+    const updated = { ...securityPreferences, lastRevokeRequest: timestamp };
+    setSecurityPreferences(updated);
+    try {
+      await AuthApi.updateProfile({
+        securityPreferences: updated,
+      });
+      toast.success('We will sign out other sessions and notify you when complete.');
+    } catch (error) {
+      console.error('Failed to sign out other sessions:', error);
+      toast.error('Failed to sign out other sessions. Please try again.');
+      setSecurityPreferences(securityPreferences);
+    }
   };
 
   const handleProfileChange = (field: string, value: string | number | string[] | Date) => {
-    setProfile(prev => ({ ...prev, [field]: value }));
+    setProfile(prev => {
+      const next = { ...prev, [field]: value } as typeof prev;
+      if (field === 'preferredLanguage' && typeof value === 'string') {
+        next.additionalLanguages = prev.additionalLanguages.filter(
+          (lang) => lang.toLowerCase() !== value.toLowerCase(),
+        );
+      }
+      return next;
+    });
     setHasUnsavedChanges(true);
   };
 
   const handleAddLanguage = (language: string) => {
-    if (language && !profile.languages.includes(language)) {
+    const normalized = language.trim();
+    if (
+      normalized &&
+      normalized.toLowerCase() !== profile.preferredLanguage.toLowerCase() &&
+      !profile.additionalLanguages.some((lang) => lang.toLowerCase() === normalized.toLowerCase())
+    ) {
       setProfile(prev => ({
         ...prev,
-        languages: [...prev.languages, language]
+        additionalLanguages: [...prev.additionalLanguages, normalized]
       }));
       setHasUnsavedChanges(true);
     }
@@ -308,7 +595,9 @@ export default function PatientSettingsPage() {
   const handleRemoveLanguage = (languageToRemove: string) => {
     setProfile(prev => ({
       ...prev,
-      languages: prev.languages.filter(lang => lang !== languageToRemove)
+      additionalLanguages: prev.additionalLanguages.filter(
+        (lang) => lang.toLowerCase() !== languageToRemove.toLowerCase(),
+      )
     }));
     setHasUnsavedChanges(true);
   };
@@ -339,29 +628,39 @@ export default function PatientSettingsPage() {
   };
 
   const handleCreateTicket = async () => {
-    if (!ticketForm.subject || !ticketForm.category || !ticketForm.description) {
-      alert('Please fill in all required fields');
+    if (!user?.id) {
+      toast.error('You must be signed in to create a support ticket.');
+      return;
+    }
+
+    if (!ticketForm.subject.trim() || !ticketForm.description.trim()) {
+      toast.error('Please provide a subject and description for your ticket.');
       return;
     }
 
     setIsCreatingTicket(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log('Creating ticket:', ticketForm);
-      
-      // Reset form
+      const ticket = await SupportApi.createTicket({
+        subject: ticketForm.subject.trim(),
+        category: ticketForm.category,
+        priority: ticketForm.priority,
+        description: ticketForm.description.trim(),
+      });
+
       setTicketForm({
         subject: '',
-        category: '',
+        category: 'technical',
         priority: 'medium',
-        description: ''
+        description: '',
       });
-      
-      alert('Support ticket created successfully! Ticket ID: #' + Date.now().toString().slice(-6));
+
+      setMyTickets((prev) => [ticket, ...prev]);
+      toast.success('Support ticket created successfully.');
     } catch (error) {
       console.error('Error creating ticket:', error);
-      alert('Failed to create ticket. Please try again.');
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to create support ticket. Please try again.',
+      );
     } finally {
       setIsCreatingTicket(false);
     }
@@ -495,10 +794,15 @@ export default function PatientSettingsPage() {
                         <Calendar className="h-4 w-4" />
                         <span>Patient since {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</span>
                       </div>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Award className="h-4 w-4" />
-                        <span>{(profile as any).currentModule || 'No module assigned'}</span>
-                      </div>
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    <span>
+                      Last sign-in{' '}
+                      {profile.lastSignInAt
+                        ? new Date(profile.lastSignInAt).toLocaleString()
+                        : 'N/A'}
+                    </span>
+                  </div>
                     </div>
                     <Badge variant="secondary" className="mt-2 bg-primary/10 text-primary border-primary/20">
                       <UserCheck className="h-3 w-3 mr-1" />
@@ -536,19 +840,47 @@ export default function PatientSettingsPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="phone">Phone Number</Label>
+                      <Label htmlFor="contactPhone">Primary Contact Phone</Label>
                       <Input
-                        id="phone"
-                        value={profile.phoneNumber}
-                        onChange={(e) => handleProfileChange('phoneNumber', e.target.value)}
+                        id="contactPhone"
+                        value={profile.contactPhone}
+                        onChange={(e) => handleProfileChange('contactPhone', e.target.value)}
+                        placeholder="+250 7XX XXX XXX"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="emergency">Emergency Contact</Label>
+                      <Label htmlFor="timezone">Timezone</Label>
+                      <Select value={profile.timezone} onValueChange={(value) => handleProfileChange('timezone', value)}>
+                        <SelectTrigger id="timezone" className="border-input focus:ring-primary/20">
+                          <SelectValue placeholder="Select timezone" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Africa/Kigali">Africa/Kigali</SelectItem>
+                          <SelectItem value="Africa/Lubumbashi">Africa/Lubumbashi</SelectItem>
+                          <SelectItem value="Africa/Nairobi">Africa/Nairobi</SelectItem>
+                          <SelectItem value="UTC">UTC</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="emergencyContactName">Emergency Contact Name</Label>
                       <Input
-                        id="emergency"
-                        value={profile.emergencyContact}
-                        onChange={(e) => handleProfileChange('emergencyContact', e.target.value)}
+                        id="emergencyContactName"
+                        value={profile.emergencyContactName}
+                        onChange={(e) => handleProfileChange('emergencyContactName', e.target.value)}
+                        placeholder="Full name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="emergencyContactPhone">Emergency Contact Phone</Label>
+                      <Input
+                        id="emergencyContactPhone"
+                        value={profile.emergencyContactPhone}
+                        onChange={(e) => handleProfileChange('emergencyContactPhone', e.target.value)}
+                        placeholder="+250 7XX XXX XXX"
                       />
                     </div>
                   </div>
@@ -602,24 +934,19 @@ export default function PatientSettingsPage() {
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="currentModule">Current Module</Label>
-                      <Input
-                        id="currentModule"
-                        value={profile.currentModule}
-                        onChange={(e) => handleProfileChange('currentModule', e.target.value)}
-                        placeholder="e.g., Coping with Anxiety"
-                      />
-                    </div>
-                    <div className="space-y-2">
                       <Label htmlFor="preferredLanguage">Preferred Language</Label>
-                      <Select value={profile.preferredLanguage} onValueChange={(value) => handleProfileChange('preferredLanguage', value)}>
+                    <Select
+                      value={profile.preferredLanguage}
+                      onValueChange={(value) => handleProfileChange('preferredLanguage', value)}
+                    >
                         <SelectTrigger className="border-input focus:ring-primary/20">
-                          <SelectValue placeholder="Select language" />
+                        <SelectValue placeholder="Select language" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="en">English</SelectItem>
-                          <SelectItem value="fr">Français</SelectItem>
-                          <SelectItem value="rw">Kinyarwanda</SelectItem>
+                        <SelectItem value="kinyarwanda">Kinyarwanda</SelectItem>
+                        <SelectItem value="english">English</SelectItem>
+                        <SelectItem value="french">French</SelectItem>
+                        <SelectItem value="swahili">Swahili</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -676,11 +1003,13 @@ export default function PatientSettingsPage() {
                             <SelectValue placeholder="Select stage" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="early">Early Stage</SelectItem>
-                            <SelectItem value="intermediate">Intermediate Stage</SelectItem>
-                            <SelectItem value="advanced">Advanced Stage</SelectItem>
-                            <SelectItem value="remission">Remission</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
+                            <SelectItem value="stage-1">Stage 1</SelectItem>
+                            <SelectItem value="stage-2">Stage 2</SelectItem>
+                            <SelectItem value="stage-3">Stage 3</SelectItem>
+                            <SelectItem value="stage-4">Stage 4</SelectItem>
+                            <SelectItem value="in-remission">In Remission</SelectItem>
+                            <SelectItem value="survivor">Survivor</SelectItem>
+                            <SelectItem value="not-specified">Not Specified</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -759,15 +1088,6 @@ export default function PatientSettingsPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="availability">Availability</Label>
-                        <Input
-                          id="availability"
-                          value={profile.availability}
-                          onChange={(e) => handleProfileChange('availability', e.target.value)}
-                          placeholder="e.g., Weekdays 9am-5pm"
-                        />
-                      </div>
                     </div>
                     <div className="space-y-2 mt-4">
                       <Label htmlFor="consultationType">Preferred Consultation Types</Label>
@@ -824,9 +1144,16 @@ export default function PatientSettingsPage() {
                   {/* Languages */}
                   <div className="space-y-2">
                     <Label>Languages</Label>
+                    <div className="text-sm text-muted-foreground">
+                      Primary language:{' '}
+                      {profile.preferredLanguage
+                        ? profile.preferredLanguage.charAt(0).toUpperCase() +
+                          profile.preferredLanguage.slice(1)
+                        : 'Not set'}
+                    </div>
                     <div className="space-y-3">
                       <div className="flex flex-wrap gap-2">
-                        {profile.languages.map((language, index) => (
+                        {profile.additionalLanguages.map((language, index) => (
                           <Badge
                             key={index}
                             variant="outline"
@@ -870,34 +1197,6 @@ export default function PatientSettingsPage() {
                           <Plus className="h-4 w-4" />
                         </Button>
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="language">Primary Language</Label>
-                      <Select value={profile.language} onValueChange={(value) => handleProfileChange('language', value)}>
-                        <SelectTrigger className="border-input focus:ring-primary/20">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="en">English</SelectItem>
-                          <SelectItem value="fr">Français</SelectItem>
-                          <SelectItem value="rw">Kinyarwanda</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="timezone">Timezone</Label>
-                      <Select value={profile.timezone} onValueChange={(value) => handleProfileChange('timezone', value)}>
-                        <SelectTrigger className="border-input focus:ring-primary/20">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Africa/Kigali">Africa/Kigali</SelectItem>
-                          <SelectItem value="UTC">UTC</SelectItem>
-                        </SelectContent>
-                      </Select>
                     </div>
                   </div>
 
@@ -1057,22 +1356,52 @@ export default function PatientSettingsPage() {
                     <div className="flex items-center justify-between p-4 border border-primary/20 rounded-xl bg-gradient-to-r from-primary/5 to-transparent">
                       <div className="space-y-1">
                         <Label className="text-base font-medium text-foreground">Two-Factor Authentication</Label>
-                        <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
+                        <p className="text-sm text-muted-foreground">
+                          Require an additional verification step when signing in.
+                        </p>
                       </div>
-                      <Button variant="outline" className="border-primary/20 hover:bg-primary/10">
-                        <Shield className="h-4 w-4 mr-2" />
-                        Enable
-                      </Button>
+                      <Switch
+                        checked={securityPreferences.mfaEnabled}
+                        onCheckedChange={(checked) =>
+                          handleSecurityPreferenceChange('mfaEnabled', checked)
+                        }
+                      />
                     </div>
 
                     <div className="flex items-center justify-between p-4 border border-primary/20 rounded-xl bg-gradient-to-r from-primary/5 to-transparent">
                       <div className="space-y-1">
-                        <Label className="text-base font-medium text-foreground">Login Activity</Label>
-                        <p className="text-sm text-muted-foreground">View recent login attempts</p>
+                        <Label className="text-base font-medium text-foreground">Login Alerts</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Get notified when there are logins from new devices or locations.
+                        </p>
                       </div>
-                      <Button variant="outline" className="border-primary/20 hover:bg-primary/10">
-                        <Eye className="h-4 w-4 mr-2" />
-                        View
+                      <Switch
+                        checked={securityPreferences.loginAlerts}
+                        onCheckedChange={(checked) =>
+                          handleSecurityPreferenceChange('loginAlerts', checked)
+                        }
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 border border-primary/20 rounded-xl bg-gradient-to-r from-primary/5 to-transparent">
+                      <div className="space-y-1">
+                        <Label className="text-base font-medium text-foreground">Sign Out Other Sessions</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Immediately revoke access from other active sessions.
+                        </p>
+                        {securityPreferences.lastRevokeRequest && (
+                          <p className="text-xs text-muted-foreground">
+                            Last request: {new Date(securityPreferences.lastRevokeRequest).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        variant="outline"
+                        className="border-primary/20 hover:bg-primary/10"
+                        onClick={handleSignOutOtherSessions}
+                      >
+                        <Shield className="h-4 w-4 mr-2" />
+                        Sign Out Others
                       </Button>
                     </div>
                   </div>
@@ -1169,9 +1498,12 @@ export default function PatientSettingsPage() {
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <Label className="text-base font-medium text-foreground">Preferred Session Duration</Label>
-                    <Select defaultValue="60">
+                    <Select
+                      value={sessionPreferences.sessionDuration}
+                      onValueChange={(value) => handleSessionPreferenceChange('sessionDuration', value)}
+                    >
                       <SelectTrigger className="w-48 border-primary/20 focus:ring-primary/20">
-                        <SelectValue />
+                        <SelectValue placeholder="Select duration" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="30">30 minutes</SelectItem>
@@ -1183,28 +1515,36 @@ export default function PatientSettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-base font-medium text-foreground">Preferred Session Type</Label>
-                    <Select defaultValue="video">
+                    <Label className="text-base font-medium text-foreground">Preferred Session Format</Label>
+                    <Select
+                      value={sessionPreferences.sessionType}
+                      onValueChange={(value) => handleSessionPreferenceChange('sessionType', value)}
+                    >
                       <SelectTrigger className="w-48 border-primary/20 focus:ring-primary/20">
-                        <SelectValue />
+                        <SelectValue placeholder="Select format" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="video">Video Call</SelectItem>
                         <SelectItem value="audio">Audio Only</SelectItem>
-                        <SelectItem value="both">Both</SelectItem>
+                        <SelectItem value="chat">Text Chat</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-base font-medium text-foreground">Time Zone</Label>
-                    <Select defaultValue="Africa/Kigali">
-                      <SelectTrigger className="w-64 border-primary/20 focus:ring-primary/20">
-                        <SelectValue />
+                    <Label className="text-base font-medium text-foreground">Reminder Lead Time</Label>
+                    <Select
+                      value={sessionPreferences.reminderLeadTime}
+                      onValueChange={(value) => handleSessionPreferenceChange('reminderLeadTime', value)}
+                    >
+                      <SelectTrigger className="w-48 border-primary/20 focus:ring-primary/20">
+                        <SelectValue placeholder="Select reminder window" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Africa/Kigali">Africa/Kigali (GMT+2)</SelectItem>
-                        <SelectItem value="UTC">UTC (GMT+0)</SelectItem>
+                        <SelectItem value="48">48 hours before</SelectItem>
+                        <SelectItem value="24">24 hours before</SelectItem>
+                        <SelectItem value="6">6 hours before</SelectItem>
+                        <SelectItem value="1">1 hour before</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1241,8 +1581,13 @@ export default function PatientSettingsPage() {
                         <div className="space-y-2">
                           <Label htmlFor="ticket-category">Category *</Label>
                           <Select 
-                            value={ticketForm.category} 
-                            onValueChange={(value) => setTicketForm(prev => ({ ...prev, category: value }))}
+                          value={ticketForm.category}
+                          onValueChange={(value) =>
+                            setTicketForm(prev => ({
+                              ...prev,
+                              category: value as SupportTicketCategory,
+                            }))
+                          }
                           >
                             <SelectTrigger className="border-input focus:ring-primary/20">
                               <SelectValue placeholder="Select a category" />
@@ -1261,8 +1606,13 @@ export default function PatientSettingsPage() {
                         <div className="space-y-2">
                           <Label htmlFor="ticket-priority">Priority</Label>
                           <Select 
-                            value={ticketForm.priority} 
-                            onValueChange={(value) => setTicketForm(prev => ({ ...prev, priority: value }))}
+                          value={ticketForm.priority}
+                          onValueChange={(value) =>
+                            setTicketForm(prev => ({
+                              ...prev,
+                              priority: value as SupportTicketPriority,
+                            }))
+                          }
                           >
                             <SelectTrigger className="border-input focus:ring-primary/20">
                               <SelectValue />
@@ -1328,7 +1678,12 @@ export default function PatientSettingsPage() {
                       <h3 className="text-lg font-semibold text-foreground">My Support Tickets</h3>
                     </div>
 
-                    {myTickets.length > 0 ? (
+                    {isLoadingTickets ? (
+                      <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+                        <Spinner variant="bars" size={28} className="text-primary mb-3" />
+                        <p>Loading your support tickets…</p>
+                      </div>
+                    ) : myTickets.length > 0 ? (
                       <div className="space-y-3">
                         {myTickets.map((ticket) => (
                           <div 
@@ -1346,19 +1701,45 @@ export default function PatientSettingsPage() {
                                 </p>
                                 <div className="flex items-center gap-3 flex-wrap">
                                   <Badge className={getStatusColor(ticket.status)}>
-                                    {ticket.status === 'in_progress' ? 'In Progress' : ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
+                                    {ticket.status === 'in_progress'
+                                      ? 'In Progress'
+                                      : ticket.status.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                                   </Badge>
                                   <Badge className={getPriorityColor(ticket.priority)}>
                                     {ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1)} Priority
                                   </Badge>
                                   <Badge variant="outline" className="border-primary/20">
-                                    {ticket.category}
+                                    {ticket.category.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                                   </Badge>
                                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                     <Calendar className="h-3 w-3" />
-                                    <span>Created {ticket.createdAt.toLocaleDateString()}</span>
+                                    <span>
+                                      Created {new Date(ticket.created_at).toLocaleDateString()}
+                                    </span>
                                   </div>
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <Clock className="h-3 w-3" />
+                                    <span>
+                                      Updated {new Date(ticket.updated_at).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                  {ticket.resolved_at && (
+                                    <div className="flex items-center gap-1 text-xs text-emerald-600">
+                                      <CheckCircle className="h-3 w-3" />
+                                      <span>
+                                        Resolved {new Date(ticket.resolved_at).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
+                                {ticket.admin_notes && (
+                                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-primary-foreground/80">
+                                    <p className="font-medium text-primary mb-1">Support Team Response</p>
+                                    <p className="text-muted-foreground whitespace-pre-line">
+                                      {ticket.admin_notes}
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>

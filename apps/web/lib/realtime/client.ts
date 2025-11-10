@@ -25,12 +25,19 @@ export interface RealtimeMessage {
 export interface RealtimeNotification {
   id: string;
   user_id: string;
-  type: string;
+  type_key?: string | null;
   title: string;
   message: string;
-  data?: unknown;
+  metadata?: unknown;
+  channels?: unknown;
+  delivery_status?: string;
+  priority?: string;
+  scheduled_for?: string | null;
+  delivered_at?: string | null;
+  expires_at?: string | null;
   is_read: boolean;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface RealtimeSession {

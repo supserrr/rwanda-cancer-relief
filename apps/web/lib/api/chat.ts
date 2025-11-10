@@ -367,6 +367,18 @@ export class ChatApi {
       })
       .eq('id', data.chatId);
 
+    void fetch('/api/notifications/events/message', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ messageId: message.id }),
+    }).catch((notificationError) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[ChatApi.sendMessage] Failed to enqueue notification:', notificationError);
+      }
+    });
+
     return this.mapMessageFromDb(message);
   }
 

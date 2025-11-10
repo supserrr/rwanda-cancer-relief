@@ -9,12 +9,13 @@ import React, {
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import {
+  AlertCircle,
   Bell,
   Calendar,
   FileText,
   LucideIcon,
   MessageSquare,
-  AlertCircle,
+  UserCheck,
 } from 'lucide-react';
 
 import { Badge } from '@workspace/ui/components/badge';
@@ -33,7 +34,6 @@ import {
 import {
   NotificationsApi,
   type Notification,
-  type NotificationType,
 } from '@/lib/api/notifications';
 import { ApiError } from '@/lib/api/client';
 import { useAuth } from '../../auth/AuthProvider';
@@ -44,15 +44,19 @@ import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
 
 type NotificationTab = 'all' | 'unread';
 
-const iconMap: Record<NotificationType, LucideIcon> = {
-  session: Calendar,
-  message: MessageSquare,
-  system: AlertCircle,
-  resource: FileText,
+const iconMap: Record<string, LucideIcon> = {
+  session_reminder: Calendar,
+  message_received: MessageSquare,
+  system_alert: AlertCircle,
+  patient_assignment: UserCheck,
+  resource_highlight: FileText,
 };
 
-const getIconForNotification = (type: NotificationType): LucideIcon => {
-  return iconMap[type] ?? Bell;
+const getIconForNotification = (typeKey?: string | null): LucideIcon => {
+  if (!typeKey) {
+    return Bell;
+  }
+  return iconMap[typeKey] ?? Bell;
 };
 
 const formatTimestamp = (timestamp: string): string => {
@@ -66,29 +70,40 @@ const formatTimestamp = (timestamp: string): string => {
 const mapRealtimeNotification = (notification: {
   id: string;
   user_id: string;
-  type: string;
+  type_key?: string | null;
   title: string;
   message: string;
-  data?: unknown;
+  metadata?: unknown;
+  channels?: unknown;
+  delivery_status?: string;
+  priority?: string;
+  scheduled_for?: string | null;
+  delivered_at?: string | null;
+  expires_at?: string | null;
   is_read: boolean;
   created_at: string;
+  updated_at?: string;
 }): Notification => ({
   id: notification.id,
   userId: notification.user_id,
   title: notification.title ?? 'Notification',
   message: notification.message ?? '',
-  type: (notification.type as NotificationType) || 'system',
-  link:
-    typeof notification.data === 'object' && notification.data !== null
-      ? (notification.data as Record<string, unknown>).link as string | undefined
-      : undefined,
+  typeKey: notification.type_key ?? null,
+  channels: Array.isArray(notification.channels)
+    ? (notification.channels as string[])
+    : ['in_app'],
+  deliveryStatus: (notification.delivery_status as Notification['deliveryStatus']) ?? 'pending',
+  priority: (notification.priority as Notification['priority']) ?? 'normal',
+  scheduledFor: notification.scheduled_for ?? null,
+  deliveredAt: notification.delivered_at ?? null,
+  expiresAt: notification.expires_at ?? null,
   metadata:
-    typeof notification.data === 'object' && notification.data !== null
-      ? (notification.data as Record<string, unknown>)
-      : undefined,
+    typeof notification.metadata === 'object' && notification.metadata !== null
+      ? (notification.metadata as Record<string, unknown>)
+      : {},
   isRead: notification.is_read ?? false,
   createdAt: notification.created_at,
-  updatedAt: notification.created_at,
+  updatedAt: notification.updated_at ?? notification.created_at,
 });
 
 export function NotificationInboxPopover() {
@@ -289,7 +304,7 @@ export function NotificationInboxPopover() {
               </div>
             ) : (
               filteredNotifications.map((notification) => {
-                const Icon = getIconForNotification(notification.type);
+                const Icon = getIconForNotification(notification.typeKey);
                 const isMarkingThis =
                   markingId === notification.id;
 
@@ -323,9 +338,17 @@ export function NotificationInboxPopover() {
                           </>
                         ) : null}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatTimestamp(notification.createdAt)}
-                      </p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>{formatTimestamp(notification.createdAt)}</span>
+                        <Badge variant="outline" className="uppercase tracking-wide text-[10px]">
+                          {notification.deliveryStatus}
+                        </Badge>
+                        {notification.priority !== 'normal' && (
+                          <Badge variant="secondary" className="uppercase tracking-wide text-[10px] bg-primary/10 text-primary border-primary/20">
+                            {notification.priority}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     {!notification.isRead && (
                       <span className="mt-2 inline-block size-2 rounded-full bg-primary flex-shrink-0" />

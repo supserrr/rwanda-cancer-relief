@@ -162,11 +162,23 @@ export class SessionsApi {
       .select()
       .single();
 
-    if (error) {
-      throw new Error(error.message || 'Failed to create session');
+    if (error || !session) {
+      throw new Error(error?.message || 'Failed to create session');
     }
 
-    return this.mapSessionFromDb(session);
+    const mapped = this.mapSessionFromDb(session);
+
+    void fetch('/api/notifications/events/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: mapped.id }),
+    }).catch((notificationError) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[SessionsApi.createSession] Failed to schedule notifications:', notificationError);
+      }
+    });
+
+    return mapped;
   }
 
   /**
@@ -269,11 +281,23 @@ export class SessionsApi {
       .select()
       .single();
 
-    if (error) {
-      throw new Error(error.message || 'Failed to update session');
+    if (error || !session) {
+      throw new Error(error?.message || 'Failed to update session');
     }
 
-    return this.mapSessionFromDb(session);
+    const mapped = this.mapSessionFromDb(session);
+
+    void fetch('/api/notifications/events/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: mapped.id }),
+    }).catch((notificationError) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[SessionsApi.updateSession] Failed to adjust notifications:', notificationError);
+      }
+    });
+
+    return mapped;
   }
 
   /**
@@ -300,11 +324,23 @@ export class SessionsApi {
       .select()
       .single();
 
-    if (error) {
-      throw new Error(error.message || 'Failed to reschedule session');
+    if (error || !session) {
+      throw new Error(error?.message || 'Failed to reschedule session');
     }
 
-    return this.mapSessionFromDb(session);
+    const mapped = this.mapSessionFromDb(session);
+
+    void fetch('/api/notifications/events/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: mapped.id }),
+    }).catch((notificationError) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[SessionsApi.rescheduleSession] Failed to adjust notifications:', notificationError);
+      }
+    });
+
+    return mapped;
   }
 
   /**
@@ -329,11 +365,23 @@ export class SessionsApi {
       .select()
       .single();
 
-    if (error) {
-      throw new Error(error.message || 'Failed to cancel session');
+    if (error || !session) {
+      throw new Error(error?.message || 'Failed to cancel session');
     }
 
-    return this.mapSessionFromDb(session);
+    const mapped = this.mapSessionFromDb(session);
+
+    void fetch('/api/notifications/events/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: mapped.id }),
+    }).catch((notificationError) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[SessionsApi.cancelSession] Failed to adjust notifications:', notificationError);
+      }
+    });
+
+    return mapped;
   }
 
   /**
@@ -361,11 +409,23 @@ export class SessionsApi {
       .select()
       .single();
 
-    if (error) {
-      throw new Error(error.message || 'Failed to complete session');
+    if (error || !session) {
+      throw new Error(error?.message || 'Failed to complete session');
     }
 
-    return this.mapSessionFromDb(session);
+    const mapped = this.mapSessionFromDb(session);
+
+    void fetch('/api/notifications/events/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: mapped.id }),
+    }).catch((notificationError) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[SessionsApi.completeSession] Failed to adjust notifications:', notificationError);
+      }
+    });
+
+    return mapped;
   }
 
   /**

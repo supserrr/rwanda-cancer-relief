@@ -43,9 +43,7 @@ type AdminRequestBody = ListUsersRequest | GetUserRequest | UpdateUserRoleReques
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL');
 const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
-
-if (!supabaseUrl || !supabaseServiceRoleKey || !supabaseAnonKey) {
+if (!supabaseUrl || !supabaseServiceRoleKey) {
   throw new Error('Missing Supabase environment variables for admin edge function.');
 }
 
@@ -63,25 +61,6 @@ const corsHeaders: Record<string, string> = {
  */
 const createServiceClient = (): SupabaseClient => {
   return createClient(supabaseUrl, supabaseServiceRoleKey, {
-    auth: {
-      persistSession: false,
-    },
-  });
-};
-
-/**
- * Create a Supabase client that uses the caller's JWT via the Authorization header.
- *
- * @param authHeader Authorization header from the request.
- * @returns Supabase client scoped to the caller's JWT.
- */
-const createAuthedClient = (authHeader: string): SupabaseClient => {
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: {
-        Authorization: authHeader,
-      },
-    },
     auth: {
       persistSession: false,
     },
@@ -469,13 +448,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
     });
   }
 
+  const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+  if (!bearerToken || bearerToken.trim().length === 0) {
+    return new Response(JSON.stringify({ success: false, error: 'Invalid authorization header.' }), {
+      status: 401,
+      headers: corsHeaders,
+    });
+  }
+
   const serviceClient = createServiceClient();
-  const authedClient = createAuthedClient(authHeader);
 
   const {
     data: { user },
     error: authError,
-  } = await authedClient.auth.getUser();
+  } = await serviceClient.auth.getUser(bearerToken);
 
   if (authError || !user) {
     return new Response(JSON.stringify({ success: false, error: 'Unauthorized.' }), {

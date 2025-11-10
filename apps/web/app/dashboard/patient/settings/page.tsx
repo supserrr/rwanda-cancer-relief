@@ -654,17 +654,40 @@ export default function PatientSettingsPage() {
 
     setIsDeleting(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      console.log('Account deleted successfully');
-      // Redirect to login or home page
-      // window.location.href = '/';
+      const response = await fetch('/api/account/delete', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        const errorMessage =
+          (payload && typeof payload.error === 'string' && payload.error.length > 0)
+            ? payload.error
+            : 'Failed to delete account. Please try again.';
+        throw new Error(errorMessage);
+      }
+
+      toast.success('Your account has been deleted.');
+
+      try {
+        await AuthApi.signOut();
+      } catch (signOutError) {
+        console.warn('Sign out after deletion failed:', signOutError);
+      }
+
+      setDeleteConfirmation('');
+      setIsDeleteModalOpen(false);
+      window.location.href = '/';
     } catch (error) {
       console.error('Error deleting account:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to delete account. Please try again.',
+      );
     } finally {
       setIsDeleting(false);
-      setIsDeleteModalOpen(false);
-      setDeleteConfirmation('');
     }
   };
 
@@ -829,7 +852,7 @@ export default function PatientSettingsPage() {
                       {isUploadingAvatar ? (
                         <Spinner variant="bars" size={16} className="text-primary" />
                       ) : (
-                        <Camera className="h-4 w-4 text-primary" />
+                      <Camera className="h-4 w-4 text-primary" />
                       )}
                     </Button>
                     <input

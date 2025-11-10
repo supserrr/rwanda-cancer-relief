@@ -15,7 +15,6 @@ import {
   UserPlus,
   GraduationCap,
   HelpCircle,
-  Server,
   ClipboardList,
 } from "lucide-react";
 import { UserRole, NavigationItem } from '../../../lib/types';
@@ -189,20 +188,6 @@ const navigationItems: NavigationItem[] = [
     roles: ['admin'],
     badge: 3
   },
-  {
-    id: 'systems',
-    label: 'Systems',
-    icon: 'Server',
-    path: '/dashboard/admin/systems',
-    roles: ['admin']
-  },
-  {
-    id: 'admin-settings',
-    label: 'Settings',
-    icon: 'Settings',
-    path: '/dashboard/admin/settings',
-    roles: ['admin']
-  }
 ];
 
 const iconMap = {
@@ -217,7 +202,6 @@ const iconMap = {
   UserPlus,
   GraduationCap,
   HelpCircle,
-  Server,
   ClipboardList,
 };
 

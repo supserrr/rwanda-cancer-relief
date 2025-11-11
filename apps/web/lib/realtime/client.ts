@@ -5,7 +5,8 @@
  * using Supabase Realtime subscriptions
  */
 
-import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
+import type { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
+import { createClient as getBrowserSupabaseClient } from '@/lib/supabase/client';
 
 /**
  * Realtime event types
@@ -81,19 +82,11 @@ let channels: Map<string, RealtimeChannel> = new Map();
  */
 function getSupabaseClient(): SupabaseClient {
   if (!supabaseClient) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Supabase URL and anon key are required');
+    const singletonClient = getBrowserSupabaseClient();
+    if (!singletonClient) {
+      throw new Error('Supabase client not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
     }
-
-    supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-      },
-    });
+    supabaseClient = singletonClient;
   }
 
   return supabaseClient;
@@ -143,9 +136,7 @@ export function subscribeToMessages(
       }
     )
     .subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        console.log(`Subscribed to messages for chat ${chatId}`);
-      } else if (status === 'CHANNEL_ERROR') {
+      if (status === 'CHANNEL_ERROR') {
         const error = new Error(`Failed to subscribe to messages for chat ${chatId}`);
         if (onError) {
           onError(error);
@@ -208,9 +199,7 @@ export function subscribeToNotifications(
       }
     )
     .subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        console.log(`Subscribed to notifications for user ${userId}`);
-      } else if (status === 'CHANNEL_ERROR') {
+      if (status === 'CHANNEL_ERROR') {
         const error = new Error(`Failed to subscribe to notifications for user ${userId}`);
         if (onError) {
           onError(error);
@@ -260,9 +249,7 @@ export function subscribeToSession(
       },
     )
     .subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        console.log(`Subscribed to session ${sessionId}`);
-      } else if (status === 'CHANNEL_ERROR') {
+      if (status === 'CHANNEL_ERROR') {
         const error = new Error(`Failed to subscribe to session ${sessionId}`);
         if (onError) {
           onError(error);
@@ -311,9 +298,7 @@ export function subscribeToChat(
       },
     )
     .subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        console.log(`Subscribed to chat ${chatId}`);
-      } else if (status === 'CHANNEL_ERROR') {
+      if (status === 'CHANNEL_ERROR') {
         const error = new Error(`Failed to subscribe to chat ${chatId}`);
         if (onError) {
           onError(error);

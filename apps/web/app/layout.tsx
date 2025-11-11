@@ -39,6 +39,9 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const isProduction =
+    process.env.NEXT_PUBLIC_VERCEL_ENV === "production" || process.env.NODE_ENV === "production"
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body
@@ -49,8 +52,8 @@ export default async function RootLayout({
         <Suspense fallback={<ProvidersLoading />}>
           <Providers>{children}</Providers>
         </Suspense>
-        <SpeedInsights />
-        <Analytics />
+        {isProduction ? <SpeedInsights /> : null}
+        {isProduction ? <Analytics /> : null}
       </body>
     </html>
   )

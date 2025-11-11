@@ -195,7 +195,7 @@ export function LandingStyleCounselorCard({
 
   const imageUrl = useMemo(() => {
     const normalized = normalizeAvatarUrl(avatar);
-    return normalized;
+      return normalized;
   }, [avatar]);
   const hasImage = Boolean(imageUrl) && !imageFailed;
 
@@ -208,10 +208,10 @@ export function LandingStyleCounselorCard({
     >
       {/* Full Cover Image */}
       {hasImage ? (
-        <img
-          src={imageUrl}
-          alt={name}
-          className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+      <img
+        src={imageUrl}
+        alt={name}
+        className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           onError={() => setImageFailed(true)}
         />
       ) : (

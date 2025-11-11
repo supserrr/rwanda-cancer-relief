@@ -30,6 +30,7 @@ import type { Counselor } from '@workspace/ui/lib/types';
 import { useProfileUpdates } from '../../../../hooks/useRealtime';
 import type { RealtimeProfile } from '../../../../lib/realtime/client';
 import { normalizeAvatarUrl } from '@workspace/ui/lib/avatar';
+import { selectFeaturedCounselors } from '../../../../lib/counselors/featured';
 
 type CounselorProfile = Counselor & {
   metadata?: Record<string, unknown>;
@@ -50,6 +51,16 @@ type CounselorProfile = Counselor & {
   waitlistEnabled?: boolean;
   telehealthOffered?: boolean;
   inPersonOffered?: boolean;
+  specializations?: string[];
+  totalSessions?: number;
+  scheduledSessions?: number;
+  upcomingSessions?: number;
+  completedSessions?: number;
+  cancelledSessions?: number;
+  nextSessionAt?: Date;
+  lastCompletedSessionAt?: Date;
+  updatedAt?: Date;
+  lastLogin?: Date;
 };
 
 const toString = (value: unknown): string | undefined => {
@@ -83,6 +94,27 @@ const toNumberLoose = (value: unknown): number | undefined => {
         return parsed;
       }
     }
+  }
+  return undefined;
+};
+
+const toDate = (value: unknown): Date | undefined => {
+  if (!value) {
+    return undefined;
+  }
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? undefined : value;
+  }
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    if (!Number.isNaN(parsed)) {
+      return new Date(parsed);
+    }
+    return undefined;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? undefined : date;
   }
   return undefined;
 };
@@ -459,6 +491,16 @@ const mapAdminUserToCounselor = (user: AdminUser): CounselorProfile => {
       findStringArrayByKeys(metadata, LANGUAGE_KEYS),
     ) ?? undefined;
 
+  const counselorSpecializations =
+    mergeStringArrays(
+      user.specializations,
+      metadata['specializations'],
+      metadata['specialties'],
+      counselorProfileRecord?.specializations,
+      counselorProfileFromMetadata?.['specializations'],
+      specialty ? [specialty] : undefined,
+    ) ?? undefined;
+
   const bio =
     toString(user.bio) ??
     toString(counselorProfileRecord?.bio) ??
@@ -505,13 +547,68 @@ const mapAdminUserToCounselor = (user: AdminUser): CounselorProfile => {
     findStringByKeys(metadata, EMAIL_KEYS) ??
     '';
 
+  const sessionStats = user.sessionStats;
+  const totalSessions =
+    toNumberLoose(user.totalSessions) ??
+    toNumberLoose(sessionStats?.totalSessions) ??
+    toNumberLoose(metadata['totalSessions']) ??
+    toNumberLoose(metadata['total_sessions']);
+  const scheduledSessions =
+    toNumberLoose(user.scheduledSessions) ??
+    toNumberLoose(sessionStats?.scheduledSessions) ??
+    toNumberLoose(metadata['scheduledSessions']) ??
+    toNumberLoose(metadata['scheduled_sessions']);
+  const upcomingSessions =
+    toNumberLoose(user.upcomingSessions) ??
+    toNumberLoose(sessionStats?.upcomingSessions) ??
+    toNumberLoose(metadata['upcomingSessions']) ??
+    toNumberLoose(metadata['upcoming_sessions']);
+  const completedSessions =
+    toNumberLoose(user.completedSessions) ??
+    toNumberLoose(sessionStats?.completedSessions) ??
+    toNumberLoose(metadata['completedSessions']) ??
+    toNumberLoose(metadata['completed_sessions']);
+  const cancelledSessions =
+    toNumberLoose(user.cancelledSessions) ??
+    toNumberLoose(sessionStats?.cancelledSessions) ??
+    toNumberLoose(metadata['cancelledSessions']) ??
+    toNumberLoose(metadata['cancelled_sessions']) ??
+    toNumberLoose(metadata['canceledSessions']) ??
+    toNumberLoose(metadata['canceled_sessions']);
+
+  const nextSessionAtValue =
+    toString(user.nextSessionAt) ??
+    sessionStats?.nextSessionAt ??
+    toString(metadata['nextSessionAt']) ??
+    toString(metadata['next_session_at']);
+  const lastCompletedSessionAtValue =
+    toString(user.lastCompletedSessionAt) ??
+    sessionStats?.lastCompletedSessionAt ??
+    toString(metadata['lastCompletedSessionAt']) ??
+    toString(metadata['last_completed_session_at']);
+
+  const nextSessionAt = toDate(nextSessionAtValue);
+  const lastCompletedSessionAt = toDate(lastCompletedSessionAtValue);
+
+  const createdAtRaw =
+    toString(user.createdAt) ??
+    new Date().toISOString();
+  const createdAtDate = toDate(createdAtRaw) ?? new Date();
+  const updatedAtDate =
+    toDate(user.updatedAt) ??
+    toDate(metadata['updatedAt']) ??
+    toDate(metadata['updated_at']);
+  const lastLoginDate = toDate(user.lastLogin);
+
   return {
     id: user.id,
     name: displayName,
     email,
     role: 'counselor',
     avatar,
-    createdAt: new Date(createdAt),
+    createdAt: createdAtDate,
+    updatedAt: updatedAtDate,
+    lastLogin: lastLoginDate,
     specialty,
     experience,
     availability,
@@ -523,6 +620,7 @@ const mapAdminUserToCounselor = (user: AdminUser): CounselorProfile => {
     phoneNumber,
     location,
     languages,
+    specializations: counselorSpecializations,
     bio,
     credentials: credentialText ?? undefined,
     visibilitySettings: user.visibilitySettings,
@@ -546,6 +644,13 @@ const mapAdminUserToCounselor = (user: AdminUser): CounselorProfile => {
       typeof user.inPersonOffered === 'boolean'
         ? user.inPersonOffered
         : counselorProfileRecord?.inPersonOffered,
+    totalSessions: totalSessions ?? undefined,
+    scheduledSessions: scheduledSessions ?? undefined,
+    upcomingSessions: upcomingSessions ?? undefined,
+    completedSessions: completedSessions ?? undefined,
+    cancelledSessions: cancelledSessions ?? undefined,
+    nextSessionAt,
+    lastCompletedSessionAt,
   };
 };
 
@@ -565,6 +670,7 @@ const mapProfileRecordToAdminUser = (profile: RealtimeProfile): AdminUser => {
     isVerified: Boolean(profile.is_verified),
     createdAt: profile.created_at ?? new Date().toISOString(),
     lastLogin: profile.updated_at ?? undefined,
+    updatedAt: profile.updated_at ?? undefined,
     metadata,
     specialty:
       (typeof profile.specialty === 'string' ? profile.specialty : undefined) ??
@@ -734,6 +840,28 @@ export default function PatientCounselorsPage() {
   });
   }, [counselors, searchTerm, selectedSpecialty, selectedAvailability]);
 
+  const { featured: featuredCounselor, runnersUp: featureRunnersUp, debugLog: featureDebugLog } = useMemo(
+    () =>
+      selectFeaturedCounselors(filteredCounselors, {
+        debug: process.env.NODE_ENV !== 'production',
+      }),
+    [filteredCounselors],
+  );
+
+  const featuredDisplayCounselors = useMemo(() => {
+    if (!featuredCounselor) {
+      return [];
+    }
+    const alternates = featureRunnersUp.slice(0, 3);
+    return [featuredCounselor, ...alternates];
+  }, [featuredCounselor, featureRunnersUp]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production' && featureDebugLog.length > 0) {
+      console.table(featureDebugLog);
+    }
+  }, [featureDebugLog]);
+
   const handleBookSession = (counselorId: string) => {
     const counselor = counselors.find(c => c.id === counselorId);
     if (counselor) {
@@ -875,7 +1003,7 @@ export default function PatientCounselorsPage() {
       )}
 
       {/* Featured Counselors */}
-      {counselors.filter(c => (c.experience ?? 0) >= 5).length > 0 && (
+      {featuredDisplayCounselors.length > 0 && (
         <div className="mt-12">
           <div className="flex items-center gap-2 mb-6">
             <Star className="h-5 w-5 text-foreground" />
@@ -883,10 +1011,15 @@ export default function PatientCounselorsPage() {
           </div>
           
           <AnimatedGrid className="grid gap-6 md:grid-cols-2" staggerDelay={0.15}>
-            {counselors
-              .filter(counselor => (counselor.experience ?? 0) >= 5)
-              .slice(0, 4)
-              .map((counselor, index) => (
+            {featuredDisplayCounselors.map((counselor, index) => {
+              const isFeatured = index === 0;
+              const primaryBadgeLabel = isFeatured ? 'Featured' : 'Top Pick';
+              const completedSessionsLabel =
+                typeof counselor.completedSessions === 'number' && counselor.completedSessions > 0
+                  ? `${counselor.completedSessions} session${counselor.completedSessions === 1 ? '' : 's'} completed`
+                  : null;
+
+              return (
                 <div key={counselor.id} className="relative">
                   <LandingStyleCounselorCard
                     id={counselor.id}
@@ -908,10 +1041,16 @@ export default function PatientCounselorsPage() {
                   />
                   <Badge className="absolute top-4 left-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0 shadow-lg z-30">
                     <Star className="w-3 h-3 mr-1 fill-current" />
-                    Featured
+                    {primaryBadgeLabel}
                   </Badge>
+                  {completedSessionsLabel && (
+                    <Badge className="absolute top-4 right-4 bg-background/80 backdrop-blur border border-border shadow-md text-xs">
+                      {completedSessionsLabel}
+                    </Badge>
+                  )}
                 </div>
-              ))}
+              );
+            })}
           </AnimatedGrid>
         </div>
       )}

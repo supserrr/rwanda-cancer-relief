@@ -26,6 +26,23 @@ export interface AdminUser {
   isVerified: boolean;
   createdAt: string;
   lastLogin?: string;
+  updatedAt?: string;
+  totalSessions?: number;
+  scheduledSessions?: number;
+  upcomingSessions?: number;
+  completedSessions?: number;
+  cancelledSessions?: number;
+  nextSessionAt?: string;
+  lastCompletedSessionAt?: string;
+  sessionStats?: {
+    totalSessions?: number;
+    scheduledSessions?: number;
+    upcomingSessions?: number;
+    completedSessions?: number;
+    cancelledSessions?: number;
+    nextSessionAt?: string;
+    lastCompletedSessionAt?: string;
+  };
   metadata?: Record<string, unknown>;
   preferredLanguage?: string;
   age?: number;
@@ -895,6 +912,79 @@ export class AdminApi {
     return undefined;
   };
 
+  const parseSessionStats = (
+    value: unknown,
+  ): {
+    totalSessions?: number;
+    scheduledSessions?: number;
+    upcomingSessions?: number;
+    completedSessions?: number;
+    cancelledSessions?: number;
+    nextSessionAt?: string;
+    lastCompletedSessionAt?: string;
+  } | undefined => {
+    const record = toRecord(value);
+    if (!record) {
+      return undefined;
+    }
+
+    const totalSessions = toNumberLoose(
+      record.totalSessions ??
+        record.total_sessions ??
+        record.total ??
+        record.count,
+    );
+    const scheduledSessions = toNumberLoose(
+      record.scheduledSessions ??
+        record.scheduled_sessions ??
+        record.totalScheduled ??
+        record.total_scheduled,
+    );
+    const upcomingSessions = toNumberLoose(
+      record.upcomingSessions ??
+        record.upcoming_sessions ??
+        record.upcoming ??
+        record.totalUpcoming ??
+        record.total_upcoming,
+    );
+    const completedSessions = toNumberLoose(
+      record.completedSessions ??
+        record.completed_sessions ??
+        record.completed ??
+        record.totalCompleted ??
+        record.total_completed,
+    );
+    const cancelledSessions = toNumberLoose(
+      record.cancelledSessions ??
+        record.cancelled_sessions ??
+        record.canceledSessions ??
+        record.canceled_sessions ??
+        record.cancelled ??
+        record.totalCancelled ??
+        record.total_cancelled,
+    );
+
+    return {
+      totalSessions,
+      scheduledSessions,
+      upcomingSessions,
+      completedSessions,
+      cancelledSessions,
+      nextSessionAt: toString(
+        record.nextSessionAt ??
+          record.next_session_at ??
+          record.nextSession ??
+          record.next_session,
+      ),
+      lastCompletedSessionAt: toString(
+        record.lastCompletedSessionAt ??
+          record.last_completed_session_at ??
+          record.lastCompleted ??
+          record.last_completed,
+      ),
+    };
+  };
+
   const mapCounselorProfile = (raw: any): CounselorProfileRecord | undefined => {
     if (!raw || typeof raw !== 'object') {
       return undefined;
@@ -1085,6 +1175,72 @@ export class AdminApi {
 
   function mapToAdminUser(raw: any): AdminUser {
     const metadata = normalizeMetadata(raw?.metadata);
+
+    const sessionStats =
+      parseSessionStats(raw?.session_stats) ??
+      parseSessionStats(raw?.sessionStats) ??
+      parseSessionStats(metadata.sessionStats) ??
+      parseSessionStats(metadata.session_stats);
+
+    const totalSessions =
+      toNumberLoose(
+        raw?.totalSessions ??
+          raw?.total_sessions ??
+          metadata.totalSessions ??
+          metadata.total_sessions,
+      ) ?? sessionStats?.totalSessions;
+
+    const scheduledSessions =
+      toNumberLoose(
+        raw?.scheduledSessions ??
+          raw?.scheduled_sessions ??
+          metadata.scheduledSessions ??
+          metadata.scheduled_sessions,
+      ) ?? sessionStats?.scheduledSessions;
+
+    const upcomingSessions =
+      toNumberLoose(
+        raw?.upcomingSessions ??
+          raw?.upcoming_sessions ??
+          metadata.upcomingSessions ??
+          metadata.upcoming_sessions,
+      ) ?? sessionStats?.upcomingSessions;
+
+    const completedSessions =
+      toNumberLoose(
+        raw?.completedSessions ??
+          raw?.completed_sessions ??
+          metadata.completedSessions ??
+          metadata.completed_sessions,
+      ) ?? sessionStats?.completedSessions;
+
+    const cancelledSessions =
+      toNumberLoose(
+        raw?.cancelledSessions ??
+          raw?.cancelled_sessions ??
+          raw?.canceledSessions ??
+          raw?.canceled_sessions ??
+          metadata.cancelledSessions ??
+          metadata.cancelled_sessions ??
+          metadata.canceledSessions ??
+          metadata.canceled_sessions,
+      ) ?? sessionStats?.cancelledSessions;
+
+    const nextSessionAt =
+      toString(
+        raw?.nextSessionAt ??
+          raw?.next_session_at ??
+          metadata.nextSessionAt ??
+          metadata.next_session_at,
+      ) ?? sessionStats?.nextSessionAt;
+
+    const lastCompletedSessionAt =
+      toString(
+        raw?.lastCompletedSessionAt ??
+          raw?.last_completed_session_at ??
+          metadata.lastCompletedSessionAt ??
+          metadata.last_completed_session_at,
+      ) ?? sessionStats?.lastCompletedSessionAt;
 
     const specialty =
       toString(raw?.specialty) ??
@@ -1540,6 +1696,11 @@ export class AdminApi {
       toString(metadata.created_at) ??
       new Date().toISOString();
 
+    const updatedAt =
+      toString(raw?.updatedAt) ??
+      toString(raw?.updated_at) ??
+      toString(metadata.updatedAt ?? metadata.updated_at);
+
     const lastLogin =
       toString(raw?.lastLogin) ??
       toString(raw?.last_login) ??
@@ -1558,6 +1719,7 @@ export class AdminApi {
       isVerified: Boolean(raw?.isVerified ?? raw?.is_verified ?? metadata.is_verified),
       createdAt,
       lastLogin,
+      updatedAt,
       metadata,
       specialty,
       experience: experience,
@@ -1568,6 +1730,14 @@ export class AdminApi {
       phoneNumber,
       contactPhone: contactPhoneValue,
       location,
+      totalSessions,
+      scheduledSessions,
+      upcomingSessions,
+      completedSessions,
+      cancelledSessions,
+      nextSessionAt,
+      lastCompletedSessionAt,
+      sessionStats,
       preferredLanguage,
       age,
       gender,
@@ -1724,6 +1894,33 @@ export class AdminApi {
       throw new Error(profilesError.message || 'Failed to list users');
     }
 
+    const sessionStatsByProfile = new Map<string, Record<string, unknown>>();
+    const profileIds = Array.isArray(profiles) ? profiles.map((profile) => profile.id) : [];
+
+    if (profileIds.length > 0 && (!params?.role || params.role === 'counselor')) {
+      const { data: sessionStatsData, error: sessionStatsError } = await supabase
+        .from('counselor_session_stats')
+        .select(
+          'user_id,total_sessions,total_scheduled,upcoming_sessions,completed_sessions,cancelled_sessions,next_session_at,last_completed_session_at',
+        )
+        .in('user_id', profileIds);
+
+      if (sessionStatsError) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            '[AdminApi.listUsers] Failed to load session stats via fallback query:',
+            sessionStatsError.message || sessionStatsError,
+          );
+        }
+      } else if (Array.isArray(sessionStatsData)) {
+        sessionStatsData.forEach((stat) => {
+          if (stat && typeof stat === 'object' && 'user_id' in stat) {
+            sessionStatsByProfile.set(String((stat as Record<string, unknown>).user_id), stat as Record<string, unknown>);
+          }
+        });
+      }
+    }
+
     const mapper = ensureMapToAdminUser();
 
     return {
@@ -1752,6 +1949,7 @@ export class AdminApi {
           counselor_profiles: Array.isArray(profile.counselor_profiles)
             ? profile.counselor_profiles[0]
             : profile.counselor_profiles,
+          session_stats: sessionStatsByProfile.get(profile.id),
         }),
       ),
       total: count ?? (profiles?.length ?? 0),

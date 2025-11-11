@@ -224,6 +224,7 @@ const handleListUsers = async (
   const authUsersMap = await fetchAuthUsers(serviceClient, ids);
 
   const documentsByProfile = new Map<string, any[]>();
+  const sessionStatsByProfile = new Map<string, any>();
   if (ids.length > 0) {
     const { data: documents } = await serviceClient
       .from('counselor_documents')
@@ -237,6 +238,19 @@ const handleListUsers = async (
         documentsByProfile.set(profileId, existing);
       }
     });
+
+    const { data: sessionStats } = await serviceClient
+      .from('counselor_session_stats')
+      .select(
+        'user_id,total_sessions,total_scheduled,upcoming_sessions,completed_sessions,cancelled_sessions,next_session_at,last_completed_session_at',
+      )
+      .in('user_id', ids);
+
+    (sessionStats ?? []).forEach((stat) => {
+      if (stat && typeof stat === 'object' && 'user_id' in stat) {
+        sessionStatsByProfile.set(stat.user_id as string, stat);
+      }
+    });
   }
 
   const combined = (data ?? []).map((row) => {
@@ -247,6 +261,7 @@ const handleListUsers = async (
       lastLogin: authUser?.last_login ?? row.updated_at,
       createdAt: authUser?.created_at ?? row.created_at,
       counselor_documents: documentsByProfile.get(row.id) ?? [],
+      session_stats: sessionStatsByProfile.get(row.id) ?? null,
     };
   });
 

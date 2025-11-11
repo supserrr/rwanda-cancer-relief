@@ -19,7 +19,11 @@ import { Search, Filter, Star } from 'lucide-react';
 import { AdminApi, type AdminUser } from '../../../../lib/api/admin';
 import { ProfileViewModal } from '@workspace/ui/components/profile-view-modal';
 import { useAuth } from '../../../../components/auth/AuthProvider';
-import type { VisibilitySettings, CounselorApprovalStatus } from '../../../../lib/types';
+import type {
+  VisibilitySettings,
+  CounselorApprovalStatus,
+  CounselorAvailabilityStatus,
+} from '../../../../lib/types';
 import { toast } from 'sonner';
 import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
 import type { Counselor } from '@workspace/ui/lib/types';
@@ -35,6 +39,15 @@ type CounselorProfile = Counselor & {
   credentials?: string;
   visibilitySettings?: VisibilitySettings;
   approvalStatus?: CounselorApprovalStatus;
+  availabilityStatus?: CounselorAvailabilityStatus;
+  rawAvailabilityStatus?: string;
+  availabilityDisplay?: string;
+  sessionModalities?: string[];
+  consultationTypes?: string[];
+  acceptingNewPatients?: boolean;
+  waitlistEnabled?: boolean;
+  telehealthOffered?: boolean;
+  inPersonOffered?: boolean;
 };
 
 const toString = (value: unknown): string | undefined => {
@@ -56,6 +69,22 @@ const toNumber = (value: unknown): number | undefined => {
   return undefined;
 };
 
+const toNumberLoose = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const match = value.match(/-?\d+(\.\d+)?/);
+    if (match) {
+      const parsed = Number.parseFloat(match[0]);
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+    }
+  }
+  return undefined;
+};
+
 const toStringArray = (value: unknown): string[] | undefined => {
   if (Array.isArray(value)) {
     const normalized = value
@@ -69,6 +98,22 @@ const toStringArray = (value: unknown): string[] | undefined => {
     return trimmed.length > 0 ? [trimmed] : undefined;
   }
   return undefined;
+};
+
+const mergeStringArrays = (...values: unknown[]): string[] | undefined => {
+  const merged = new Set<string>();
+  values.forEach((value) => {
+    const array = toStringArray(value);
+    if (array) {
+      array.forEach((item) => {
+        const normalized = item.trim();
+        if (normalized.length > 0) {
+          merged.add(normalized);
+        }
+      });
+    }
+  });
+  return merged.size > 0 ? Array.from(merged) : undefined;
 };
 
 const createKeySet = (keys: string[]): Set<string> =>
@@ -228,32 +273,159 @@ const LANGUAGE_KEYS = createKeySet([
   'preferred_languages',
 ]);
 
-const sanitizeAvailability = (value?: string): Counselor['availability'] => {
-  if (value === 'busy' || value === 'offline') {
-    return value;
-  }
-  return 'available';
-};
-
 const mapAdminUserToCounselor = (user: AdminUser): CounselorProfile => {
   const metadata = (user.metadata ?? {}) as Record<string, unknown>;
+  const rawMetadataCounselorProfile =
+    (metadata['counselorProfile'] as unknown) ?? metadata['counselor_profile'];
+  const counselorProfileFromMetadata =
+    rawMetadataCounselorProfile && typeof rawMetadataCounselorProfile === 'object'
+      ? (rawMetadataCounselorProfile as Record<string, unknown>)
+      : undefined;
+  const counselorProfileRecord = user.counselorProfile ?? undefined;
+
   const specialty =
     toString(user.specialty) ??
-    toString(metadata.specialty) ??
-    toStringArray(metadata.specialties)?.[0] ??
-    toString(metadata.expertise) ??
+    toString(metadata['specialty']) ??
+    toStringArray(metadata['specialties'])?.[0] ??
+    toStringArray(counselorProfileRecord?.specializations)?.[0] ??
+    (counselorProfileFromMetadata
+      ? toStringArray(counselorProfileFromMetadata['specializations'])?.[0]
+      : undefined) ??
+    toString(metadata['expertise']) ??
     'General Counseling';
 
-  const experience =
-    toNumber(user.experience) ??
-    toNumber(metadata.experience) ??
-    toNumber(metadata.experienceYears) ??
-    toNumber(metadata.experience_years) ??
-    0;
+  const experienceCandidates: unknown[] = [
+    user.experience,
+    (user as unknown as { experienceYears?: unknown }).experienceYears,
+    counselorProfileRecord?.yearsExperience,
+    metadata['experience'],
+    metadata['experienceYears'],
+    metadata['experience_years'],
+    metadata['years_experience'],
+    counselorProfileFromMetadata?.['experience'],
+    counselorProfileFromMetadata?.['experienceYears'],
+    counselorProfileFromMetadata?.['experience_years'],
+  ];
 
-  const availability = sanitizeAvailability(
-    toString(user.availability) ?? toString(metadata.availability),
-  );
+  let experienceValue: number | undefined;
+  for (const candidate of experienceCandidates) {
+    const parsed = toNumberLoose(candidate);
+    if (parsed !== undefined) {
+      experienceValue = parsed;
+      break;
+    }
+  }
+  const experience = experienceValue ?? 0;
+
+  const availabilitySources: unknown[] = [
+    user.availabilityStatus,
+    user.availability,
+    counselorProfileRecord?.availabilityStatus,
+    counselorProfileFromMetadata?.['availabilityStatus'],
+    counselorProfileFromMetadata?.['availability'],
+    metadata['availabilityStatus'],
+    metadata['availability_status'],
+    metadata['availability'],
+    metadata['status'],
+    metadata['currentAvailability'],
+  ];
+
+  const availabilityDisplayMap: Record<string, string> = {
+    available: 'Available',
+    busy: 'Busy',
+    limited: 'Limited Spots',
+    waitlist: 'Waitlist',
+    offline: 'Offline',
+    unavailable: 'Unavailable',
+  };
+
+  let availabilityKey = 'available';
+
+  for (const source of availabilitySources) {
+    const str = toString(source);
+    if (!str) {
+      continue;
+    }
+    const normalized = str.trim().toLowerCase();
+    const compact = normalized.replace(/[\s_-]+/g, '');
+    let mapped = compact;
+    if (compact === 'limitedspots' || compact === 'limitedavailability') {
+      mapped = 'limited';
+    } else if (compact === 'booked' || compact === 'partial') {
+      mapped = 'busy';
+    } else if (compact === 'notavailable' || compact === 'outofoffice') {
+      mapped = 'unavailable';
+    } else if (compact === 'away' || compact === 'inactive') {
+      mapped = 'unavailable';
+    }
+
+    if (
+      ['available', 'busy', 'limited', 'waitlist', 'offline', 'unavailable'].includes(mapped)
+    ) {
+      availabilityKey = mapped;
+      break;
+    }
+  }
+
+  const availabilityDisplay =
+    availabilityDisplayMap[availabilityKey] ?? availabilityDisplayMap.available;
+
+  let availability: Counselor['availability'];
+  if (availabilityKey === 'offline' || availabilityKey === 'unavailable') {
+    availability = 'offline';
+  } else if (availabilityKey === 'busy' || availabilityKey === 'limited' || availabilityKey === 'waitlist') {
+    availability = 'busy';
+  } else {
+    availability = 'available';
+  }
+
+  let availabilityStatus: CounselorAvailabilityStatus | undefined;
+  switch (availabilityKey) {
+    case 'available':
+      availabilityStatus = 'available';
+      break;
+    case 'limited':
+    case 'busy':
+      availabilityStatus = 'limited';
+      break;
+    case 'waitlist':
+      availabilityStatus = 'waitlist';
+      break;
+    case 'offline':
+    case 'unavailable':
+      availabilityStatus = 'unavailable';
+      break;
+    default:
+      availabilityStatus = undefined;
+      break;
+  }
+
+  const rawAvailabilityStatus = availabilityKey;
+
+  const sessionModalities =
+    mergeStringArrays(
+      user.sessionModalities,
+      user.consultationTypes,
+      counselorProfileRecord?.sessionModalities,
+      metadata['sessionModalities'],
+      metadata['session_modalities'],
+      metadata['consultationTypes'],
+      metadata['consultation_types'],
+      metadata['modalities'],
+      counselorProfileFromMetadata?.['sessionModalities'],
+      counselorProfileFromMetadata?.['session_modalities'],
+      counselorProfileFromMetadata?.['consultationTypes'],
+      counselorProfileFromMetadata?.['consultation_types'],
+    ) ?? undefined;
+
+  const consultationTypes =
+    mergeStringArrays(
+      user.consultationTypes,
+      metadata['consultationTypes'],
+      metadata['consultation_types'],
+      counselorProfileFromMetadata?.['consultationTypes'],
+      counselorProfileFromMetadata?.['consultation_types'],
+    ) ?? undefined;
 
   const avatar =
     toString(user.avatarUrl) ??
@@ -268,11 +440,21 @@ const mapAdminUserToCounselor = (user: AdminUser): CounselorProfile => {
     findStringByKeys(metadata, LOCATION_KEYS);
 
   const languages =
-    toStringArray(user.languages) ??
-    findStringArrayByKeys(metadata, LANGUAGE_KEYS);
+    mergeStringArrays(
+      user.languages,
+      counselorProfileRecord?.languages,
+      metadata['languages'],
+      metadata['languagePreferences'],
+      metadata['language_preferences'],
+      findStringArrayByKeys(metadata, LANGUAGE_KEYS),
+    ) ?? undefined;
 
   const bio =
     toString(user.bio) ??
+    toString(counselorProfileRecord?.bio) ??
+    (counselorProfileFromMetadata
+      ? toString(counselorProfileFromMetadata['bio'])
+      : undefined) ??
     findStringByKeys(metadata, BIO_KEYS);
 
   const credentialSource =
@@ -323,6 +505,8 @@ const mapAdminUserToCounselor = (user: AdminUser): CounselorProfile => {
     specialty,
     experience,
     availability,
+    rawAvailabilityStatus,
+    availabilityDisplay,
     patients,
     metadata,
     phoneNumber,
@@ -332,6 +516,25 @@ const mapAdminUserToCounselor = (user: AdminUser): CounselorProfile => {
     credentials: credentialText ?? undefined,
     visibilitySettings: user.visibilitySettings,
     approvalStatus: user.approvalStatus,
+    availabilityStatus,
+    sessionModalities,
+    consultationTypes,
+    acceptingNewPatients:
+      typeof user.acceptingNewPatients === 'boolean'
+        ? user.acceptingNewPatients
+        : counselorProfileRecord?.acceptingNewPatients,
+    waitlistEnabled:
+      typeof user.waitlistEnabled === 'boolean'
+        ? user.waitlistEnabled
+        : counselorProfileRecord?.waitlistEnabled,
+    telehealthOffered:
+      typeof user.telehealthOffered === 'boolean'
+        ? user.telehealthOffered
+        : counselorProfileRecord?.telehealthOffered,
+    inPersonOffered:
+      typeof user.inPersonOffered === 'boolean'
+        ? user.inPersonOffered
+        : counselorProfileRecord?.inPersonOffered,
   };
 };
 
@@ -624,7 +827,13 @@ export default function PatientCounselorsPage() {
               avatar={counselor.avatar}
               specialty={counselor.specialty}
               availability={counselor.availability}
+              availabilityStatus={
+                counselor.rawAvailabilityStatus ??
+                counselor.availabilityStatus ??
+                counselor.availability
+              }
               experience={counselor.experience}
+              services={counselor.sessionModalities ?? counselor.consultationTypes}
               onBookSession={handleBookSession}
               onViewProfile={handleViewProfile}
               delay={index * 0.1}
@@ -673,7 +882,13 @@ export default function PatientCounselorsPage() {
                     avatar={counselor.avatar}
                     specialty={counselor.specialty}
                     availability={counselor.availability}
+                    availabilityStatus={
+                      counselor.rawAvailabilityStatus ??
+                      counselor.availabilityStatus ??
+                      counselor.availability
+                    }
                     experience={counselor.experience}
+                    services={counselor.sessionModalities ?? counselor.consultationTypes}
                     onBookSession={handleBookSession}
                     onViewProfile={handleViewProfile}
                     delay={index * 0.15}

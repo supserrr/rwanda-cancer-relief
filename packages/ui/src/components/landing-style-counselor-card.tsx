@@ -15,6 +15,8 @@ interface LandingStyleCounselorCardProps {
   specialty?: string;
   availability?: 'available' | 'busy' | 'offline';
   experience?: number;
+  availabilityStatus?: string;
+  services?: string[];
   onBookSession?: (id: string) => void;
   onViewProfile?: (id: string) => void;
   delay?: number;
@@ -28,6 +30,8 @@ export function LandingStyleCounselorCard({
   specialty,
   availability,
   experience,
+  availabilityStatus,
+  services,
   onBookSession,
   onViewProfile,
   delay = 0,
@@ -52,8 +56,39 @@ export function LandingStyleCounselorCard({
     ? `${specialty} • ${experienceLabel}`
     : experienceLabel;
 
-  // Default consultation types - you can make this configurable later
-  const consultationTypes: ('chat' | 'video' | 'phone')[] = ['chat', 'video', 'phone'];
+  const resolvedServices = useMemo(() => {
+    if (Array.isArray(services) && services.length > 0) {
+      const unique = Array.from(
+        new Set(
+          services
+            .map((service) => (typeof service === 'string' ? service.trim() : ''))
+            .filter((service) => service.length > 0),
+        ),
+      );
+      if (unique.length > 0) {
+        return unique;
+      }
+    }
+    return ['chat', 'video', 'phone'];
+  }, [services]);
+
+  const serviceConfig: Record<
+    string,
+    { label: string; icon?: React.ComponentType<{ className?: string }> }
+  > = {
+    chat: { label: 'Chat', icon: MessageCircle },
+    messaging: { label: 'Messaging', icon: MessageCircle },
+    message: { label: 'Messaging', icon: MessageCircle },
+    text: { label: 'Messaging', icon: MessageCircle },
+    video: { label: 'Video', icon: Video },
+    telehealth: { label: 'Telehealth', icon: Video },
+    virtual: { label: 'Virtual', icon: Video },
+    phone: { label: 'Phone', icon: Phone },
+    call: { label: 'Phone', icon: Phone },
+    voice: { label: 'Phone', icon: Phone },
+    inperson: { label: 'In-Person', icon: CircleDot },
+    'in-person': { label: 'In-Person', icon: CircleDot },
+  };
   const placeholderImages: string[] = [
     'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&h=400&fit=crop&auto=format&q=80',
     'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&auto=format&q=80',
@@ -62,27 +97,69 @@ export function LandingStyleCounselorCard({
   ];
 
   const getAvailabilityBadge = () => {
-    if (!availability) return null;
-    
-    const config = {
+    const rawStatus = availabilityStatus ?? availability;
+    if (!rawStatus) {
+      return null;
+    }
+
+    const config: Record<
+      string,
+      { className: string; icon: React.ComponentType<{ className?: string }>; text: string }
+    > = {
       available: {
         className: 'bg-green-500 text-white',
         icon: CircleDot,
-        text: 'Available'
+        text: 'Available',
       },
       busy: {
         className: 'bg-yellow-500 text-white',
         icon: Circle,
-        text: 'Busy'
+        text: 'Busy',
       },
       offline: {
         className: 'bg-gray-500 text-white',
         icon: Minus,
-        text: 'Offline'
-      }
+        text: 'Offline',
+      },
+      limited: {
+        className: 'bg-amber-500 text-white',
+        icon: Circle,
+        text: 'Limited Spots',
+      },
+      waitlist: {
+        className: 'bg-orange-500 text-white',
+        icon: Circle,
+        text: 'Waitlist',
+      },
+      unavailable: {
+        className: 'bg-gray-500 text-white',
+        icon: Minus,
+        text: 'Unavailable',
+      },
     };
 
-    const badgeConfig = config[availability];
+    const normalized = rawStatus.toLowerCase().trim();
+    const compact = normalized.replace(/[\s_-]+/g, '');
+    let lookupKey = compact;
+
+    if (compact === 'limitedspots' || compact === 'limitedavailability') {
+      lookupKey = 'limited';
+    } else if (compact === 'booked' || compact === 'partial') {
+      lookupKey = 'busy';
+    } else if (compact === 'notavailable' || compact === 'outofoffice') {
+      lookupKey = 'unavailable';
+    }
+
+    if (!config[lookupKey]) {
+      lookupKey = availability ? availability.toLowerCase() : 'available';
+    }
+
+    const badgeConfig = config[lookupKey] ?? config.available;
+
+    if (!badgeConfig) {
+      return null;
+    }
+
     const Icon = badgeConfig.icon;
 
     return (
@@ -149,24 +226,22 @@ export function LandingStyleCounselorCard({
 
         {/* Consultation Types */}
         <div className="flex gap-2 flex-wrap">
-          {consultationTypes.includes('chat') && (
-            <Badge variant="outline" className="bg-sidebar/80 backdrop-blur-sm text-xs">
-              <MessageCircle className="w-3 h-3 mr-1" />
-              Chat
-            </Badge>
-          )}
-          {consultationTypes.includes('video') && (
-            <Badge variant="outline" className="bg-sidebar/80 backdrop-blur-sm text-xs">
-              <Video className="w-3 h-3 mr-1" />
-              Video
-            </Badge>
-          )}
-          {consultationTypes.includes('phone') && (
-            <Badge variant="outline" className="bg-sidebar/80 backdrop-blur-sm text-xs">
-              <Phone className="w-3 h-3 mr-1" />
-              Phone
-            </Badge>
-          )}
+          {resolvedServices.map((service) => {
+            const key = service.toLowerCase().replace(/\s+/g, '');
+            const configEntry = serviceConfig[key];
+            const Icon = configEntry?.icon;
+            const label = configEntry?.label ?? service;
+            return (
+              <Badge
+                key={`${service}-${id}`}
+                variant="outline"
+                className="bg-sidebar/80 backdrop-blur-sm text-xs"
+              >
+                {Icon ? <Icon className="w-3 h-3 mr-1" /> : null}
+                {label}
+              </Badge>
+            );
+          })}
         </div>
 
         {/* Action Buttons */}

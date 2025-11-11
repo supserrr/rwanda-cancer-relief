@@ -795,7 +795,7 @@ export default function AdminUsersPage() {
       </div>
 
       <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
-      <DialogContent className="max-w-3xl sm:max-w-4xl max-h-[90vh] overflow-hidden">
+      <DialogContent className="max-w-3xl sm:max-w-4xl max-h-[90vh] overflow-hidden px-4 sm:px-6">
           <DialogHeader>
             <DialogTitle>User details</DialogTitle>
             <DialogDescription>Review account metadata and recent activity.</DialogDescription>

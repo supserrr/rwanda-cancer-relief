@@ -51,9 +51,123 @@ export function ProfileViewModal({
   const patient = !isCounselor ? user as Patient : null;
 
   const avatarUrl = useMemo(() => normalizeAvatarUrl(user.avatar), [user.avatar]);
+  const availabilityDisplayOverride =
+    typeof (user as any).availabilityDisplay === 'string'
+      ? ((user as any).availabilityDisplay as string)
+      : undefined;
+
+  const rawAvailabilityStatusValue =
+    (typeof (user as any).rawAvailabilityStatus === 'string'
+      ? ((user as any).rawAvailabilityStatus as string)
+      : undefined) ??
+    (typeof (user as any).availabilityStatus === 'string'
+      ? ((user as any).availabilityStatus as string)
+      : undefined) ??
+    (counselor
+      ? (counselor as unknown as { rawAvailabilityStatus?: string | undefined }).rawAvailabilityStatus
+      : undefined);
+
+  const availabilityRawFallback =
+    (typeof (user as any).availability === 'string'
+      ? ((user as any).availability as string)
+      : undefined) ?? counselor?.availability;
+
+  const formatAvailabilityStatus = (status?: string) => {
+    if (!status) {
+      return undefined;
+    }
+    const normalizedOriginal = status.trim();
+    const token = normalizedOriginal.toLowerCase().replace(/[\s_-]+/g, '');
+    switch (token) {
+      case 'available':
+        return 'Available';
+      case 'busy':
+      case 'booked':
+      case 'partial':
+        return 'Busy';
+      case 'limited':
+      case 'limitedspots':
+      case 'limitedavailability':
+        return 'Limited Spots';
+      case 'waitlist':
+        return 'Waitlist';
+      case 'offline':
+        return 'Offline';
+      case 'unavailable':
+      case 'notavailable':
+      case 'away':
+      case 'inactive':
+      case 'outofoffice':
+        return 'Unavailable';
+      default:
+        return normalizedOriginal.charAt(0).toUpperCase() + normalizedOriginal.slice(1);
+    }
+  };
+
   const counselorAvailability =
-    (('availability' in user ? (user as any).availability : undefined) as Counselor['availability'] | undefined) ||
-    counselor?.availability;
+    availabilityDisplayOverride ??
+    formatAvailabilityStatus(rawAvailabilityStatusValue) ??
+    formatAvailabilityStatus(availabilityRawFallback);
+
+  const mergeStringArrays = (...values: unknown[]): string[] | undefined => {
+    const merged = new Set<string>();
+    values.forEach((value) => {
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          if (typeof item === 'string') {
+            const trimmed = item.trim();
+            if (trimmed.length > 0) {
+              merged.add(trimmed);
+            }
+          }
+        });
+      } else if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed.length > 0) {
+          merged.add(trimmed);
+        }
+      }
+    });
+    return merged.size > 0 ? Array.from(merged) : undefined;
+  };
+
+  const counselorSessionModalities = mergeStringArrays(
+    (user as any).sessionModalities,
+    (user as any).consultationTypes,
+    (user as any).services,
+    counselor
+      ? (counselor as unknown as { sessionModalities?: string[] | undefined }).sessionModalities
+      : undefined,
+    (counselor as unknown as { consultationTypes?: string[] | undefined })?.consultationTypes,
+  );
+
+  const formatServiceLabel = (service: string) => {
+    const normalized = service.toLowerCase().replace(/\s+/g, '');
+    switch (normalized) {
+      case 'chat':
+        return 'Chat';
+      case 'messaging':
+      case 'message':
+      case 'text':
+        return 'Messaging';
+      case 'video':
+        return 'Video';
+      case 'telehealth':
+        return 'Telehealth';
+      case 'virtual':
+        return 'Virtual';
+      case 'phone':
+      case 'call':
+      case 'voice':
+        return 'Phone';
+      case 'inperson':
+      case 'in-person':
+        return 'In-Person';
+      default:
+        return service;
+    }
+  };
+
   const counselorLanguages =
     (('languages' in user ? (user as any).languages : undefined) as string[] | undefined) ||
     (counselor && Array.isArray((counselor as any).languages) ? (counselor as any).languages : undefined);
@@ -75,14 +189,13 @@ export function ProfileViewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] w-full max-h-[95vh] overflow-hidden p-0 flex flex-col">
+      <DialogContent className="max-w-3xl sm:max-w-4xl max-h-[90vh] overflow-hidden px-4 sm:px-6 py-6 flex flex-col">
         <DialogTitle className="sr-only">
           {isCounselor ? 'Counselor Profile' : 'Patient Profile'} - {user.name}
         </DialogTitle>
-        {/* Modern Header with Gradient Background */}
-        <div className="relative bg-gradient-to-br from-primary/10 via-primary/5 to-background border-b flex-shrink-0">
+        <div className="relative bg-gradient-to-br from-primary/10 via-primary/5 to-background border-b flex-shrink-0 -mx-4 sm:-mx-6 -mt-6 sm:-mt-6 px-4 sm:px-6 pt-6 sm:pt-8 pb-6 sm:pb-8">
           <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent" />
-          <div className="relative p-6 pb-8">
+          <div className="relative">
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-center gap-4">
                 <div className="relative">
@@ -124,7 +237,7 @@ export function ProfileViewModal({
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto mt-6 space-y-6">
           <div className="space-y-6">
             {/* Consolidated Information Card */}
             <Card className="border-0 shadow-sm bg-gradient-to-br from-background to-muted/20">
@@ -219,6 +332,18 @@ export function ProfileViewModal({
                         <p className="text-sm text-muted-foreground leading-relaxed">{'bio' in counselor ? (counselor as any).bio : ''}</p>
                       </div>
                     ) : null}
+                    {counselorSessionModalities && counselorSessionModalities.length > 0 && (
+                      <div className="p-3 rounded-lg bg-muted/30">
+                        <p className="text-sm font-medium mb-2">Counseling Formats</p>
+                        <div className="flex flex-wrap gap-2">
+                          {counselorSessionModalities.map((modality) => (
+                            <Badge key={modality} variant="outline" className="bg-muted/60 capitalize">
+                              {formatServiceLabel(modality)}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {counselorLanguages && counselorLanguages.length > 0 && (
                       <div className="p-3 rounded-lg bg-muted/30">
                         <p className="text-sm font-medium mb-2">Languages</p>

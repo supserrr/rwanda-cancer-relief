@@ -77,6 +77,39 @@ export interface RealtimeProfile {
 let supabaseClient: SupabaseClient | null = null;
 let channels: Map<string, RealtimeChannel> = new Map();
 
+async function ensureRealtimeAuth(client: SupabaseClient): Promise<void> {
+  try {
+    const {
+      data: { session },
+    } = await client.auth.getSession();
+    if (session?.access_token) {
+      client.realtime.setAuth(session.access_token);
+    }
+  } catch (error) {
+    console.warn('[realtime] Failed to sync realtime auth token', error);
+  }
+}
+
+function toError(details: unknown, fallbackMessage: string): Error {
+  if (!details) {
+    return new Error(fallbackMessage);
+  }
+
+  if (details instanceof Error) {
+    return details;
+  }
+
+  if (typeof details === 'string') {
+    return new Error(`${fallbackMessage}: ${details}`);
+  }
+
+  if (typeof details === 'object' && 'message' in details && typeof (details as any).message === 'string') {
+    return new Error(`${fallbackMessage}: ${(details as any).message}`);
+  }
+
+  return new Error(fallbackMessage);
+}
+
 /**
  * Get Supabase client
  */
@@ -161,12 +194,11 @@ export function subscribeToMessages(
 export function subscribeToNotifications(
   userId: string,
   onNotification: (notification: RealtimeNotification) => void,
-  onError?: (error: Error) => void
+  onError?: (error: Error) => void,
 ): () => void {
   const client = getSupabaseClient();
   const channelName = `notifications:${userId}`;
 
-  // Remove existing channel if any
   if (channels.has(channelName)) {
     channels.get(channelName)?.unsubscribe();
     channels.delete(channelName);
@@ -177,30 +209,41 @@ export function subscribeToNotifications(
     .on(
       'postgres_changes',
       {
-        event: 'INSERT',
+        event: '*',
         schema: 'public',
         table: 'notifications',
         filter: `user_id=eq.${userId}`,
       },
       (payload) => {
         onNotification(payload.new as RealtimeNotification);
-      }
-    )
-    .on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${userId}`,
       },
-      (payload) => {
-        onNotification(payload.new as RealtimeNotification);
+    );
+
+  channels.set(channelName, channel);
+
+  void (async () => {
+    await ensureRealtimeAuth(client);
+    await channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        return;
       }
-    )
-    .subscribe((status) => {
+
+      if (status === 'TIMED_OUT') {
+        console.warn('[realtime] Notifications channel timed out. Retrying subscribe…');
+        await ensureRealtimeAuth(client);
+        await channel.subscribe();
+        return;
+      }
+
+      if (status === 'CLOSED') {
+        channels.delete(channelName);
+        return;
+      }
+
       if (status === 'CHANNEL_ERROR') {
-        const error = new Error(`Failed to subscribe to notifications for user ${userId}`);
+        const details = (channel as any)?.getError?.();
+        const error = toError(details, `Failed to subscribe to notifications for user ${userId}`);
+        channels.delete(channelName);
         if (onError) {
           onError(error);
         } else {
@@ -208,10 +251,16 @@ export function subscribeToNotifications(
         }
       }
     });
+  })().catch((error) => {
+    const err = toError(error, `Failed to subscribe to notifications for user ${userId}`);
+    channels.delete(channelName);
+    if (onError) {
+      onError(err);
+    } else {
+      console.error(err);
+    }
+  });
 
-  channels.set(channelName, channel);
-
-  // Return unsubscribe function
   return () => {
     channel.unsubscribe();
     channels.delete(channelName);
@@ -224,7 +273,7 @@ export function subscribeToNotifications(
 export function subscribeToSession(
   sessionId: string,
   onUpdate: (session: RealtimeSession) => void,
-  onError?: (error: Error) => void
+  onError?: (error: Error) => void,
 ): () => void {
   const client = getSupabaseClient();
   const channelName = `sessions:${sessionId}`;
@@ -247,10 +296,33 @@ export function subscribeToSession(
       (payload) => {
         onUpdate(payload.new as RealtimeSession);
       },
-    )
-    .subscribe((status) => {
+    );
+
+  channels.set(channelName, channel);
+
+  void (async () => {
+    await ensureRealtimeAuth(client);
+    await channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        return;
+      }
+
+      if (status === 'TIMED_OUT') {
+        console.warn('[realtime] Session channel timed out. Retrying subscribe…');
+        await ensureRealtimeAuth(client);
+        await channel.subscribe();
+        return;
+      }
+
+      if (status === 'CLOSED') {
+        channels.delete(channelName);
+        return;
+      }
+
       if (status === 'CHANNEL_ERROR') {
-        const error = new Error(`Failed to subscribe to session ${sessionId}`);
+        const details = (channel as any)?.getError?.();
+        const error = toError(details, `Failed to subscribe to session ${sessionId}`);
+        channels.delete(channelName);
         if (onError) {
           onError(error);
         } else {
@@ -258,8 +330,15 @@ export function subscribeToSession(
         }
       }
     });
-
-  channels.set(channelName, channel);
+  })().catch((error) => {
+    const err = toError(error, `Failed to subscribe to session ${sessionId}`);
+    channels.delete(channelName);
+    if (onError) {
+      onError(err);
+    } else {
+      console.error(err);
+    }
+  });
 
   return () => {
     channel.unsubscribe();
@@ -273,7 +352,7 @@ export function subscribeToSession(
 export function subscribeToChat(
   chatId: string,
   onUpdate: (chat: { id: string; updated_at: string }) => void,
-  onError?: (error: Error) => void
+  onError?: (error: Error) => void,
 ): () => void {
   const client = getSupabaseClient();
   const channelName = `chats:${chatId}`;
@@ -296,10 +375,33 @@ export function subscribeToChat(
       (payload) => {
         onUpdate(payload.new as { id: string; updated_at: string });
       },
-    )
-    .subscribe((status) => {
+    );
+
+  channels.set(channelName, channel);
+
+  void (async () => {
+    await ensureRealtimeAuth(client);
+    await channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        return;
+      }
+
+      if (status === 'TIMED_OUT') {
+        console.warn('[realtime] Chat channel timed out. Retrying subscribe…');
+        await ensureRealtimeAuth(client);
+        await channel.subscribe();
+        return;
+      }
+
+      if (status === 'CLOSED') {
+        channels.delete(channelName);
+        return;
+      }
+
       if (status === 'CHANNEL_ERROR') {
-        const error = new Error(`Failed to subscribe to chat ${chatId}`);
+        const details = (channel as any)?.getError?.();
+        const error = toError(details, `Failed to subscribe to chat ${chatId}`);
+        channels.delete(channelName);
         if (onError) {
           onError(error);
         } else {
@@ -307,8 +409,15 @@ export function subscribeToChat(
         }
       }
     });
-
-  channels.set(channelName, channel);
+  })().catch((error) => {
+    const err = toError(error, `Failed to subscribe to chat ${chatId}`);
+    channels.delete(channelName);
+    if (onError) {
+      onError(err);
+    } else {
+      console.error(err);
+    }
+  });
 
   return () => {
     channel.unsubscribe();

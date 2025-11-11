@@ -145,7 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Convert Supabase user to our User type
             const supabaseUser = session.user;
             const userMetadata = supabaseUser.user_metadata || {};
-
+            
             let currentUser: User = {
               id: supabaseUser.id,
               email: supabaseUser.email || '',
@@ -169,39 +169,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 console.warn('Failed to enrich Supabase session user from backend:', enrichError);
               }
             }
-
+            
             setUser(currentUser);
             AuthSession.setUser(currentUser);
             AuthSession.setToken(session.access_token);
-
+            
             // Check onboarding status and redirect if needed
-            // Only redirect if not already on onboarding page to prevent loops
+              // Only redirect if not already on onboarding page to prevent loops
             if (currentUser && currentUser.role !== 'guest' && currentUser.role !== 'admin') {
               const onboardingComplete = isOnboardingComplete(currentUser);
-              // Check if we're already on the correct onboarding route
-              const expectedOnboardingRoute = getOnboardingRoute(currentUser.role);
-              const isOnCorrectOnboardingRoute = pathname === expectedOnboardingRoute;
-
+                // Check if we're already on the correct onboarding route
+                const expectedOnboardingRoute = getOnboardingRoute(currentUser.role);
+                const isOnCorrectOnboardingRoute = pathname === expectedOnboardingRoute;
+                
               if (!onboardingComplete && !pathname.startsWith('/onboarding') && !isPublicPath(pathname)) {
-                // Not on onboarding page, redirect to appropriate onboarding
-                const onboardingRoute = getOnboardingRoute(currentUser.role);
-                router.push(onboardingRoute);
-                setIsLoading(false);
-                return;
-              } else if (
-                !onboardingComplete &&
-                pathname.startsWith('/onboarding') &&
-                !isOnCorrectOnboardingRoute
-              ) {
-                // On wrong onboarding route, redirect to correct one
+                  // Not on onboarding page, redirect to appropriate onboarding
+                  const onboardingRoute = getOnboardingRoute(currentUser.role);
+                  router.push(onboardingRoute);
+                  setIsLoading(false);
+                  return;
+                } else if (
+                  !onboardingComplete &&
+                  pathname.startsWith('/onboarding') &&
+                  !isOnCorrectOnboardingRoute
+                ) {
+                  // On wrong onboarding route, redirect to correct one
                 const onboardingRoute = getOnboardingRoute(currentUser.role);
                 router.push(onboardingRoute);
                 setIsLoading(false);
                 return;
               }
-              // If already on correct onboarding route, or public route, don't redirect
+                // If already on correct onboarding route, or public route, don't redirect
             }
-
+            
             setIsLoading(false);
             return;
           }

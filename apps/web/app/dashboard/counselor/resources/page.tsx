@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { ResourceCard } from '../../../../components/dashboard/shared/ResourceCard';
@@ -56,7 +56,8 @@ import {
   Clock,
   TrendingUp,
   ExternalLink,
-  ArrowLeft
+  ArrowLeft,
+  X
 } from 'lucide-react';
 import { useAuth } from '../../../../components/auth/AuthProvider';
 import { useResources } from '../../../../hooks/useResources';
@@ -84,6 +85,27 @@ export default function CounselorResourcesPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  // File input refs
+  const audioFileInputRef = useRef<HTMLInputElement>(null);
+  const videoFileInputRef = useRef<HTMLInputElement>(null);
+  const pdfFileInputRef = useRef<HTMLInputElement>(null);
+  const bulkFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Upload form state
+  const [uploadFormData, setUploadFormData] = useState<{
+    audio: { file: File | null; title: string; description: string; tags: string; duration: string };
+    video: { file: File | null; title: string; description: string; tags: string; duration: string };
+    pdf: { file: File | null; title: string; description: string; tags: string };
+    bulk: { files: File[] };
+  }>({
+    audio: { file: null, title: '', description: '', tags: '', duration: '' },
+    video: { file: null, title: '', description: '', tags: '', duration: '' },
+    pdf: { file: null, title: '', description: '', tags: '' },
+    bulk: { files: [] },
+  });
+
+  const [isUploading, setIsUploading] = useState(false);
 
   const resourceTypes = ['all', 'audio', 'pdf', 'video', 'article'] as const;
 
@@ -138,6 +160,7 @@ export default function CounselorResourcesPage() {
     loading: resourcesLoading,
     error: resourcesError,
     createResource,
+    createResourceWithFile,
     updateResource,
     deleteResource,
     refreshResources,
@@ -454,10 +477,215 @@ export default function CounselorResourcesPage() {
     setEditingArticle(null);
   };
 
-  const handleUploadResource = () => {
-    // Open upload modal or create new resource
-    setIsEditOpen(true);
-    setEditingResource(null);
+  // File input handlers
+  const handleChooseAudioFile = () => {
+    audioFileInputRef.current?.click();
+  };
+
+  const handleChooseVideoFile = () => {
+    videoFileInputRef.current?.click();
+  };
+
+  const handleChoosePdfFile = () => {
+    pdfFileInputRef.current?.click();
+  };
+
+  const handleChooseBulkFiles = () => {
+    bulkFileInputRef.current?.click();
+  };
+
+  // File selection handlers
+  const handleAudioFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setUploadFormData(prev => ({
+        ...prev,
+        audio: {
+          ...prev.audio,
+          file,
+          title: prev.audio.title || file.name.replace(/\.[^/.]+$/, ''),
+        },
+      }));
+      toast.success('Audio file selected');
+    }
+    // Reset input value to allow selecting the same file again
+    if (event.target) {
+      event.target.value = '';
+    }
+  };
+
+  const handleVideoFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setUploadFormData(prev => ({
+        ...prev,
+        video: {
+          ...prev.video,
+          file,
+          title: prev.video.title || file.name.replace(/\.[^/.]+$/, ''),
+        },
+      }));
+      toast.success('Video file selected');
+    }
+    // Reset input value to allow selecting the same file again
+    if (event.target) {
+      event.target.value = '';
+    }
+  };
+
+  const handlePdfFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setUploadFormData(prev => ({
+        ...prev,
+        pdf: {
+          ...prev.pdf,
+          file,
+          title: prev.pdf.title || file.name.replace(/\.[^/.]+$/, ''),
+        },
+      }));
+      toast.success('PDF file selected');
+    }
+    // Reset input value to allow selecting the same file again
+    if (event.target) {
+      event.target.value = '';
+    }
+  };
+
+  const handleBulkFilesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length > 0) {
+      setUploadFormData(prev => ({
+        ...prev,
+        bulk: { files },
+      }));
+      toast.success(`${files.length} file${files.length > 1 ? 's' : ''} selected`);
+    }
+    // Reset input value to allow selecting the same files again
+    if (event.target) {
+      event.target.value = '';
+    }
+  };
+
+  // Upload handlers
+  const handleUploadAudio = async () => {
+    const { file, title, description, tags, duration } = uploadFormData.audio;
+    if (!file) {
+      toast.error('Please select an audio file');
+      return;
+    }
+    if (!title.trim()) {
+      toast.error('Please enter a title');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const tagsArray = tags.split(',').map(t => t.trim()).filter(t => t);
+      await createResourceWithFile(file, {
+        title: title.trim(),
+        description: description.trim(),
+        type: 'audio',
+        tags: tagsArray,
+        isPublic: true,
+      });
+
+      toast.success('Audio resource uploaded successfully');
+      
+      // Reset form
+      setUploadFormData(prev => ({
+        ...prev,
+        audio: { file: null, title: '', description: '', tags: '', duration: '' },
+      }));
+      
+      // Switch to view tab
+      setActiveTab('view');
+    } catch (error) {
+      console.error('Error uploading audio:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to upload audio');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleUploadVideo = async () => {
+    const { file, title, description, tags, duration } = uploadFormData.video;
+    if (!file) {
+      toast.error('Please select a video file');
+      return;
+    }
+    if (!title.trim()) {
+      toast.error('Please enter a title');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const tagsArray = tags.split(',').map(t => t.trim()).filter(t => t);
+      await createResourceWithFile(file, {
+        title: title.trim(),
+        description: description.trim(),
+        type: 'video',
+        tags: tagsArray,
+        isPublic: true,
+      });
+
+      toast.success('Video resource uploaded successfully');
+      
+      // Reset form
+      setUploadFormData(prev => ({
+        ...prev,
+        video: { file: null, title: '', description: '', tags: '', duration: '' },
+      }));
+      
+      // Switch to view tab
+      setActiveTab('view');
+    } catch (error) {
+      console.error('Error uploading video:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to upload video');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleUploadPdf = async () => {
+    const { file, title, description, tags } = uploadFormData.pdf;
+    if (!file) {
+      toast.error('Please select a PDF file');
+      return;
+    }
+    if (!title.trim()) {
+      toast.error('Please enter a title');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const tagsArray = tags.split(',').map(t => t.trim()).filter(t => t);
+      await createResourceWithFile(file, {
+        title: title.trim(),
+        description: description.trim(),
+        type: 'pdf',
+        tags: tagsArray,
+        isPublic: true,
+      });
+
+      toast.success('PDF resource uploaded successfully');
+      
+      // Reset form
+      setUploadFormData(prev => ({
+        ...prev,
+        pdf: { file: null, title: '', description: '', tags: '' },
+      }));
+      
+      // Switch to view tab
+      setActiveTab('view');
+    } catch (error) {
+      console.error('Error uploading PDF:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to upload PDF');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   if (resourcesError && !resourcesLoading) {
@@ -1030,6 +1258,15 @@ export default function CounselorResourcesPage() {
 
         <TabsContent value="upload-audio" className="mt-6">
           <div className="space-y-6">
+            {/* Hidden file input */}
+            <input
+              ref={audioFileInputRef}
+              type="file"
+              accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac"
+              onChange={handleAudioFileChange}
+              className="hidden"
+            />
+
             {/* Header with Back Button */}
             <div className="flex items-center space-x-4">
               <Button 
@@ -1057,11 +1294,30 @@ export default function CounselorResourcesPage() {
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                   Supported formats: MP3, WAV, M4A, AAC. Maximum file size: 100MB
                 </p>
+                {uploadFormData.audio.file && (
+                  <div className="mb-4 p-3 bg-purple-50 dark:bg-purple-950 rounded-lg">
+                    <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                      Selected: {uploadFormData.audio.file.name}
+                    </p>
+                    <p className="text-xs text-purple-700 dark:text-purple-300">
+                      {(uploadFormData.audio.file.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  </div>
+                )}
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button onClick={handleUploadResource} className="bg-purple-600 hover:bg-purple-700">
+                  <Button onClick={handleChooseAudioFile} className="bg-purple-600 hover:bg-purple-700">
                     <Upload className="h-4 w-4 mr-2" />
-                    Choose Audio File
+                    {uploadFormData.audio.file ? 'Change Audio File' : 'Choose Audio File'}
                   </Button>
+                  {uploadFormData.audio.file && (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setUploadFormData(prev => ({ ...prev, audio: { ...prev.audio, file: null } }))}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Remove
+                    </Button>
+                  )}
                   <Button variant="outline">
                     <FileText className="h-4 w-4 mr-2" />
                     Upload Guidelines
@@ -1076,27 +1332,58 @@ export default function CounselorResourcesPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground mb-2 block">Title</label>
-                  <Input placeholder="Enter audio title..." />
+                  <Input 
+                    placeholder="Enter audio title..." 
+                    value={uploadFormData.audio.title}
+                    onChange={(e) => setUploadFormData(prev => ({ ...prev, audio: { ...prev.audio, title: e.target.value } }))}
+                  />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground mb-2 block">Duration</label>
-                  <Input placeholder="e.g., 15:30" />
+                  <Input 
+                    placeholder="e.g., 15:30" 
+                    value={uploadFormData.audio.duration}
+                    onChange={(e) => setUploadFormData(prev => ({ ...prev, audio: { ...prev.audio, duration: e.target.value } }))}
+                  />
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-sm font-medium text-muted-foreground mb-2 block">Description</label>
-                  <Textarea placeholder="Describe the audio content..." rows={3} />
+                  <Textarea 
+                    placeholder="Describe the audio content..." 
+                    rows={3}
+                    value={uploadFormData.audio.description}
+                    onChange={(e) => setUploadFormData(prev => ({ ...prev, audio: { ...prev.audio, description: e.target.value } }))}
+                  />
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-sm font-medium text-muted-foreground mb-2 block">Tags</label>
-                  <Input placeholder="Enter tags separated by commas..." />
+                  <Input 
+                    placeholder="Enter tags separated by commas..." 
+                    value={uploadFormData.audio.tags}
+                    onChange={(e) => setUploadFormData(prev => ({ ...prev, audio: { ...prev.audio, tags: e.target.value } }))}
+                  />
                 </div>
               </div>
               <div className="flex justify-end space-x-3 mt-6">
                 <Button variant="outline" onClick={() => setActiveTab('manage')}>
                   Cancel
                 </Button>
-                <Button className="bg-purple-600 hover:bg-purple-700">
-                  Upload & Save
+                <Button 
+                  className="bg-purple-600 hover:bg-purple-700"
+                  onClick={handleUploadAudio}
+                  disabled={isUploading || !uploadFormData.audio.file}
+                >
+                  {isUploading ? (
+                    <>
+                      <Spinner variant="bars" size={16} className="mr-2" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload & Save
+                    </>
+                  )}
                 </Button>
               </div>
             </AnimatedCard>
@@ -1105,6 +1392,15 @@ export default function CounselorResourcesPage() {
 
         <TabsContent value="upload-video" className="mt-6">
           <div className="space-y-6">
+            {/* Hidden file input */}
+            <input
+              ref={videoFileInputRef}
+              type="file"
+              accept="video/*,.mp4,.mov,.avi,.mkv,.webm,.flv"
+              onChange={handleVideoFileChange}
+              className="hidden"
+            />
+
             {/* Header with Back Button */}
             <div className="flex items-center space-x-4">
               <Button 
@@ -1132,11 +1428,30 @@ export default function CounselorResourcesPage() {
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                   Supported formats: MP4, MOV, AVI, MKV. Maximum file size: 500MB
                 </p>
+                {uploadFormData.video.file && (
+                  <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                      Selected: {uploadFormData.video.file.name}
+                    </p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      {(uploadFormData.video.file.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  </div>
+                )}
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button onClick={handleUploadResource} className="bg-blue-600 hover:bg-blue-700">
+                  <Button onClick={handleChooseVideoFile} className="bg-blue-600 hover:bg-blue-700">
                     <Upload className="h-4 w-4 mr-2" />
-                    Choose Video File
+                    {uploadFormData.video.file ? 'Change Video File' : 'Choose Video File'}
                   </Button>
+                  {uploadFormData.video.file && (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setUploadFormData(prev => ({ ...prev, video: { ...prev.video, file: null } }))}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Remove
+                    </Button>
+                  )}
                   <Button variant="outline">
                     <FileText className="h-4 w-4 mr-2" />
                     Upload Guidelines
@@ -1151,27 +1466,58 @@ export default function CounselorResourcesPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground mb-2 block">Title</label>
-                  <Input placeholder="Enter video title..." />
+                  <Input 
+                    placeholder="Enter video title..." 
+                    value={uploadFormData.video.title}
+                    onChange={(e) => setUploadFormData(prev => ({ ...prev, video: { ...prev.video, title: e.target.value } }))}
+                  />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground mb-2 block">Duration</label>
-                  <Input placeholder="e.g., 25:45" />
+                  <Input 
+                    placeholder="e.g., 25:45" 
+                    value={uploadFormData.video.duration}
+                    onChange={(e) => setUploadFormData(prev => ({ ...prev, video: { ...prev.video, duration: e.target.value } }))}
+                  />
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-sm font-medium text-muted-foreground mb-2 block">Description</label>
-                  <Textarea placeholder="Describe the video content..." rows={3} />
+                  <Textarea 
+                    placeholder="Describe the video content..." 
+                    rows={3}
+                    value={uploadFormData.video.description}
+                    onChange={(e) => setUploadFormData(prev => ({ ...prev, video: { ...prev.video, description: e.target.value } }))}
+                  />
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-sm font-medium text-muted-foreground mb-2 block">Tags</label>
-                  <Input placeholder="Enter tags separated by commas..." />
+                  <Input 
+                    placeholder="Enter tags separated by commas..." 
+                    value={uploadFormData.video.tags}
+                    onChange={(e) => setUploadFormData(prev => ({ ...prev, video: { ...prev.video, tags: e.target.value } }))}
+                  />
                 </div>
               </div>
               <div className="flex justify-end space-x-3 mt-6">
                 <Button variant="outline" onClick={() => setActiveTab('manage')}>
                   Cancel
                 </Button>
-                <Button className="bg-blue-600 hover:bg-blue-700">
-                  Upload & Save
+                <Button 
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={handleUploadVideo}
+                  disabled={isUploading || !uploadFormData.video.file}
+                >
+                  {isUploading ? (
+                    <>
+                      <Spinner variant="bars" size={16} className="mr-2" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload & Save
+                    </>
+                  )}
                 </Button>
               </div>
             </AnimatedCard>
@@ -1180,6 +1526,15 @@ export default function CounselorResourcesPage() {
 
         <TabsContent value="upload-pdf" className="mt-6">
           <div className="space-y-6">
+            {/* Hidden file input */}
+            <input
+              ref={pdfFileInputRef}
+              type="file"
+              accept=".pdf,application/pdf"
+              onChange={handlePdfFileChange}
+              className="hidden"
+            />
+
             {/* Header with Back Button */}
             <div className="flex items-center space-x-4">
               <Button 
@@ -1207,11 +1562,30 @@ export default function CounselorResourcesPage() {
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                   Supported formats: PDF. Maximum file size: 50MB
                 </p>
+                {uploadFormData.pdf.file && (
+                  <div className="mb-4 p-3 bg-red-50 dark:bg-red-950 rounded-lg">
+                    <p className="text-sm font-medium text-red-900 dark:text-red-100">
+                      Selected: {uploadFormData.pdf.file.name}
+                    </p>
+                    <p className="text-xs text-red-700 dark:text-red-300">
+                      {(uploadFormData.pdf.file.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  </div>
+                )}
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button onClick={handleUploadResource} className="bg-red-600 hover:bg-red-700">
+                  <Button onClick={handleChoosePdfFile} className="bg-red-600 hover:bg-red-700">
                     <Upload className="h-4 w-4 mr-2" />
-                    Choose PDF File
+                    {uploadFormData.pdf.file ? 'Change PDF File' : 'Choose PDF File'}
                   </Button>
+                  {uploadFormData.pdf.file && (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setUploadFormData(prev => ({ ...prev, pdf: { ...prev.pdf, file: null } }))}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Remove
+                    </Button>
+                  )}
                   <Button variant="outline">
                     <FileText className="h-4 w-4 mr-2" />
                     Upload Guidelines
@@ -1226,23 +1600,50 @@ export default function CounselorResourcesPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <label className="text-sm font-medium text-muted-foreground mb-2 block">Title</label>
-                  <Input placeholder="Enter document title..." />
+                  <Input 
+                    placeholder="Enter document title..." 
+                    value={uploadFormData.pdf.title}
+                    onChange={(e) => setUploadFormData(prev => ({ ...prev, pdf: { ...prev.pdf, title: e.target.value } }))}
+                  />
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-sm font-medium text-muted-foreground mb-2 block">Description</label>
-                  <Textarea placeholder="Describe the document content..." rows={3} />
+                  <Textarea 
+                    placeholder="Describe the document content..." 
+                    rows={3}
+                    value={uploadFormData.pdf.description}
+                    onChange={(e) => setUploadFormData(prev => ({ ...prev, pdf: { ...prev.pdf, description: e.target.value } }))}
+                  />
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-sm font-medium text-muted-foreground mb-2 block">Tags</label>
-                  <Input placeholder="Enter tags separated by commas..." />
+                  <Input 
+                    placeholder="Enter tags separated by commas..." 
+                    value={uploadFormData.pdf.tags}
+                    onChange={(e) => setUploadFormData(prev => ({ ...prev, pdf: { ...prev.pdf, tags: e.target.value } }))}
+                  />
                 </div>
               </div>
               <div className="flex justify-end space-x-3 mt-6">
                 <Button variant="outline" onClick={() => setActiveTab('manage')}>
                   Cancel
                 </Button>
-                <Button className="bg-red-600 hover:bg-red-700">
-                  Upload & Save
+                <Button 
+                  className="bg-red-600 hover:bg-red-700"
+                  onClick={handleUploadPdf}
+                  disabled={isUploading || !uploadFormData.pdf.file}
+                >
+                  {isUploading ? (
+                    <>
+                      <Spinner variant="bars" size={16} className="mr-2" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload & Save
+                    </>
+                  )}
                 </Button>
               </div>
             </AnimatedCard>
@@ -1421,6 +1822,16 @@ export default function CounselorResourcesPage() {
 
         <TabsContent value="bulk-upload" className="mt-6">
           <div className="space-y-6">
+            {/* Hidden file input */}
+            <input
+              ref={bulkFileInputRef}
+              type="file"
+              accept="audio/*,video/*,.pdf,.mp3,.wav,.m4a,.aac,.mp4,.mov,.avi,.mkv"
+              onChange={handleBulkFilesChange}
+              multiple
+              className="hidden"
+            />
+
             {/* Header with Back Button */}
             <div className="flex items-center space-x-4">
               <Button 
@@ -1447,11 +1858,34 @@ export default function CounselorResourcesPage() {
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                   Drag and drop multiple files or click to browse. Files will be automatically categorized.
                 </p>
+                {uploadFormData.bulk.files.length > 0 && (
+                  <div className="mb-4 p-3 bg-indigo-50 dark:bg-indigo-950 rounded-lg max-h-48 overflow-y-auto">
+                    <p className="text-sm font-medium text-indigo-900 dark:text-indigo-100 mb-2">
+                      {uploadFormData.bulk.files.length} file{uploadFormData.bulk.files.length > 1 ? 's' : ''} selected:
+                    </p>
+                    <ul className="text-xs text-indigo-700 dark:text-indigo-300 space-y-1 text-left">
+                      {uploadFormData.bulk.files.map((file, index) => (
+                        <li key={index} className="truncate">
+                          {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button onClick={handleUploadResource} className="bg-indigo-600 hover:bg-indigo-700">
+                  <Button onClick={handleChooseBulkFiles} className="bg-indigo-600 hover:bg-indigo-700">
                     <Upload className="h-4 w-4 mr-2" />
-                    Choose Multiple Files
+                    {uploadFormData.bulk.files.length > 0 ? 'Change Files' : 'Choose Multiple Files'}
                   </Button>
+                  {uploadFormData.bulk.files.length > 0 && (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setUploadFormData(prev => ({ ...prev, bulk: { files: [] } }))}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Clear All
+                    </Button>
+                  )}
                   <Button variant="outline">
                     <FileText className="h-4 w-4 mr-2" />
                     Upload Guidelines
@@ -1778,9 +2212,9 @@ Remember to:
       )}
 
       {/* Resource Edit Modal */}
-      {isEditOpen && (
+      {editingResource && (
         <ResourceEditModal
-          resource={editingResource ? convertToUIResource(editingResource) : null}
+          resource={convertToUIResource(editingResource)}
           isOpen={isEditOpen}
           onClose={handleCloseEditModal}
           onSave={handleSaveResource}

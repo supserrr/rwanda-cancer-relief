@@ -234,11 +234,12 @@ export class ResourcesApi {
       }
     };
 
-    // Generate file path - use folder structure like avatars bucket
+    // Generate file path - use root level (folder structure was causing 400 errors)
+    // The RLS policies will check file name prefix for ownership
     const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-    // Use folder structure: resources/userId/filename to match RLS policies
-    // This ensures files are organized and policies can check ownership
-    const filePath = `${user.id}/${fileName}`;
+    // Use root level: just filename with user ID prefix
+    // This matches the pattern that worked successfully (MP3 upload succeeded)
+    const filePath = fileName;
 
     try {
       // Upload file to Supabase Storage
@@ -253,17 +254,42 @@ export class ResourcesApi {
         });
 
       if (uploadError) {
+        // Log the raw error object to see what Supabase is actually returning
+        console.error('Supabase storage upload error - RAW:', uploadError);
+        console.error('Upload error type:', typeof uploadError);
+        console.error('Upload error keys:', Object.keys(uploadError));
+        
         const errorMessage = uploadError.message || 'Unknown error';
         const errorObj = uploadError as any;
+        
+        // Try to extract error details from various possible formats
+        let statusCode: number | string | undefined;
+        let status: number | undefined;
+        let statusText: string | undefined;
+        let errorBody: any;
+        
+        // Check various error object structures
+        if (errorObj?.statusCode) {
+          statusCode = errorObj.statusCode;
+        } else if (errorObj?.status) {
+          status = errorObj.status;
+          statusCode = status;
+        } else if (errorObj?.response?.status) {
+          status = errorObj.response.status;
+          statusCode = status;
+          statusText = errorObj.response.statusText;
+          errorBody = errorObj.response.data || errorObj.response.body;
+        }
         
         // Log detailed error information
         const errorDetails = {
           message: errorMessage,
           error: uploadError,
           errorObj: errorObj,
-          statusCode: errorObj?.statusCode,
-          status: errorObj?.status,
-          statusText: errorObj?.statusText,
+          statusCode,
+          status,
+          statusText,
+          errorBody,
           filePath,
           fileSize: file.size,
           fileType: file.type,
@@ -272,32 +298,37 @@ export class ResourcesApi {
           bucket: 'resources',
           userId: user.id,
           fileName: file.name,
+          uploadData: uploadData, // Log upload data if it exists
         };
         
-        console.error('Supabase storage upload error:', errorDetails);
+        console.error('Supabase storage upload error - DETAILED:', errorDetails);
         
-        // Parse error to get more details
+        // Try to get more detailed error message
         let detailedError = errorMessage;
-        if (errorObj) {
-          try {
-            // Try to extract error details from the error object
-            if (errorObj.error) {
-              detailedError = typeof errorObj.error === 'string' ? errorObj.error : JSON.stringify(errorObj.error);
-            } else if (errorObj.message) {
-              detailedError = errorObj.message;
-            } else if (errorObj.statusText) {
-              detailedError = errorObj.statusText;
-            }
-          } catch (e) {
-            // Ignore parsing errors
+        if (errorBody) {
+          if (typeof errorBody === 'string') {
+            detailedError = errorBody;
+          } else if (errorBody.message) {
+            detailedError = errorBody.message;
+          } else if (errorBody.error) {
+            detailedError = errorBody.error;
+          } else {
+            detailedError = JSON.stringify(errorBody);
           }
+        } else if (errorObj?.error) {
+          detailedError = typeof errorObj.error === 'string' ? errorObj.error : JSON.stringify(errorObj.error);
+        } else if (errorObj?.message) {
+          detailedError = errorObj.message;
+        } else if (statusText) {
+          detailedError = statusText;
         }
         
-        // Check if it's a 400 error with more specific details
+        // Check if it's a 400 error
         const is400Error = errorMessage.includes('400') || 
                           errorMessage.includes('Bad Request') || 
-                          errorObj?.statusCode === '400' || 
-                          errorObj?.status === 400 ||
+                          statusCode === '400' || 
+                          statusCode === 400 ||
+                          status === 400 ||
                           detailedError.includes('400');
         
         if (is400Error) {
@@ -306,38 +337,71 @@ export class ResourcesApi {
             `File: ${file.name}, ` +
             `Size: ${(file.size / 1024 / 1024).toFixed(2)}MB, ` +
             `Type: ${file.type || 'unknown'}, ` +
-            `Extension: ${fileExt}. ` +
+            `Extension: ${fileExt}, ` +
+            `Path: ${filePath}. ` +
             `Error: ${detailedError}. ` +
-            `Please check: (1) File format is supported, (2) File size is under 500MB, (3) The resources bucket is configured correctly.`
+            `Please check the browser console for full error details.`
           );
-        } else if (errorMessage.includes('403') || errorMessage.includes('Forbidden') || errorMessage.includes('Permission denied') || errorObj?.statusCode === '403' || errorObj?.status === 403) {
+        } else if (errorMessage.includes('403') || errorMessage.includes('Forbidden') || errorMessage.includes('Permission denied') || statusCode === '403' || statusCode === 403 || status === 403) {
           throw new Error(
             `Permission denied (403). Please check if you have permission to upload files to the resources bucket. Error: ${detailedError}`
           );
-        } else if (errorMessage.includes('413') || errorMessage.includes('Payload Too Large') || errorMessage.includes('file too large') || errorObj?.statusCode === '413' || errorObj?.status === 413) {
+        } else if (errorMessage.includes('413') || errorMessage.includes('Payload Too Large') || errorMessage.includes('file too large') || statusCode === '413' || statusCode === 413 || status === 413) {
           throw new Error(
             `File too large (413). Maximum file size is 500MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB.`
           );
-        } else if (errorMessage.includes('Bucket not found') || errorMessage.includes('bucket') || errorMessage.includes('404') || errorObj?.status === 404) {
+        } else if (errorMessage.includes('Bucket not found') || errorMessage.includes('bucket') || errorMessage.includes('404') || status === 404 || statusCode === 404) {
           throw new Error(
             `Storage bucket 'resources' not found (404). Please check if the bucket exists in Supabase Storage. Error: ${detailedError}`
           );
         } else {
           throw new Error(
-            `Failed to upload file. Error: ${detailedError}. Status: ${errorObj?.statusCode || errorObj?.status || 'unknown'}. File: ${file.name}. Please check the browser console for more details.`
+            `Failed to upload file. Error: ${detailedError}. Status: ${statusCode || status || 'unknown'}. File: ${file.name}. Path: ${filePath}. Please check the browser console for more details.`
           );
         }
       }
 
-      // Get public URL
+      // Log successful upload
+      console.log('File uploaded successfully:', {
+        filePath,
+        uploadData,
+        userId: user.id,
+      });
+
+      // Get public URL - this doesn't actually fetch the file, just constructs the URL
       const { data: { publicUrl } } = supabase.storage
         .from('resources')
         .getPublicUrl(filePath);
 
+      console.log('Public URL generated:', publicUrl);
+
       if (!publicUrl) {
         // Clean up uploaded file if URL generation fails
-        await supabase.storage.from('resources').remove([filePath]).catch(() => undefined);
+        console.error('Failed to generate public URL, cleaning up file:', filePath);
+        await supabase.storage.from('resources').remove([filePath]).catch((err) => {
+          console.error('Failed to clean up file:', err);
+        });
         throw new Error('Failed to generate public URL for uploaded file');
+      }
+      
+      // Verify the file exists by checking metadata (optional, but helps debug)
+      // List files at root level with user ID prefix
+      const { data: fileMetadata, error: metadataError } = await supabase.storage
+        .from('resources')
+        .list('', {
+          limit: 100,
+          search: user.id,
+        });
+      
+      if (metadataError) {
+        console.warn('Could not verify file existence:', metadataError);
+      } else {
+        const uploadedFile = fileMetadata?.find(f => f.name === fileName);
+        if (uploadedFile) {
+          console.log('File verified in storage:', uploadedFile);
+        } else {
+          console.warn('File not found in listing:', fileName);
+        }
       }
 
       // Create resource with file URL

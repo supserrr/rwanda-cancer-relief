@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dialog,
@@ -69,6 +69,8 @@ export function ResourceEditModal({
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const thumbnailInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (resource) {
@@ -122,11 +124,9 @@ export function ResourceEditModal({
   };
 
   const handleSave = async () => {
-    if (!resource) return;
-    
     setIsLoading(true);
     try {
-      const updatedResource: Resource = {
+      const resourceToSave: Resource = resource ? {
         ...resource,
         title: formData.title,
         description: formData.description,
@@ -139,12 +139,27 @@ export function ResourceEditModal({
         isPublic: formData.isPublic,
         isYouTube: formData.isYouTube,
         youtubeUrl: formData.youtubeUrl,
-        content: formData.content, // Added for article content
-        createdAt: formData.createdAt // Added for creation date
+        content: formData.content,
+        createdAt: formData.createdAt
+      } : {
+        id: `temp-${Date.now()}`,
+        title: formData.title,
+        description: formData.description,
+        type: formData.type,
+        url: formData.isYouTube ? formData.youtubeUrl : formData.url,
+        thumbnail: formData.thumbnail || '',
+        duration: formData.duration ? parseInt(formData.duration) : undefined,
+        tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
+        createdAt: formData.createdAt,
+        isPublic: formData.isPublic,
+        publisher: formData.publisher,
+        isYouTube: formData.isYouTube,
+        youtubeUrl: formData.youtubeUrl,
+        content: formData.content
       };
       
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      onSave(updatedResource);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      onSave(resourceToSave);
       onClose();
     } catch (error) {
       console.error('Error saving resource:', error);
@@ -162,7 +177,7 @@ export function ResourceEditModal({
     
     setIsDeleting(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
       onDelete(resource.id);
       onClose();
     } catch (error) {
@@ -190,18 +205,18 @@ export function ResourceEditModal({
     }
   };
 
-  if (!resource) return null;
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent wide className="max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {getTypeIcon(formData.type)}
-            Edit Resource
+            {resource ? 'Edit Resource' : 'Create New Resource'}
           </DialogTitle>
           <DialogDescription>
-            <span className="text-muted-foreground text-sm">Update resource details and preview changes.</span>
+            <span className="text-muted-foreground text-sm">
+              {resource ? 'Update resource details and preview changes.' : 'Fill in the details below to create a new resource.'}
+            </span>
           </DialogDescription>
         </DialogHeader>
 
@@ -329,17 +344,23 @@ export function ResourceEditModal({
                 placeholder="https://example.com/thumbnail.jpg"
                 className="flex-1"
               />
-              <div className="relative">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleThumbnailUpload}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                <Button variant="outline" size="sm">
-                  <Upload className="h-4 w-4" />
-                </Button>
-              </div>
+              <input
+                ref={thumbnailInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleThumbnailUpload}
+                className="hidden"
+                id="thumbnail-upload"
+              />
+              <Button 
+                type="button"
+                variant="outline" 
+                size="sm"
+                onClick={() => thumbnailInputRef.current?.click()}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload
+              </Button>
             </div>
             {formData.thumbnail && (
               <div className="mt-2">
@@ -347,6 +368,10 @@ export function ResourceEditModal({
                   src={formData.thumbnail} 
                   alt="Thumbnail preview" 
                   className="w-20 h-20 object-cover rounded-lg border"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    target.style.display = 'none';
+                  }}
                 />
               </div>
             )}
@@ -377,21 +402,35 @@ export function ResourceEditModal({
           {/* File Upload */}
           {formData.type !== 'article' && !formData.isYouTube && (
             <div>
-              <Label>Upload Resource File</Label>
-              <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center">
+              <Label htmlFor="resource-file-upload">Upload Resource File</Label>
+              <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
                 <input
+                  ref={fileInputRef}
                   type="file"
+                  id="resource-file-upload"
                   accept={formData.type === 'audio' ? 'audio/*' : formData.type === 'video' ? 'video/*' : formData.type === 'pdf' ? '.pdf' : '*'}
                   onChange={handleFileUpload}
                   className="hidden"
-                  id="file-upload"
                 />
-                <label htmlFor="file-upload" className="cursor-pointer">
-                  <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">
+                <div 
+                  className="flex flex-col items-center justify-center min-h-[120px] cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-10 w-10 text-muted-foreground mb-3" />
+                  <p className="text-sm font-medium text-foreground mb-1">
                     Click to upload {formData.type} file
                   </p>
-                </label>
+                  <p className="text-xs text-muted-foreground">
+                    or drag and drop your file here
+                  </p>
+                </div>
+                {formData.url && (
+                  <div className="mt-4 p-2 bg-primary/5 rounded-md">
+                    <p className="text-xs text-muted-foreground">
+                      File selected: {formData.url.includes('blob:') ? 'Local file' : formData.url.substring(formData.url.lastIndexOf('/') + 1)}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -524,23 +563,27 @@ export function ResourceEditModal({
 
           {/* Actions */}
           <div className="flex items-center justify-between pt-4 border-t">
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                <>
-                  <X className="h-4 w-4 mr-2" />
-                  Delete Resource
-                </>
-              )}
-            </Button>
+            {resource ? (
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <X className="h-4 w-4 mr-2" />
+                    Delete Resource
+                  </>
+                )}
+              </Button>
+            ) : (
+              <div />
+            )}
             
             <div className="flex items-center gap-2">
               <Button variant="outline" onClick={onClose}>
@@ -550,12 +593,12 @@ export function ResourceEditModal({
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
+                    {resource ? 'Saving...' : 'Creating...'}
                   </>
                 ) : (
                   <>
                     <Save className="h-4 w-4 mr-2" />
-                    Save Changes
+                    {resource ? 'Save Changes' : 'Create Resource'}
                   </>
                 )}
               </Button>

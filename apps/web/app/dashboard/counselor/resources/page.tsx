@@ -1778,9 +1778,9 @@ Remember to:
       )}
 
       {/* Resource Edit Modal */}
-      {editingResource && (
+      {isEditOpen && (
         <ResourceEditModal
-          resource={convertToUIResource(editingResource)}
+          resource={editingResource ? convertToUIResource(editingResource) : null}
           isOpen={isEditOpen}
           onClose={handleCloseEditModal}
           onSave={handleSaveResource}

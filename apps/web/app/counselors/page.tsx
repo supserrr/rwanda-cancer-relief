@@ -89,7 +89,7 @@ const mergeStringArrays = (...values: unknown[]): string[] | undefined => {
         const normalized = item.trim();
         if (normalized.length > 0) {
           merged.add(normalized);
-        }
+  }
       });
     }
   });
@@ -158,7 +158,7 @@ const findStringByKeys = (
     const nested = findStringByKeys(rawValue, keys, visited);
     if (nested) {
       return nested;
-    }
+  }
   }
 
   return undefined;

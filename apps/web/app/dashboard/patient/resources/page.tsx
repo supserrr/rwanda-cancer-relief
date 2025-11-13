@@ -19,6 +19,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@workspace/ui/components/tabs';
 import { Search, Filter, Play, FileText, Video, BookOpen, Download, SortAsc, SortDesc, Grid3X3, List, RefreshCw } from 'lucide-react';
 import { useResources } from '../../../../hooks/useResources';
+import { useResourceViewer } from '../../../../hooks/useResourceViewer';
 import { ResourcesApi, type Resource } from '../../../../lib/api/resources';
 import { toast } from 'sonner';
 import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
@@ -26,10 +27,19 @@ import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
 export default function PatientResourcesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('all');
-  const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
-  const [isViewerOpen, setIsViewerOpen] = useState(false);
-  const [isArticleViewerOpen, setIsArticleViewerOpen] = useState(false);
-  const [viewingArticle, setViewingArticle] = useState<Resource | null>(null);
+  // Use shared resource viewer hook for consistent behavior
+  const {
+    selectedResource,
+    viewingArticle,
+    isViewerOpen,
+    isArticleViewerOpen,
+    handleViewResource,
+    handleCloseViewer,
+    handleCloseArticleViewer,
+    setViewingArticle,
+    setIsArticleViewerOpen,
+    setIsViewerOpen,
+  } = useResourceViewer(true); // Patients track views
   const [activeTab, setActiveTab] = useState('all');
   const [savedResources, setSavedResources] = useState<string[]>([]); // Track saved resource IDs
   const [sortBy, setSortBy] = useState<'title' | 'created_at' | 'views' | 'downloads'>('created_at');
@@ -100,16 +110,7 @@ export default function PatientResourcesPage() {
     return resources.filter(resource => savedResources.includes(resource.id));
   };
 
-
-  const handleCloseArticleViewer = () => {
-    setIsArticleViewerOpen(false);
-    setViewingArticle(null);
-  };
-
-  const handleCloseViewer = () => {
-    setIsViewerOpen(false);
-    setSelectedResource(null);
-  };
+  // Resource viewing is now handled by useResourceViewer hook
 
   const handleDownloadResource = async (resource: Resource) => {
     try {
@@ -157,22 +158,7 @@ export default function PatientResourcesPage() {
     );
   };
 
-  const handleViewResource = async (resource: Resource) => {
-    // Track view
-    try {
-      await ResourcesApi.trackView(resource.id);
-    } catch (error) {
-      console.error('Error tracking view:', error);
-    }
-
-    if (resource.type === 'article') {
-      setViewingArticle(resource);
-      setIsArticleViewerOpen(true);
-    } else {
-      setSelectedResource(resource);
-      setIsViewerOpen(true);
-    }
-  };
+  // Resource viewing is now handled by useResourceViewer hook
 
   const handleRefresh = async () => {
     await refreshResources();

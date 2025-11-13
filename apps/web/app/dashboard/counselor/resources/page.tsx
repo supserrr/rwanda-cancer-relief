@@ -69,6 +69,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../../components/auth/AuthProvider';
 import { useResources } from '../../../../hooks/useResources';
+import { useResourceViewer } from '../../../../hooks/useResourceViewer';
 import { ResourcesApi, type Resource } from '../../../../lib/api/resources';
 import { toast } from 'sonner';
 import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
@@ -77,13 +78,24 @@ export default function CounselorResourcesPage() {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('all');
-  const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
-  const [isViewerOpen, setIsViewerOpen] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [resourceToDelete, setResourceToDelete] = useState<string | null>(null);
   const [isArticleEditorOpen, setIsArticleEditorOpen] = useState(false);
-  const [isArticleViewerOpen, setIsArticleViewerOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   const [editingArticle, setEditingArticle] = useState<Resource | null>(null);
-  const [viewingArticle, setViewingArticle] = useState<Resource | null>(null);
+  
+  // Use shared resource viewer hook for consistent behavior
+  const {
+    selectedResource,
+    viewingArticle,
+    isViewerOpen,
+    isArticleViewerOpen,
+    handleViewResource,
+    handleCloseViewer,
+    handleCloseArticleViewer,
+    setViewingArticle,
+    setIsArticleViewerOpen,
+  } = useResourceViewer(true);
   const [activeTab, setActiveTab] = useState('view');
   const [savedResources, setSavedResources] = useState<string[]>([]);
   
@@ -136,6 +148,10 @@ export default function CounselorResourcesPage() {
   // Embed dialog state
   const [showEmbedDialog, setShowEmbedDialog] = useState(false);
   const [embedUrl, setEmbedUrl] = useState('');
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [showDeleteDraftDialog, setShowDeleteDraftDialog] = useState(false);
+  const [draftToDelete, setDraftToDelete] = useState<string | null>(null);
 
   // Article editor form state
   const [articleFormData, setArticleFormData] = useState({
@@ -568,32 +584,7 @@ export default function CounselorResourcesPage() {
     }
   };
 
-  const handleViewResource = async (resource: Resource) => {
-    // Track view
-    try {
-      await ResourcesApi.trackView(resource.id);
-    } catch (error) {
-      console.error('Error tracking view:', error);
-    }
-
-    if (resource.type === 'article') {
-      setViewingArticle(resource);
-      setIsArticleViewerOpen(true);
-    } else {
-      setSelectedResource(resource);
-      setIsViewerOpen(true);
-    }
-  };
-
-  const handleCloseViewer = () => {
-    setIsViewerOpen(false);
-    setSelectedResource(null);
-  };
-
-  const handleCloseArticleViewer = () => {
-    setIsArticleViewerOpen(false);
-    setViewingArticle(null);
-  };
+  // Resource viewing is now handled by useResourceViewer hook
 
   const handleDownloadResource = async (resource: Resource) => {
     try {
@@ -800,39 +791,25 @@ export default function CounselorResourcesPage() {
     }
   };
 
-  const handleDeleteResource = async (resourceId: string) => {
-    if (!confirm('Are you sure you want to delete this resource? This action cannot be undone.')) {
-      return;
-    }
+  const handleDeleteResource = (resourceId: string) => {
+    setResourceToDelete(resourceId);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeleteResource = async () => {
+    if (!resourceToDelete) return;
 
     try {
-      await deleteResource(resourceId);
+      await deleteResource(resourceToDelete);
       toast.success('Resource deleted successfully');
+      setShowDeleteDialog(false);
+      setResourceToDelete(null);
     } catch (error) {
       console.error('Error deleting resource:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to delete resource');
     }
   };
 
-  const handlePublishResource = async (resourceId: string) => {
-    try {
-      await updateResource(resourceId, { isPublic: true });
-      toast.success('Resource published successfully');
-    } catch (error) {
-      console.error('Error publishing resource:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to publish resource');
-    }
-  };
-
-  const handleUnpublishResource = async (resourceId: string) => {
-    try {
-      await updateResource(resourceId, { isPublic: false });
-      toast.success('Resource unpublished successfully');
-    } catch (error) {
-      console.error('Error unpublishing resource:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to unpublish resource');
-    }
-  };
 
 
   const handleCloseArticleEditor = () => {
@@ -1026,20 +1003,34 @@ export default function CounselorResourcesPage() {
 
   const handleInsertLink = () => {
     if (!articleContentRef.current) return;
+    setLinkUrl('');
+    setShowLinkDialog(true);
+  };
+
+  const handleConfirmLink = () => {
+    if (!linkUrl.trim() || !articleContentRef.current) return;
+    
+    try {
+      new URL(linkUrl.trim()); // Validate URL
+    } catch {
+      toast.error('Please enter a valid URL');
+      return;
+    }
     
     articleContentRef.current.focus();
     
     setTimeout(() => {
       if (articleContentRef.current) {
-        const url = prompt('Enter URL:');
-        if (url) {
-          const success = document.execCommand('createLink', false, url);
-          console.log('Link command executed:', success);
-          
-          const content = articleContentRef.current.innerHTML;
-          setArticleFormData(prev => ({ ...prev, content }));
-          articleContentRef.current.focus();
-        }
+        const success = document.execCommand('createLink', false, linkUrl.trim());
+        console.log('Link command executed:', success);
+        
+        const content = articleContentRef.current.innerHTML;
+        setArticleFormData(prev => ({ ...prev, content }));
+        articleContentRef.current.focus();
+        
+        setShowLinkDialog(false);
+        setLinkUrl('');
+        toast.success('Link inserted successfully');
       }
     }, 10);
   };
@@ -1648,124 +1639,6 @@ export default function CounselorResourcesPage() {
     }
   };
 
-  const handlePublishArticle = async () => {
-    if (!articleFormData.title.trim()) {
-      toast.error('Please enter an article title');
-      return;
-    }
-
-    // Get the latest content directly from the contentEditable div
-    const currentContent = articleContentRef.current?.innerHTML || articleFormData.content || '';
-    
-    // Ensure content is not just empty tags
-    const cleanedContent = currentContent.trim() === '<br>' || currentContent.trim() === '' ? '' : currentContent;
-    
-    // Debug: Log if embed content is present
-    if (cleanedContent.includes('iframe')) {
-      console.log('Publishing article with iframe embed');
-      console.log('Iframe count:', (cleanedContent.match(/<iframe/g) || []).length);
-    }
-    
-    if (!cleanedContent.trim()) {
-      toast.error('Please add article content');
-      return;
-    }
-
-    try {
-      const tags = articleFormData.tags
-        .split(',')
-        .map(tag => tag.trim())
-        .filter(tag => tag.length > 0);
-
-      // Upload cover image if a new file was selected
-      let thumbnailUrl: string | undefined = undefined;
-      if (coverImage.file) {
-        const { createClient } = await import('@/lib/supabase/client');
-        const supabase = createClient();
-        if (!supabase) {
-          throw new Error('Supabase is not configured');
-        }
-
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          throw new Error('User not authenticated');
-        }
-
-        const fileExt = coverImage.file.name.split('.').pop()?.toLowerCase() || 'jpg';
-        const fileName = `${user.id}-cover-${Date.now()}.${fileExt}`;
-        const filePath = fileName;
-
-        const { error: uploadError } = await supabase.storage
-          .from('resources')
-          .upload(filePath, coverImage.file, {
-            cacheControl: '3600',
-            upsert: false,
-          });
-
-        if (uploadError) {
-          throw new Error(`Failed to upload cover image: ${uploadError.message}`);
-        }
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('resources')
-          .getPublicUrl(filePath);
-        
-        thumbnailUrl = publicUrl;
-      } else if (coverImage.preview && coverImage.preview.startsWith('http')) {
-        // Use existing URL if it's already a URL (from loaded draft)
-        thumbnailUrl = coverImage.preview;
-      }
-
-      const resourceData = {
-        title: articleFormData.title,
-        description: articleFormData.excerpt || articleFormData.title,
-        type: 'article' as const,
-        content: cleanedContent,
-        category: articleFormData.category || undefined,
-        tags,
-        isPublic: true, // Published articles are public
-        thumbnail: thumbnailUrl,
-        readingTime: articleFormData.readingTime || undefined,
-        publisherName: articleFormData.author || user?.name || 'Unknown',
-      };
-      
-      console.log('Publishing article with content length:', cleanedContent.length);
-
-      // Update existing draft or create new one
-      if (editingDraftId) {
-        await updateResource(editingDraftId, resourceData);
-        toast.success('Article published successfully');
-      } else {
-        await createResource(resourceData);
-        toast.success('Article published successfully');
-      }
-      
-      // Reset form
-      setArticleFormData({
-        title: '',
-        excerpt: '',
-        content: '',
-        category: '',
-        readingTime: '',
-        author: '',
-        tags: '',
-      });
-      if (coverImage.preview && coverImage.preview.startsWith('blob:')) {
-        URL.revokeObjectURL(coverImage.preview);
-      }
-      setCoverImage({ file: null, preview: null });
-      setArticleSettings({
-        allowComments: true,
-        featuredArticle: false,
-        seoDescription: '',
-      });
-      setEditingDraftId(null);
-      setActiveTab('manage');
-    } catch (error) {
-      console.error('Error publishing article:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to publish article');
-    }
-  };
 
   const handleCoverImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -2171,42 +2044,109 @@ export default function CounselorResourcesPage() {
           if (response.ok) {
             const data = await response.json();
             
-            // Try to fetch duration from YouTube Data API if available
+            // Try to fetch additional metadata from YouTube Data API if available
             let duration = '';
+            let fullDescription = '';
+            let videoTags: string[] = [];
+            let publishedAt = '';
+            let channelTitle = '';
+            let viewCount = '';
             const youtubeApiKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
             if (youtubeApiKey) {
               try {
-                const apiUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=contentDetails&key=${youtubeApiKey}`;
+                // Fetch comprehensive video data: contentDetails, snippet, statistics
+                const apiUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=contentDetails,snippet,statistics&key=${youtubeApiKey}`;
                 const apiResponse = await fetch(apiUrl);
                 if (apiResponse.ok) {
                   const apiData = await apiResponse.json();
-                  if (apiData.items && apiData.items[0] && apiData.items[0].contentDetails) {
-                    const isoDuration = apiData.items[0].contentDetails.duration;
-                    // Convert ISO 8601 duration (PT4M13S) to MM:SS or HH:MM:SS format
-                    duration = convertISODurationToTime(isoDuration);
+                  if (apiData.items && apiData.items[0]) {
+                    const video = apiData.items[0];
+                    
+                    // Get duration
+                    if (video.contentDetails?.duration) {
+                      duration = convertISODurationToTime(video.contentDetails.duration);
+                    }
+                    
+                    // Get full description (more detailed than oEmbed)
+                    if (video.snippet?.description) {
+                      fullDescription = video.snippet.description;
+                      // Truncate if too long (keep first 500 chars)
+                      if (fullDescription.length > 500) {
+                        fullDescription = fullDescription.substring(0, 500) + '...';
+                      }
+                    }
+                    
+                    // Get video tags (can auto-populate tags field)
+                    if (video.snippet?.tags && Array.isArray(video.snippet.tags)) {
+                      videoTags = video.snippet.tags.slice(0, 10); // Limit to 10 tags
+                    }
+                    
+                    // Get published date
+                    if (video.snippet?.publishedAt) {
+                      const date = new Date(video.snippet.publishedAt);
+                      publishedAt = date.toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      });
+                    }
+                    
+                    // Get channel title (more reliable than oEmbed author_name)
+                    if (video.snippet?.channelTitle) {
+                      channelTitle = video.snippet.channelTitle;
+                    }
+                    
+                    // Get view count (for reference, could show in preview)
+                    if (video.statistics?.viewCount) {
+                      const views = parseInt(video.statistics.viewCount, 10);
+                      viewCount = views >= 1000000 
+                        ? `${(views / 1000000).toFixed(1)}M views`
+                        : views >= 1000
+                        ? `${(views / 1000).toFixed(1)}K views`
+                        : `${views} views`;
+                    }
                   }
                 }
               } catch (apiError) {
-                console.warn('Failed to fetch duration from YouTube API:', apiError);
-                // Continue without duration
+                console.warn('Failed to fetch additional data from YouTube API:', apiError);
+                // Continue with oEmbed data only
               }
             }
             
+            // Build description with available information
+            let descriptionParts: string[] = [];
+            if (channelTitle) {
+              descriptionParts.push(`By ${channelTitle}`);
+            } else if (data.author_name) {
+              descriptionParts.push(`By ${data.author_name}`);
+            }
+            if (publishedAt) {
+              descriptionParts.push(`Published: ${publishedAt}`);
+            }
+            if (viewCount) {
+              descriptionParts.push(viewCount);
+            }
+            
+            const previewDescription = descriptionParts.length > 0 
+              ? descriptionParts.join(' • ')
+              : (fullDescription || (data.author_name ? `By ${data.author_name}` : ''));
+            
             setLinkPreview({
               title: data.title,
-              description: data.author_name ? `By ${data.author_name}` : '',
+              description: previewDescription,
               thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
               loading: false,
             });
             
-            // Auto-fill form
+            // Auto-fill form with enhanced data
             setUploadFormData(prev => ({
               ...prev,
               externalLink: {
                 ...prev.externalLink,
                 title: data.title || '',
-                description: data.author_name ? `By ${data.author_name}` : '',
+                description: fullDescription || (channelTitle ? `By ${channelTitle}` : data.author_name ? `By ${data.author_name}` : ''),
                 duration: duration,
+                tags: videoTags.length > 0 ? videoTags.join(', ') : prev.externalLink.tags, // Only set if we have tags, otherwise keep existing
                 isYouTube: true,
               },
             }));
@@ -2219,26 +2159,94 @@ export default function CounselorResourcesPage() {
           throw new Error('Invalid YouTube URL');
         }
       } else {
-        // For other URLs, try to fetch basic metadata
-        // Use a proxy or fetch the page (CORS may be an issue)
-        // For now, just set basic info
-        setLinkPreview({
-          title: new URL(url).hostname,
-          description: '',
-          thumbnail: undefined,
-          loading: false,
-        });
-        
-        setUploadFormData(prev => ({
-          ...prev,
-          externalLink: {
-            ...prev.externalLink,
-            title: new URL(url).hostname,
-            isYouTube: false,
-          },
-        }));
-        
-        toast.success('Link ready. Please fill in the details manually.');
+        // For other URLs (articles, websites), try to fetch metadata using Open Graph and meta tags
+        try {
+          // Use a CORS proxy or server-side fetch would be better, but for now try direct fetch
+          // Note: This may fail due to CORS, but we'll try
+          const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+          const proxyResponse = await fetch(proxyUrl);
+          
+          if (proxyResponse.ok) {
+            const proxyData = await proxyResponse.json();
+            const htmlContent = proxyData.contents;
+            
+            // Parse HTML to extract metadata
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlContent, 'text/html');
+            
+            // Extract Open Graph and meta tags
+            const getMetaContent = (property: string, attribute: string = 'property') => {
+              const meta = doc.querySelector(`meta[${attribute}="${property}"]`);
+              return meta?.getAttribute('content') || '';
+            };
+            
+            const ogTitle = getMetaContent('og:title') || doc.querySelector('title')?.textContent || '';
+            const ogDescription = getMetaContent('og:description') || getMetaContent('description', 'name') || '';
+            const ogImage = getMetaContent('og:image') || '';
+            const ogSiteName = getMetaContent('og:site_name') || new URL(url).hostname;
+            const ogType = getMetaContent('og:type') || '';
+            const articleAuthor = getMetaContent('article:author', 'property') || getMetaContent('author', 'name') || '';
+            
+            // Determine if it's an article
+            const isArticle = ogType === 'article' || 
+                             url.includes('/article/') || 
+                             url.includes('/post/') || 
+                             url.includes('/blog/') ||
+                             url.includes('/news/');
+            
+            const articleTitle = ogTitle || new URL(url).hostname;
+            const articleDescription = ogDescription || '';
+            const articleThumbnail = ogImage || '';
+            const articlePublisher = articleAuthor || ogSiteName || new URL(url).hostname;
+            
+            setLinkPreview({
+              title: articleTitle,
+              description: articleDescription || `From ${articlePublisher}`,
+              thumbnail: articleThumbnail || undefined,
+              loading: false,
+            });
+            
+            setUploadFormData(prev => ({
+              ...prev,
+              externalLink: {
+                ...prev.externalLink,
+                title: articleTitle,
+                description: articleDescription,
+                isYouTube: false,
+              },
+            }));
+            
+            toast.success(isArticle ? 'Article metadata fetched successfully' : 'Link metadata fetched successfully');
+          } else {
+            throw new Error('Failed to fetch page metadata');
+          }
+        } catch (fetchError) {
+          console.warn('Failed to fetch article metadata:', fetchError);
+          // Fallback to basic info
+          const urlObj = new URL(url);
+          const isArticle = url.includes('/article/') || 
+                          url.includes('/post/') || 
+                          url.includes('/blog/') ||
+                          url.includes('/news/');
+          
+          setLinkPreview({
+            title: urlObj.hostname,
+            description: '',
+            thumbnail: undefined,
+            loading: false,
+          });
+          
+          setUploadFormData(prev => ({
+            ...prev,
+            externalLink: {
+              ...prev.externalLink,
+              title: urlObj.hostname,
+              isYouTube: false,
+            },
+          }));
+          
+          toast.success(isArticle ? 'Article link ready. Please fill in the details.' : 'Link ready. Please fill in the details manually.');
+        }
       }
     } catch (error) {
       console.error('Error fetching link info:', error);
@@ -2265,10 +2273,19 @@ export default function CounselorResourcesPage() {
     try {
       const tagsArray = tags.split(',').map(t => t.trim()).filter(Boolean);
 
+      // Determine if it's an article based on URL patterns or explicit selection
+      const isArticle = !isYouTube && (
+        url.includes('/article/') || 
+        url.includes('/post/') || 
+        url.includes('/blog/') ||
+        url.includes('/news/') ||
+        url.includes('/story/')
+      );
+      
       const resourceData: import('../../../../lib/api/resources').CreateResourceInput = {
         title: title.trim(),
         description: description.trim() || 'External link resource',
-        type: isYouTube ? 'video' : 'article', // Use video for YouTube, article for other links
+        type: isYouTube ? 'video' : (isArticle ? 'article' : 'article'), // Use article for external links
         url: url.trim(),
         thumbnail: linkPreview.thumbnail,
         tags: tagsArray,
@@ -2276,6 +2293,8 @@ export default function CounselorResourcesPage() {
         youtubeUrl: isYouTube ? url.trim() : undefined,
         category: category || undefined,
         publisherName: user?.name || user?.email?.split('@')[0] || 'Unknown',
+        // External articles should never have content stored - only description and URL
+        content: undefined,
       };
 
       await createResource(resourceData);
@@ -2524,21 +2543,22 @@ export default function CounselorResourcesPage() {
           ) : filteredResources.length > 0 ? (
             viewMode === 'grid' ? (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-8">
-                {filteredResources.map((resource, index) => (
+                {filteredResources.map((resource, index) => {
+                  const uiResource = convertToUIResource(resource);
+                  return (
                   <div key={resource.id} className="relative">
                     <ResourceCard
-                      resource={convertToUIResource(resource)}
+                        resource={uiResource}
                       onView={(r: any) => handleViewResource(resource)}
                       onDownload={(r: any) => handleDownloadResource(resource)}
                       onEdit={(r: any) => handleEditResource(resource)}
-                      onDelete={(r: any) => handleDeleteResource(resource.id)}
-                      onPublish={(r: any) => handlePublishResource(resource.id)}
-                      onUnpublish={(r: any) => handleUnpublishResource(resource.id)}
+                        onDelete={(r: any) => handleDeleteResource(r.id || resource.id)}
                       showEditActions={true}
                       delay={index * 0.1}
                     />
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="space-y-4 mt-8">
@@ -2603,27 +2623,6 @@ export default function CounselorResourcesPage() {
                       >
                         <Download className="h-4 w-4" />
                       </Button>
-                      {resource.isPublic ? (
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="bg-yellow-50 border-yellow-200 hover:bg-yellow-100 hover:text-yellow-700 hover:border-yellow-300 dark:bg-yellow-900/20 dark:border-yellow-800 dark:hover:bg-yellow-900/30 dark:hover:text-yellow-300"
-                          onClick={() => handleUnpublishResource(resource.id)}
-                          title="Unpublish resource"
-                        >
-                          <Lock className="h-4 w-4" />
-                        </Button>
-                      ) : (
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="bg-green-50 border-green-200 hover:bg-green-100 hover:text-green-700 hover:border-green-300 dark:bg-green-900/20 dark:border-green-800 dark:hover:bg-green-900/30 dark:hover:text-green-300"
-                          onClick={() => handlePublishResource(resource.id)}
-                          title="Publish resource"
-                        >
-                          <Globe className="h-4 w-4" />
-                        </Button>
-                      )}
                       <Button 
                         size="sm" 
                         variant="outline" 
@@ -2635,7 +2634,12 @@ export default function CounselorResourcesPage() {
                       <Button 
                         size="sm" 
                         variant="destructive" 
-                        onClick={() => handleDeleteResource(resource.id)}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDeleteResource(resource.id);
+                        }}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -2680,7 +2684,7 @@ export default function CounselorResourcesPage() {
                     onView={(r: any) => handleViewResource(resource)}
                     onDownload={(r: any) => handleDownloadResource(resource)}
                     onEdit={(r: any) => handleEditResource(resource)}
-                    onDelete={(r: any) => handleDeleteResource(resource.id)}
+                    onDelete={(r: any) => handleDeleteResource(r.id || resource.id)}
                     onUnsave={(r: any) => handleUnsaveResource(resource.id)}
                     showEditActions={true}
                     delay={index * 0.1}
@@ -2824,16 +2828,10 @@ export default function CounselorResourcesPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={async (e) => {
+                            onClick={(e) => {
                               e.stopPropagation();
-                              if (confirm('Are you sure you want to delete this draft?')) {
-                                try {
-                                  await deleteResource(draft.id);
-                                  toast.success('Draft deleted');
-                                } catch (error) {
-                                  toast.error('Failed to delete draft');
-                                }
-                              }
+                              setDraftToDelete(draft.id);
+                              setShowDeleteDraftDialog(true);
                             }}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -3621,12 +3619,12 @@ export default function CounselorResourcesPage() {
                     </div>
                   ) : (
                     <>
-                      <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center mx-auto mb-3">
-                        <ExternalLink className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        Preview will appear here after entering URL
-                      </p>
+                  <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <ExternalLink className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Preview will appear here after entering URL
+                  </p>
                     </>
                   )}
                 </div>
@@ -3657,33 +3655,33 @@ export default function CounselorResourcesPage() {
                     onChange={(e) => setUploadFormData(prev => ({ ...prev, externalLink: { ...prev.externalLink, description: e.target.value } }))}
                   />
                 </div>
-                <div>
+                  <div>
                   <label className="text-sm font-medium text-muted-foreground mb-2 block">Category</label>
                   <Select 
                     value={uploadFormData.externalLink.category}
                     onValueChange={(value) => setUploadFormData(prev => ({ ...prev, externalLink: { ...prev.externalLink, category: value } }))}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="educational">Educational</SelectItem>
-                      <SelectItem value="meditation">Meditation</SelectItem>
-                      <SelectItem value="therapy">Therapy</SelectItem>
-                      <SelectItem value="wellness">Wellness</SelectItem>
-                      <SelectItem value="support">Support</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="educational">Educational</SelectItem>
+                        <SelectItem value="meditation">Meditation</SelectItem>
+                        <SelectItem value="therapy">Therapy</SelectItem>
+                        <SelectItem value="wellness">Wellness</SelectItem>
+                        <SelectItem value="support">Support</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
                   <label className="text-sm font-medium text-muted-foreground mb-2 block">Duration (if video)</label>
                   <Input 
                     placeholder="e.g., 12:30" 
                     value={uploadFormData.externalLink.duration}
                     onChange={(e) => setUploadFormData(prev => ({ ...prev, externalLink: { ...prev.externalLink, duration: e.target.value } }))}
                   />
-                </div>
+                  </div>
                 <div className="md:col-span-2">
                   <label className="text-sm font-medium text-muted-foreground mb-2 block">Tags</label>
                   <Input 
@@ -3695,7 +3693,7 @@ export default function CounselorResourcesPage() {
                     Help patients discover this resource with relevant tags
                   </p>
                 </div>
-              </div>
+                    </div>
               <div className="flex justify-end space-x-3 mt-6">
                 <Button variant="outline" onClick={() => {
                   setUploadFormData(prev => ({
@@ -3833,14 +3831,6 @@ export default function CounselorResourcesPage() {
                   onClick={handleSaveDraft}
                 >
                   Save Draft
-                </Button>
-                <Button 
-                  size="sm" 
-                  className="bg-green-600 hover:bg-green-700"
-                  onClick={handlePublishArticle}
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Publish
                 </Button>
               </div>
             </div>
@@ -4907,6 +4897,7 @@ export default function CounselorResourcesPage() {
             createdAt: new Date(viewingArticle.createdAt),
             thumbnail: viewingArticle.thumbnail,
             tags: viewingArticle.tags,
+            url: viewingArticle.url, // Include URL for external articles
           }}
           isOpen={isArticleViewerOpen}
           onClose={handleCloseArticleViewer}
@@ -4964,6 +4955,129 @@ export default function CounselorResourcesPage() {
             </Button>
             <Button onClick={handleConfirmEmbed} disabled={!embedUrl.trim()}>
               Insert Embed
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Resource</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this resource? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              This will permanently remove the resource from your library. All associated data will be lost.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setResourceToDelete(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDeleteResource}
+            >
+              Delete Resource
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Link URL Dialog */}
+      <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Insert Link</DialogTitle>
+            <DialogDescription>
+              Enter the URL you want to link to. The selected text will become a clickable link.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="linkUrl">URL</Label>
+              <Input
+                id="linkUrl"
+                type="url"
+                placeholder="https://example.com"
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleConfirmLink();
+                  }
+                }}
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter a valid URL (e.g., https://example.com)
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowLinkDialog(false);
+              setLinkUrl('');
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmLink} disabled={!linkUrl.trim()}>
+              Insert Link
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Draft Confirmation Dialog */}
+      <Dialog open={showDeleteDraftDialog} onOpenChange={setShowDeleteDraftDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Draft</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this draft? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              This will permanently remove the draft from your library. All unsaved changes will be lost.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowDeleteDraftDialog(false);
+                setDraftToDelete(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={async () => {
+                if (!draftToDelete) return;
+                try {
+                  await deleteResource(draftToDelete);
+                  toast.success('Draft deleted');
+                  setShowDeleteDraftDialog(false);
+                  setDraftToDelete(null);
+                } catch (error) {
+                  toast.error('Failed to delete draft');
+                }
+              }}
+            >
+              Delete Draft
             </Button>
           </DialogFooter>
         </DialogContent>

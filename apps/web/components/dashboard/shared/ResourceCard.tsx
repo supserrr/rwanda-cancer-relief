@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { Button } from '@workspace/ui/components/button';
 import { Badge } from '@workspace/ui/components/badge';
@@ -29,10 +29,11 @@ interface ResourceCardProps {
   onUnpublish?: (resource: Resource) => void;
   showActions?: boolean;
   showEditActions?: boolean;
+  customActions?: React.ReactNode;
   delay?: number;
 }
 
-export function ResourceCard({ 
+export const ResourceCard = memo(function ResourceCard({ 
   resource, 
   onView, 
   onDownload, 
@@ -43,6 +44,7 @@ export function ResourceCard({
   onUnpublish,
   showActions = true, 
   showEditActions = false,
+  customActions,
   delay = 0 
 }: ResourceCardProps) {
   const getTypeIcon = (type: string) => {
@@ -191,7 +193,12 @@ export function ResourceCard({
               <Button 
                 size="sm" 
                 variant="destructive"
-                onClick={() => onDelete(resource)}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onDelete(resource);
+                }}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -209,9 +216,23 @@ export function ResourceCard({
                 View
               </Button>
             )}
+            {customActions}
           </div>
         )}
       </div>
     </AnimatedCard>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison function for memoization
+  // Only re-render if these specific props change
+  return (
+    prevProps.resource.id === nextProps.resource.id &&
+    prevProps.resource.title === nextProps.resource.title &&
+    prevProps.resource.description === nextProps.resource.description &&
+    prevProps.resource.isPublic === nextProps.resource.isPublic &&
+    prevProps.resource.tags?.length === nextProps.resource.tags?.length &&
+    prevProps.showActions === nextProps.showActions &&
+    prevProps.showEditActions === nextProps.showEditActions &&
+    prevProps.delay === nextProps.delay
+  );
+});

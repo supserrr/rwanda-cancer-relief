@@ -12,6 +12,11 @@ import { createClient } from '@/lib/supabase/client';
 export type ResourceType = 'audio' | 'pdf' | 'video' | 'article';
 
 /**
+ * Resource status
+ */
+export type ResourceStatus = 'pending_review' | 'reviewed' | 'published' | 'rejected';
+
+/**
  * Resource interface
  */
 export interface Resource {
@@ -33,6 +38,10 @@ export interface Resource {
   downloads: number;
   createdAt: string;
   updatedAt: string;
+  reviewed?: boolean;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  status?: ResourceStatus;
 }
 
 /**
@@ -97,6 +106,8 @@ export interface UpdateResourceInput {
   category?: string;
   readingTime?: string;
   publisherName?: string;
+  reviewed?: boolean;
+  status?: ResourceStatus;
 }
 
 /**
@@ -161,7 +172,8 @@ export class ResourcesApi {
         url: data.url,
         thumbnail: data.thumbnail,
         tags: data.tags,
-        is_public: data.isPublic ?? true,
+        is_public: false, // Resources must be reviewed before publishing
+        status: 'pending_review', // Default status - must be reviewed before publishing
         publisher: user.id,
         publisher_name: data.publisherName || user.user_metadata?.name || user.email?.split('@')[0] || 'Unknown',
         youtube_url: data.youtubeUrl,
@@ -393,7 +405,8 @@ export class ResourcesApi {
           url: publicUrl,
           thumbnail: data.thumbnail,
           tags: data.tags,
-          is_public: data.isPublic ?? true,
+          is_public: false, // Resources must be reviewed before publishing
+          status: 'pending_review', // Default status - must be reviewed before publishing
           publisher: user.id,
           publisher_name: data.publisherName || user.user_metadata?.name || user.email?.split('@')[0] || 'Unknown',
           youtube_url: data.youtubeUrl,
@@ -642,6 +655,93 @@ export class ResourcesApi {
     if (data.category !== undefined) updateData.category = data.category;
     if (data.readingTime !== undefined) updateData.reading_time = data.readingTime;
     if (data.publisherName !== undefined) updateData.publisher_name = data.publisherName;
+    if (data.reviewed !== undefined) {
+      updateData.reviewed = data.reviewed;
+      // Get current user for reviewed_by
+      const { data: { user } } = await supabase.auth.getUser();
+      if (data.reviewed) {
+        // When marking as reviewed, set reviewed_at, reviewed_by, and status
+        updateData.reviewed_at = new Date().toISOString();
+        if (user) {
+          updateData.reviewed_by = user.id;
+        }
+        // Set status to 'reviewed' (unless already published)
+        if (data.status !== 'published') {
+          updateData.status = 'reviewed';
+        }
+      } else {
+        // When marking as not reviewed, clear reviewed_at, reviewed_by, and set status to pending_review
+        updateData.reviewed_at = null;
+        updateData.reviewed_by = null;
+        updateData.status = 'pending_review';
+      }
+    }
+    
+    if (data.status !== undefined) {
+      updateData.status = data.status;
+      // When status changes, update related fields
+      if (data.status === 'reviewed') {
+        // Ensure reviewed flag is set
+        updateData.reviewed = true;
+        if (!updateData.reviewed_at) {
+          updateData.reviewed_at = new Date().toISOString();
+        }
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && !updateData.reviewed_by) {
+          updateData.reviewed_by = user.id;
+        }
+      } else if (data.status === 'published') {
+        // Publishing requires reviewed status
+        updateData.reviewed = true;
+        updateData.is_public = true;
+        if (!updateData.reviewed_at) {
+          updateData.reviewed_at = new Date().toISOString();
+        }
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && !updateData.reviewed_by) {
+          updateData.reviewed_by = user.id;
+        }
+      } else if (data.status === 'pending_review') {
+        // Reset to pending review
+        updateData.reviewed = false;
+        updateData.reviewed_at = null;
+        updateData.reviewed_by = null;
+      }
+    }
+    
+    // Handle isPublic changes in relation to status
+    if (data.isPublic !== undefined) {
+      updateData.is_public = data.isPublic;
+      // If publishing, ensure status is 'published' and resource is reviewed
+      if (data.isPublic) {
+        // Check if resource is reviewed before allowing publish
+        const { data: existingResource } = await supabase
+          .from('resources')
+          .select('reviewed, status')
+          .eq('id', resourceId)
+          .single();
+        
+        if (existingResource && existingResource.reviewed) {
+          updateData.status = 'published';
+        } else {
+          // Cannot publish without review - revert isPublic
+          throw new Error('Resource must be reviewed before it can be published');
+        }
+      } else {
+        // If unpublishing, set status back to 'reviewed' (if it was published)
+        if (updateData.status === 'published' || !updateData.status) {
+          const { data: existingResource } = await supabase
+            .from('resources')
+            .select('status')
+            .eq('id', resourceId)
+            .single();
+          
+          if (existingResource && existingResource.status === 'published') {
+            updateData.status = 'reviewed';
+          }
+        }
+      }
+    }
 
     const { data: resource, error } = await supabase
       .from('resources')
@@ -651,6 +751,9 @@ export class ResourcesApi {
       .single();
 
     if (error) {
+      console.error('Supabase update error:', error);
+      console.error('Update data:', updateData);
+      console.error('Resource ID:', resourceId);
       throw new Error(error.message || 'Failed to update resource');
     }
 
@@ -812,6 +915,10 @@ export class ResourcesApi {
       downloads: dbResource.downloads as number || 0,
       createdAt: dbResource.created_at as string,
       updatedAt: dbResource.updated_at as string,
+      reviewed: dbResource.reviewed as boolean | undefined,
+      reviewedAt: dbResource.reviewed_at as string | undefined,
+      reviewedBy: dbResource.reviewed_by as string | undefined,
+      status: (dbResource.status as ResourceStatus) || 'pending_review',
     };
   }
 

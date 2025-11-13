@@ -19,6 +19,15 @@ import {
   SelectValue,
 } from '@workspace/ui/components/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@workspace/ui/components/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@workspace/ui/components/dialog';
+import { Label } from '@workspace/ui/components/label';
 import { 
   Search, 
   Upload, 
@@ -91,6 +100,9 @@ export default function CounselorResourcesPage() {
   const bulkFileInputRef = useRef<HTMLInputElement>(null);
   const coverImageInputRef = useRef<HTMLInputElement>(null);
   const articleContentRef = useRef<HTMLDivElement>(null);
+  const articleImageInputRef = useRef<HTMLInputElement>(null);
+  const savedSelectionRef = useRef<Range | null>(null);
+  const draggedImageRef = useRef<HTMLElement | null>(null);
 
   // Upload form state
   const [uploadFormData, setUploadFormData] = useState<{
@@ -98,18 +110,32 @@ export default function CounselorResourcesPage() {
     video: { file: File | null; title: string; description: string; tags: string; duration: string; isYouTube: boolean; youtubeUrl: string };
     pdf: { file: File | null; title: string; description: string; tags: string };
     bulk: { files: File[] };
+    externalLink: { url: string; title: string; description: string; tags: string; category: string; duration: string; isYouTube: boolean };
   }>({
     audio: { file: null, title: '', description: '', tags: '', duration: '' },
     video: { file: null, title: '', description: '', tags: '', duration: '', isYouTube: false, youtubeUrl: '' },
     pdf: { file: null, title: '', description: '', tags: '' },
     bulk: { files: [] },
+    externalLink: { url: '', title: '', description: '', tags: '', category: '', duration: '', isYouTube: false },
   });
+
+  // External link preview state
+  const [linkPreview, setLinkPreview] = useState<{
+    title?: string;
+    description?: string;
+    thumbnail?: string;
+    loading: boolean;
+  }>({ loading: false });
 
   const [isUploading, setIsUploading] = useState(false);
   const [coverImage, setCoverImage] = useState<{ file: File | null; preview: string | null }>({
     file: null,
     preview: null,
   });
+  
+  // Embed dialog state
+  const [showEmbedDialog, setShowEmbedDialog] = useState(false);
+  const [embedUrl, setEmbedUrl] = useState('');
 
   // Article editor form state
   const [articleFormData, setArticleFormData] = useState({
@@ -235,6 +261,73 @@ export default function CounselorResourcesPage() {
     }
   }, [activeTab, editingDraftId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Function to make existing images interactive (draggable and deletable)
+  const makeImagesInteractive = useCallback(() => {
+    if (!articleContentRef.current) return;
+    
+    const images = articleContentRef.current.querySelectorAll('img:not(.article-image-container img)');
+    images.forEach((img) => {
+      // Skip if already wrapped
+      if (img.parentElement?.classList.contains('article-image-container')) return;
+      
+      // Create container
+      const container = document.createElement('div');
+      container.className = 'article-image-container';
+      container.style.position = 'relative';
+      container.style.display = 'inline-block';
+      container.style.width = '100%';
+      container.style.maxWidth = '100%';
+      container.style.margin = '1rem 0';
+      container.setAttribute('draggable', 'true');
+      container.setAttribute('contenteditable', 'false');
+      
+      // Create delete button
+      const deleteBtn = document.createElement('button');
+      deleteBtn.innerHTML = '×';
+      deleteBtn.className = 'article-image-delete';
+      deleteBtn.setAttribute('type', 'button');
+      deleteBtn.setAttribute('contenteditable', 'false');
+      deleteBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        container.remove();
+        const content = articleContentRef.current?.innerHTML || '';
+        setArticleFormData(prev => ({ ...prev, content }));
+      };
+      
+      // Set image styles
+      (img as HTMLImageElement).style.maxWidth = '100%';
+      (img as HTMLImageElement).style.height = 'auto';
+      (img as HTMLImageElement).style.display = 'block';
+      (img as HTMLImageElement).style.borderRadius = '0.5rem';
+      (img as HTMLImageElement).style.margin = '0';
+      img.setAttribute('draggable', 'false');
+      img.setAttribute('contenteditable', 'false');
+      
+      // Add drag handlers
+      container.ondragstart = (e) => {
+        draggedImageRef.current = container;
+        e.dataTransfer?.setData('text/plain', ''); // Required for drag to work
+        e.dataTransfer!.effectAllowed = 'move';
+        container.style.opacity = '0.5';
+        container.style.cursor = 'grabbing';
+      };
+      
+      container.ondragend = () => {
+        if (draggedImageRef.current) {
+          draggedImageRef.current.style.opacity = '1';
+          draggedImageRef.current.style.cursor = 'move';
+          draggedImageRef.current = null;
+        }
+      };
+      
+      // Wrap image
+      img.parentNode?.insertBefore(container, img);
+      container.appendChild(img);
+      container.appendChild(deleteBtn);
+    });
+  }, []);
+
   // Initialize and sync contentEditable with state
   useEffect(() => {
     if (activeTab === 'create-article') {
@@ -248,24 +341,30 @@ export default function CounselorResourcesPage() {
           // This handles loading drafts
           if (stateContent && (!currentContent || currentContent === '<br>' || currentContent === '')) {
             articleContentRef.current.innerHTML = stateContent;
+            // Make images interactive after loading
+            setTimeout(() => makeImagesInteractive(), 50);
           } else if (stateContent && currentContent !== stateContent) {
             // Only update if the element doesn't have focus (user isn't typing)
             // This prevents overwriting user input while they're typing
             if (document.activeElement !== articleContentRef.current) {
               articleContentRef.current.innerHTML = stateContent;
+              setTimeout(() => makeImagesInteractive(), 50);
             }
           } else if (!stateContent && (!currentContent || currentContent === '<br>')) {
             // Initialize with <br> for placeholder to work and ensure it's editable
             articleContentRef.current.innerHTML = '<br>';
             // Ensure the element is properly set up as contentEditable
             articleContentRef.current.setAttribute('contenteditable', 'true');
+          } else {
+            // Make existing images interactive
+            makeImagesInteractive();
           }
         }
       }, 100); // Small delay to ensure DOM is ready
 
       return () => clearTimeout(timeoutId);
     }
-  }, [articleFormData.content, activeTab, editingDraftId]);
+  }, [articleFormData.content, activeTab, editingDraftId, makeImagesInteractive]);
 
   // Update active formatting states based on cursor position
   const updateActiveFormatting = useCallback(() => {
@@ -948,21 +1047,383 @@ export default function CounselorResourcesPage() {
   const handleInsertImage = () => {
     if (!articleContentRef.current) return;
     
-    articleContentRef.current.focus();
+    // Save the current cursor position before opening file dialog
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      // Check if selection is within the editor
+      const range = selection.getRangeAt(0);
+      if (articleContentRef.current.contains(range.commonAncestorContainer)) {
+        savedSelectionRef.current = range.cloneRange();
+      }
+    }
     
-    setTimeout(() => {
+    articleImageInputRef.current?.click();
+  };
+
+  const handleArticleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      if (event.target) {
+        event.target.value = '';
+      }
+      return;
+    }
+
+    // Validate file size (10MB limit for article images)
+    const maxFileSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxFileSize) {
+      toast.error(
+        `Image size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds the maximum allowed size of 10MB. ` +
+        `Please compress your image or choose a smaller file.`
+      );
+      if (event.target) {
+        event.target.value = '';
+      }
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      if (!supabase) throw new Error('Supabase is not configured');
+
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) throw new Error('User not authenticated');
+
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${authUser.id}-article-image-${Date.now()}.${fileExt}`;
+      const filePath = `article-images/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('resources')
+        .upload(filePath, file, { cacheControl: '3600', upsert: false });
+
+      if (uploadError) throw new Error(`Failed to upload image: ${uploadError.message}`);
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('resources')
+        .getPublicUrl(filePath);
+
+      // Insert image into contentEditable at the saved cursor position
       if (articleContentRef.current) {
-        const url = prompt('Enter image URL:');
-        if (url) {
-          const success = document.execCommand('insertImage', false, url);
-          console.log('Image command executed:', success);
-          
-          const content = articleContentRef.current.innerHTML;
+        articleContentRef.current.focus();
+        
+        // Restore saved selection or get current selection
+        let range: Range | null = null;
+        const selection = window.getSelection();
+        
+        // Try to restore saved selection first
+        if (savedSelectionRef.current) {
+          try {
+            // Check if the saved range is still valid
+            const savedRange = savedSelectionRef.current;
+            if (articleContentRef.current.contains(savedRange.commonAncestorContainer)) {
+              range = savedRange;
+            }
+          } catch (e) {
+            // Range is invalid (DOM changed), ignore it
+            console.log('Saved range is invalid, using current selection');
+          }
+          // Clear saved selection
+          savedSelectionRef.current = null;
+        }
+        
+        // If saved range is invalid or doesn't exist, try current selection
+        if (!range && selection && selection.rangeCount > 0) {
+          const currentRange = selection.getRangeAt(0);
+          if (articleContentRef.current.contains(currentRange.commonAncestorContainer)) {
+            range = currentRange;
+          }
+        }
+        
+        // If no valid range, create one at the end of the editor
+        if (!range) {
+          range = document.createRange();
+          if (articleContentRef.current.childNodes.length > 0) {
+            const lastNode = articleContentRef.current.childNodes[articleContentRef.current.childNodes.length - 1];
+            range.setStartAfter(lastNode);
+          } else {
+            range.selectNodeContents(articleContentRef.current);
+            range.collapse(false); // Collapse to end
+          }
+        }
+        
+        // Create image container with delete button
+        const container = document.createElement('div');
+        container.className = 'article-image-container';
+        container.style.position = 'relative';
+        container.style.display = 'inline-block';
+        container.style.width = '100%';
+        container.style.maxWidth = '100%';
+        container.style.margin = '1rem 0';
+        container.setAttribute('draggable', 'true');
+        container.setAttribute('contenteditable', 'false');
+        
+        // Create delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.innerHTML = '×';
+        deleteBtn.className = 'article-image-delete';
+        deleteBtn.style.position = 'absolute';
+        deleteBtn.style.top = '0.5rem';
+        deleteBtn.style.right = '0.5rem';
+        deleteBtn.style.width = '24px';
+        deleteBtn.style.height = '24px';
+        deleteBtn.style.borderRadius = '50%';
+        deleteBtn.style.background = 'rgba(0, 0, 0, 0.7)';
+        deleteBtn.style.color = 'white';
+        deleteBtn.style.border = 'none';
+        deleteBtn.style.cursor = 'pointer';
+        deleteBtn.style.display = 'flex';
+        deleteBtn.style.alignItems = 'center';
+        deleteBtn.style.justifyContent = 'center';
+        deleteBtn.style.fontSize = '18px';
+        deleteBtn.style.lineHeight = '1';
+        deleteBtn.style.zIndex = '10';
+        deleteBtn.style.opacity = '0';
+        deleteBtn.style.transition = 'opacity 0.2s';
+        deleteBtn.setAttribute('type', 'button');
+        deleteBtn.setAttribute('contenteditable', 'false');
+        deleteBtn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          container.remove();
+          const content = articleContentRef.current?.innerHTML || '';
           setArticleFormData(prev => ({ ...prev, content }));
-          articleContentRef.current.focus();
+        };
+        
+        // Show delete button on hover
+        container.onmouseenter = () => {
+          deleteBtn.style.opacity = '1';
+        };
+        container.onmouseleave = () => {
+          deleteBtn.style.opacity = '0';
+        };
+        
+        // Create image element
+        const img = document.createElement('img');
+        img.src = publicUrl;
+        img.alt = file.name;
+        img.style.maxWidth = '100%';
+        img.style.height = 'auto';
+        img.style.display = 'block';
+        img.style.borderRadius = '0.5rem';
+        img.setAttribute('draggable', 'false');
+        img.setAttribute('contenteditable', 'false');
+        
+        // Add drag and drop handlers
+        container.ondragstart = (e) => {
+          draggedImageRef.current = container;
+          e.dataTransfer?.setData('text/plain', ''); // Required for drag to work
+          e.dataTransfer!.effectAllowed = 'move';
+          container.style.opacity = '0.5';
+          container.style.cursor = 'grabbing';
+        };
+        
+        container.ondragend = () => {
+          if (draggedImageRef.current) {
+            draggedImageRef.current.style.opacity = '1';
+            draggedImageRef.current.style.cursor = 'move';
+            draggedImageRef.current = null;
+          }
+        };
+        
+        // Assemble container
+        container.appendChild(img);
+        container.appendChild(deleteBtn);
+        
+        // Insert container at cursor position
+        range.insertNode(container);
+        
+        // Insert a line break after the image
+        const br = document.createElement('br');
+        range.setStartAfter(container);
+        range.insertNode(br);
+        range.setStartAfter(br);
+        range.collapse(true);
+        
+        // Update selection
+        if (selection) {
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+
+        const content = articleContentRef.current.innerHTML;
+        setArticleFormData(prev => ({ ...prev, content }));
+        articleContentRef.current.focus();
+      }
+
+      toast.success('Image inserted successfully');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to upload image');
+    } finally {
+      setIsUploading(false);
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  };
+
+  const handleInsertEmbed = () => {
+    if (!articleContentRef.current) return;
+    setEmbedUrl('');
+    setShowEmbedDialog(true);
+  };
+
+  const handleConfirmEmbed = () => {
+    if (!embedUrl.trim()) {
+      toast.error('Please enter an embed URL');
+      return;
+    }
+
+    if (!articleContentRef.current) return;
+    
+    try {
+      const convertedUrl = convertToEmbedUrl(embedUrl.trim());
+      if (!convertedUrl) {
+        toast.error('Invalid embed URL. Please enter a valid YouTube, Vimeo, SoundCloud, or other supported platform URL.');
+        return;
+      }
+
+      if (!articleContentRef.current) return;
+      
+      // Ensure editor is focused and has a selection
+      articleContentRef.current.focus();
+      
+      // Wait a tick for focus to settle
+      setTimeout(() => {
+        if (!articleContentRef.current) return;
+        
+        const selection = window.getSelection();
+        const isSoundCloud = embedUrl.toLowerCase().includes('soundcloud.com');
+        // SoundCloud uses a fixed height (typically 166px for tracks, 450px for playlists)
+        // For other platforms, use 16:9 aspect ratio
+        const paddingBottom = isSoundCloud ? '166px' : '56.25%';
+        const minHeight = isSoundCloud ? '166px' : '0';
+        const iframeHeight = isSoundCloud ? '166px' : '100%';
+        
+        // Create the embed container with all styles as inline attributes
+        const container = document.createElement('div');
+        container.setAttribute('data-embed', 'true'); // Mark as embed for easier identification
+        container.setAttribute('style', `position: relative; width: 100%; max-width: 100%; margin: 1rem 0; padding-bottom: ${paddingBottom}; height: ${minHeight}; overflow: hidden; border-radius: 0.5rem; min-height: ${isSoundCloud ? '166px' : '200px'};`);
+        
+        const iframe = document.createElement('iframe');
+        iframe.src = convertedUrl;
+        iframe.setAttribute('style', `position: absolute; top: 0; left: 0; width: 100%; height: ${iframeHeight}; border: none;`);
+        iframe.setAttribute('allowfullscreen', 'true');
+        iframe.setAttribute('frameborder', '0');
+        iframe.setAttribute('scrolling', 'no');
+        iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
+        
+        container.appendChild(iframe);
+        
+        // Ensure we have a valid selection within the editor
+        let range: Range | null = null;
+        
+        if (selection && selection.rangeCount > 0) {
+          const currentRange = selection.getRangeAt(0);
+          // Check if selection is within the editor
+          if (articleContentRef.current.contains(currentRange.commonAncestorContainer)) {
+            range = currentRange;
+          }
+        }
+        
+        // If no valid range, create one at the end of the editor
+        if (!range) {
+          range = document.createRange();
+          if (articleContentRef.current.childNodes.length > 0) {
+            const lastNode = articleContentRef.current.childNodes[articleContentRef.current.childNodes.length - 1];
+            range.setStartAfter(lastNode);
+          } else {
+            range.selectNodeContents(articleContentRef.current);
+            range.collapse(false); // Collapse to end
+          }
+        }
+        
+        // Insert the embed
+        range.insertNode(container);
+        
+        // Insert a line break after the embed
+        const br = document.createElement('br');
+        range.setStartAfter(container);
+        range.insertNode(br);
+        range.setStartAfter(br);
+        range.collapse(true);
+        
+        // Update selection
+        if (selection) {
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+        
+        // Update state with the new content
+        const content = articleContentRef.current.innerHTML;
+        console.log('Embed inserted, content length:', content.length);
+        console.log('Content includes iframe:', content.includes('iframe'));
+        setArticleFormData(prev => ({ ...prev, content }));
+        articleContentRef.current.focus();
+        
+        setShowEmbedDialog(false);
+        setEmbedUrl('');
+        toast.success('Embed inserted successfully');
+      }, 10);
+
+      // Content update is now handled inside the setTimeout above
+    } catch (error) {
+      console.error('Error inserting embed:', error);
+      toast.error('Failed to insert embed');
+    }
+  };
+
+  const convertToEmbedUrl = (url: string): string | null => {
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname.toLowerCase();
+
+      // YouTube
+      if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) {
+        let videoId = '';
+        if (hostname.includes('youtu.be')) {
+          videoId = urlObj.pathname.slice(1);
+        } else {
+          videoId = urlObj.searchParams.get('v') || '';
+        }
+        if (videoId) {
+          return `https://www.youtube.com/embed/${videoId}`;
         }
       }
-    }, 10);
+
+      // Vimeo
+      if (hostname.includes('vimeo.com')) {
+        const videoId = urlObj.pathname.split('/').filter(Boolean).pop();
+        if (videoId) {
+          return `https://player.vimeo.com/video/${videoId}`;
+        }
+      }
+
+      // SoundCloud
+      if (hostname.includes('soundcloud.com')) {
+        // SoundCloud uses a widget player URL format
+        // The URL should be the full SoundCloud track/playlist URL
+        const soundcloudUrl = urlObj.toString();
+        return `https://w.soundcloud.com/player/?url=${encodeURIComponent(soundcloudUrl)}&color=%23ff5500&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true&visual=true`;
+      }
+
+      // Generic iframe support (for other platforms)
+      // Return the original URL if it's a valid HTTP/HTTPS URL
+      if (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') {
+        return url;
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
   };
 
   const handleInsertQuote = () => {
@@ -1050,13 +1511,16 @@ export default function CounselorResourcesPage() {
       return;
     }
     
+    // Get the latest content directly from the contentEditable div
+    const currentContent = articleContentRef.current?.innerHTML || articleFormData.content || '';
+    
     // Create a preview article object
     const preview: Resource = {
       id: 'preview',
       title: articleFormData.title,
       description: articleFormData.excerpt || articleFormData.title,
       type: 'article',
-      content: articleFormData.content,
+      content: currentContent,
       category: articleFormData.category,
       tags: articleFormData.tags.split(',').map(t => t.trim()).filter(t => t),
       isPublic: true,
@@ -1069,6 +1533,9 @@ export default function CounselorResourcesPage() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+    
+    console.log('Preview content length:', currentContent.length);
+    console.log('Preview includes iframe:', currentContent.includes('iframe'));
     
     setPreviewArticle(preview);
     setIsArticleViewerOpen(true);
@@ -1086,6 +1553,13 @@ export default function CounselorResourcesPage() {
       
       // Ensure content is not just empty tags
       const cleanedContent = currentContent.trim() === '<br>' || currentContent.trim() === '' ? '' : currentContent;
+      
+      // Debug: Log if embed content is present
+      if (cleanedContent.includes('iframe')) {
+        console.log('Saving draft with iframe embed');
+        console.log('Iframe count:', (cleanedContent.match(/<iframe/g) || []).length);
+        console.log('Content preview (first 500 chars):', cleanedContent.substring(0, 500));
+      }
       
       const tags = articleFormData.tags
         .split(',')
@@ -1175,6 +1649,12 @@ export default function CounselorResourcesPage() {
     
     // Ensure content is not just empty tags
     const cleanedContent = currentContent.trim() === '<br>' || currentContent.trim() === '' ? '' : currentContent;
+    
+    // Debug: Log if embed content is present
+    if (cleanedContent.includes('iframe')) {
+      console.log('Publishing article with iframe embed');
+      console.log('Iframe count:', (cleanedContent.match(/<iframe/g) || []).length);
+    }
     
     if (!cleanedContent.trim()) {
       toast.error('Please add article content');
@@ -1619,6 +2099,189 @@ export default function CounselorResourcesPage() {
     } catch (error) {
       console.error('Error uploading video:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to upload video');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Helper function to convert ISO 8601 duration to MM:SS or HH:MM:SS format
+  const convertISODurationToTime = (isoDuration: string): string => {
+    // ISO 8601 format: PT4M13S (4 minutes 13 seconds), PT1H2M3S (1 hour 2 minutes 3 seconds)
+    const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+    if (!match) return '';
+    
+    const hours = parseInt(match[1] || '0', 10);
+    const minutes = parseInt(match[2] || '0', 10);
+    const seconds = parseInt(match[3] || '0', 10);
+    
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    } else {
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+  };
+
+  // External link handlers
+  const handleFetchLinkInfo = async () => {
+    const url = uploadFormData.externalLink.url.trim();
+    if (!url) {
+      toast.error('Please enter a URL');
+      return;
+    }
+
+    // Validate URL
+    try {
+      new URL(url);
+    } catch {
+      toast.error('Please enter a valid URL');
+      return;
+    }
+
+    setLinkPreview({ loading: true });
+
+    try {
+      // Check if it's a YouTube URL
+      const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+      
+      if (isYouTube) {
+        // Extract video ID
+        let videoId = '';
+        if (url.includes('youtu.be')) {
+          videoId = url.split('/').pop()?.split('?')[0] || '';
+        } else {
+          const urlObj = new URL(url);
+          videoId = urlObj.searchParams.get('v') || '';
+        }
+
+        if (videoId) {
+          // Fetch YouTube video metadata using oEmbed
+          const oEmbedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+          const response = await fetch(oEmbedUrl);
+          
+          if (response.ok) {
+            const data = await response.json();
+            
+            // Try to fetch duration from YouTube Data API if available
+            let duration = '';
+            const youtubeApiKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
+            if (youtubeApiKey) {
+              try {
+                const apiUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=contentDetails&key=${youtubeApiKey}`;
+                const apiResponse = await fetch(apiUrl);
+                if (apiResponse.ok) {
+                  const apiData = await apiResponse.json();
+                  if (apiData.items && apiData.items[0] && apiData.items[0].contentDetails) {
+                    const isoDuration = apiData.items[0].contentDetails.duration;
+                    // Convert ISO 8601 duration (PT4M13S) to MM:SS or HH:MM:SS format
+                    duration = convertISODurationToTime(isoDuration);
+                  }
+                }
+              } catch (apiError) {
+                console.warn('Failed to fetch duration from YouTube API:', apiError);
+                // Continue without duration
+              }
+            }
+            
+            setLinkPreview({
+              title: data.title,
+              description: data.author_name ? `By ${data.author_name}` : '',
+              thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+              loading: false,
+            });
+            
+            // Auto-fill form
+            setUploadFormData(prev => ({
+              ...prev,
+              externalLink: {
+                ...prev.externalLink,
+                title: data.title || '',
+                description: data.author_name ? `By ${data.author_name}` : '',
+                duration: duration,
+                isYouTube: true,
+              },
+            }));
+            
+            toast.success('Link information fetched successfully');
+          } else {
+            throw new Error('Failed to fetch YouTube video information');
+          }
+        } else {
+          throw new Error('Invalid YouTube URL');
+        }
+      } else {
+        // For other URLs, try to fetch basic metadata
+        // Use a proxy or fetch the page (CORS may be an issue)
+        // For now, just set basic info
+        setLinkPreview({
+          title: new URL(url).hostname,
+          description: '',
+          thumbnail: undefined,
+          loading: false,
+        });
+        
+        setUploadFormData(prev => ({
+          ...prev,
+          externalLink: {
+            ...prev.externalLink,
+            title: new URL(url).hostname,
+            isYouTube: false,
+          },
+        }));
+        
+        toast.success('Link ready. Please fill in the details manually.');
+      }
+    } catch (error) {
+      console.error('Error fetching link info:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch link information');
+      setLinkPreview({ loading: false });
+    }
+  };
+
+  const handleAddExternalLink = async () => {
+    const { url, title, description, tags, category, duration, isYouTube } = uploadFormData.externalLink;
+
+    if (!url.trim()) {
+      toast.error('Please enter a URL');
+      return;
+    }
+
+    if (!title.trim()) {
+      toast.error('Please enter a title');
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const tagsArray = tags.split(',').map(t => t.trim()).filter(Boolean);
+
+      const resourceData: ResourcesApi.CreateResourceInput = {
+        title: title.trim(),
+        description: description.trim() || 'External link resource',
+        type: isYouTube ? 'video' : 'article', // Use video for YouTube, article for other links
+        url: url.trim(),
+        thumbnail: linkPreview.thumbnail,
+        tags: tagsArray,
+        isPublic: true,
+        youtubeUrl: isYouTube ? url.trim() : undefined,
+        category: category || undefined,
+        publisherName: user?.name || user?.email?.split('@')[0] || 'Unknown',
+      };
+
+      await createResource(resourceData);
+      
+      toast.success('External link added successfully');
+      
+      // Reset form
+      setUploadFormData(prev => ({
+        ...prev,
+        externalLink: { url: '', title: '', description: '', tags: '', category: '', duration: '', isYouTube: false },
+      }));
+      setLinkPreview({ loading: false });
+      setActiveTab('manage');
+    } catch (error) {
+      console.error('Error adding external link:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to add external link');
     } finally {
       setIsUploading(false);
     }
@@ -2842,25 +3505,21 @@ export default function CounselorResourcesPage() {
         <TabsContent value="add-link" className="mt-6">
           <div className="space-y-6 max-w-4xl mx-auto">
             {/* Header with Back Button */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
               <Button 
-                variant="ghost" 
+                variant="outline" 
                 size="sm" 
                 onClick={() => setActiveTab('manage')}
                 className="flex items-center gap-2"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Back to Resources
+                Back
               </Button>
-              <div className="flex items-center gap-3">
-                <Button variant="outline" size="sm">
-                  <Eye className="h-4 w-4 mr-2" />
-                  Preview
-                </Button>
-                <Button size="sm" className="bg-orange-600 hover:bg-orange-700">
-                  <Globe className="h-4 w-4 mr-2" />
-                  Add Resource
-                </Button>
+              <div>
+                <h3 className="text-xl font-semibold">Add External Link</h3>
+                <p className="text-sm text-muted-foreground">
+                  Link to YouTube videos, websites, or other online resources
+                </p>
               </div>
             </div>
 
@@ -2868,10 +3527,10 @@ export default function CounselorResourcesPage() {
             <AnimatedCard className="p-6">
               <h4 className="font-semibold mb-4">Resource Type</h4>
               <div className="grid grid-cols-2 gap-4">
-                <button className="p-4 border-2 border-orange-200 bg-orange-50 rounded-lg text-left hover:border-orange-300 transition-colors">
+                <button className="p-4 border-2 border-orange-200 bg-orange-50 dark:bg-orange-950 rounded-lg text-left hover:border-orange-300 transition-colors">
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                      <Video className="h-5 w-5 text-orange-600" />
+                    <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
+                      <Video className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                     </div>
                     <div>
                       <h5 className="font-semibold">YouTube Video</h5>
@@ -2879,10 +3538,10 @@ export default function CounselorResourcesPage() {
                     </div>
                   </div>
                 </button>
-                <button className="p-4 border-2 border-gray-200 rounded-lg text-left hover:border-gray-300 transition-colors">
+                <button className="p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg text-left hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <Globe className="h-5 w-5 text-gray-600" />
+                    <div className="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
+                      <Globe className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                     </div>
                     <div>
                       <h5 className="font-semibold">External Link</h5>
@@ -2893,37 +3552,73 @@ export default function CounselorResourcesPage() {
               </div>
             </AnimatedCard>
 
-            {/* Link Input */}
-            <AnimatedCard className="p-6">
-              <div className="space-y-6">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Resource URL</label>
+            {/* URL Input Area */}
+            <AnimatedCard className="p-8">
+              <div className="border-2 border-dashed border-orange-200 dark:border-orange-800 rounded-xl p-12 text-center hover:border-orange-300 dark:hover:border-orange-700 transition-colors">
+                <div className="w-20 h-20 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Globe className="h-10 w-10 text-orange-600 dark:text-orange-400" />
+                </div>
+                <h4 className="text-xl font-semibold mb-2">Paste your link here</h4>
+                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                  Supported: YouTube videos, websites, and other online resources. We'll automatically fetch the title, description, and thumbnail.
+                </p>
+                <div className="max-w-lg mx-auto mb-4">
                   <div className="relative">
                     <Input 
                       placeholder="Paste YouTube URL or website link (e.g., https://youtube.com/watch?v=...)"
                       className="pr-24"
+                      value={uploadFormData.externalLink.url}
+                      onChange={(e) => setUploadFormData(prev => ({ ...prev, externalLink: { ...prev.externalLink, url: e.target.value } }))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleFetchLinkInfo();
+                        }
+                      }}
                     />
                     <Button 
                       size="sm" 
                       variant="ghost" 
                       className="absolute right-1 top-1/2 -translate-y-1/2 text-xs"
+                      onClick={handleFetchLinkInfo}
+                      disabled={linkPreview.loading || !uploadFormData.externalLink.url.trim()}
                     >
-                      Fetch Info
+                      {linkPreview.loading ? 'Fetching...' : 'Fetch Info'}
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    We'll automatically fetch the title, description, and thumbnail
-                  </p>
                 </div>
-
-                {/* Preview Area */}
-                <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                  <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center mx-auto mb-3">
-                    <ExternalLink className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Preview will appear here after entering URL
-                  </p>
+                <div className="border-2 border-dashed border-orange-100 dark:border-orange-900 rounded-lg p-8 text-center bg-orange-50/50 dark:bg-orange-950/50">
+                  {linkPreview.loading ? (
+                    <div className="flex flex-col items-center">
+                      <Spinner variant="bars" size={32} className="mb-3" />
+                      <p className="text-sm text-muted-foreground">Fetching link information...</p>
+                    </div>
+                  ) : linkPreview.title || linkPreview.thumbnail ? (
+                    <div className="text-left">
+                      {linkPreview.thumbnail && (
+                        <img 
+                          src={linkPreview.thumbnail} 
+                          alt={linkPreview.title || 'Preview'} 
+                          className="w-full h-48 object-cover rounded-lg mb-4"
+                        />
+                      )}
+                      {linkPreview.title && (
+                        <h5 className="font-semibold mb-2">{linkPreview.title}</h5>
+                      )}
+                      {linkPreview.description && (
+                        <p className="text-sm text-muted-foreground">{linkPreview.description}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center mx-auto mb-3">
+                        <ExternalLink className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Preview will appear here after entering URL
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             </AnimatedCard>
@@ -2931,79 +3626,94 @@ export default function CounselorResourcesPage() {
             {/* Resource Details */}
             <AnimatedCard className="p-6">
               <h4 className="font-semibold mb-4">Resource Details</h4>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Title</label>
-                  <Input placeholder="Resource title (auto-filled from URL)" />
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="md:col-span-2">
+                  <label className="text-sm font-medium text-muted-foreground mb-2 block">Title</label>
+                  <Input 
+                    placeholder="Resource title (auto-filled from URL)" 
+                    value={uploadFormData.externalLink.title}
+                    onChange={(e) => setUploadFormData(prev => ({ ...prev, externalLink: { ...prev.externalLink, title: e.target.value } }))}
+                  />
                   <p className="text-xs text-muted-foreground mt-1">
                     You can edit this if needed
                   </p>
                 </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Description</label>
+                <div className="md:col-span-2">
+                  <label className="text-sm font-medium text-muted-foreground mb-2 block">Description</label>
                   <Textarea 
-                    rows={4}
+                    rows={3}
                     placeholder="Resource description (auto-filled from URL or add your own)"
+                    value={uploadFormData.externalLink.description}
+                    onChange={(e) => setUploadFormData(prev => ({ ...prev, externalLink: { ...prev.externalLink, description: e.target.value } }))}
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Category</label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="educational">Educational</SelectItem>
-                        <SelectItem value="meditation">Meditation</SelectItem>
-                        <SelectItem value="therapy">Therapy</SelectItem>
-                        <SelectItem value="wellness">Wellness</SelectItem>
-                        <SelectItem value="support">Support</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Duration (if video)</label>
-                    <Input placeholder="e.g., 12:30" />
-                  </div>
-                </div>
-
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Tags</label>
-                  <Input placeholder="Add tags (separate with commas): mindfulness, breathing, relaxation..." />
+                  <label className="text-sm font-medium text-muted-foreground mb-2 block">Category</label>
+                  <Select 
+                    value={uploadFormData.externalLink.category}
+                    onValueChange={(value) => setUploadFormData(prev => ({ ...prev, externalLink: { ...prev.externalLink, category: value } }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="educational">Educational</SelectItem>
+                      <SelectItem value="meditation">Meditation</SelectItem>
+                      <SelectItem value="therapy">Therapy</SelectItem>
+                      <SelectItem value="wellness">Wellness</SelectItem>
+                      <SelectItem value="support">Support</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground mb-2 block">Duration (if video)</label>
+                  <Input 
+                    placeholder="e.g., 12:30" 
+                    value={uploadFormData.externalLink.duration}
+                    onChange={(e) => setUploadFormData(prev => ({ ...prev, externalLink: { ...prev.externalLink, duration: e.target.value } }))}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-sm font-medium text-muted-foreground mb-2 block">Tags</label>
+                  <Input 
+                    placeholder="Enter tags separated by commas..." 
+                    value={uploadFormData.externalLink.tags}
+                    onChange={(e) => setUploadFormData(prev => ({ ...prev, externalLink: { ...prev.externalLink, tags: e.target.value } }))}
+                  />
                   <p className="text-xs text-muted-foreground mt-1">
                     Help patients discover this resource with relevant tags
                   </p>
                 </div>
-
-                <div className="pt-4 border-t">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">Make this resource public</p>
-                      <p className="text-xs text-muted-foreground">Allow all patients to access this resource</p>
-                    </div>
-                    <input type="checkbox" className="toggle" defaultChecked />
-                  </div>
-                </div>
               </div>
-            </AnimatedCard>
-
-            {/* Tips */}
-            <AnimatedCard className="p-6 bg-orange-50/50 border-orange-200">
-              <div className="flex gap-3">
-                <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h5 className="font-semibold mb-2">Tips for Adding External Resources</h5>
-                  <ul className="space-y-1 text-sm text-muted-foreground">
-                    <li>• YouTube videos will be embedded directly in the platform</li>
-                    <li>• Verify the content is appropriate and helpful for patients</li>
-                    <li>• Provide context in the description to help patients understand the value</li>
-                    <li>• Use clear, descriptive titles and relevant tags</li>
-                  </ul>
-                </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <Button variant="outline" onClick={() => {
+                  setUploadFormData(prev => ({
+                    ...prev,
+                    externalLink: { url: '', title: '', description: '', tags: '', category: '', duration: '', isYouTube: false },
+                  }));
+                  setLinkPreview({ loading: false });
+                  setActiveTab('manage');
+                }}>
+                  Cancel
+                </Button>
+                <Button 
+                  className="bg-orange-600 hover:bg-orange-700"
+                  onClick={handleAddExternalLink}
+                  disabled={isUploading || !uploadFormData.externalLink.url.trim() || !uploadFormData.externalLink.title.trim()}
+                >
+                  {isUploading ? (
+                    <>
+                      <Spinner variant="bars" size={16} className="mr-2" />
+                      Adding...
+                    </>
+                  ) : (
+                    <>
+                      <Globe className="h-4 w-4 mr-2" />
+                      Add Resource
+                    </>
+                  )}
+                </Button>
               </div>
             </AnimatedCard>
           </div>
@@ -3485,8 +4195,23 @@ export default function CounselorResourcesPage() {
                             e.stopPropagation();
                             handleInsertImage();
                           }}
+                          disabled={isUploading}
                         >
                           <Upload className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0" 
+                          title="Insert Embed (YouTube, Vimeo, SoundCloud, etc.)"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleInsertEmbed();
+                          }}
+                        >
+                          <Video className="h-4 w-4" />
                         </Button>
                         <Button 
                           variant="ghost" 
@@ -3568,6 +4293,15 @@ export default function CounselorResourcesPage() {
                       </div>
                     </div>
 
+                    {/* Hidden file input for article images */}
+                    <input
+                      ref={articleImageInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleArticleImageChange}
+                      className="hidden"
+                    />
+
                     {/* Editor Content Area */}
                       <div className="min-h-[500px]">
                         <div
@@ -3589,6 +4323,105 @@ export default function CounselorResourcesPage() {
                             const content = e.currentTarget.innerHTML;
                             setArticleFormData(prev => ({ ...prev, content }));
                           }}
+                          onKeyDown={(e) => {
+                            // Handle backspace/delete to remove images
+                            if (e.key === 'Backspace' || e.key === 'Delete') {
+                              const selection = window.getSelection();
+                              if (!selection || selection.rangeCount === 0) return;
+                              
+                              const range = selection.getRangeAt(0);
+                              if (!range.collapsed) return; // Only handle when cursor is collapsed (no selection)
+                              
+                              // Check if cursor is right before an image container
+                              let nodeToCheck: Node | null = null;
+                              if (e.key === 'Backspace') {
+                                // For backspace, check the node before the cursor
+                                nodeToCheck = range.startContainer;
+                                if (nodeToCheck.nodeType === Node.TEXT_NODE) {
+                                  // If at start of text node, check previous sibling
+                                  if (range.startOffset === 0) {
+                                    nodeToCheck = nodeToCheck.previousSibling;
+                                  }
+                                } else {
+                                  // If in an element, check previous sibling
+                                  nodeToCheck = nodeToCheck.previousSibling;
+                                }
+                              } else {
+                                // For delete, check the node after the cursor
+                                nodeToCheck = range.startContainer;
+                                if (nodeToCheck.nodeType === Node.TEXT_NODE) {
+                                  // If at end of text node, check next sibling
+                                  const textNode = nodeToCheck as Text;
+                                  if (range.startOffset === textNode.length) {
+                                    nodeToCheck = nodeToCheck.nextSibling;
+                                  }
+                                } else {
+                                  // If in an element, check first child or next sibling
+                                  nodeToCheck = (nodeToCheck as Element).firstChild || nodeToCheck.nextSibling;
+                                }
+                              }
+                              
+                              // Find image container
+                              let imageContainer: HTMLElement | null = null;
+                              if (nodeToCheck) {
+                                // Check if the node itself is an image container
+                                if (nodeToCheck.nodeType === Node.ELEMENT_NODE) {
+                                  const element = nodeToCheck as HTMLElement;
+                                  if (element.classList?.contains('article-image-container')) {
+                                    imageContainer = element;
+                                  } else {
+                                    // Check if it's inside an image container
+                                    imageContainer = element.closest('.article-image-container');
+                                  }
+                                } else {
+                                  // Check parent
+                                  imageContainer = nodeToCheck.parentElement?.closest('.article-image-container') || null;
+                                }
+                              }
+                              
+                              // Also check if cursor is directly inside an image container
+                              if (!imageContainer) {
+                                const commonAncestor = range.commonAncestorContainer;
+                                if (commonAncestor.nodeType === Node.ELEMENT_NODE) {
+                                  imageContainer = (commonAncestor as HTMLElement).closest('.article-image-container');
+                                } else {
+                                  imageContainer = commonAncestor.parentElement?.closest('.article-image-container') || null;
+                                }
+                              }
+                              
+                              // Remove image container if found
+                              if (imageContainer && articleContentRef.current?.contains(imageContainer)) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                
+                                // Create a range after the image for cursor placement
+                                const newRange = document.createRange();
+                                if (imageContainer.nextSibling) {
+                                  newRange.setStartBefore(imageContainer.nextSibling);
+                                } else if (imageContainer.previousSibling) {
+                                  newRange.setStartAfter(imageContainer.previousSibling);
+                                } else {
+                                  // No siblings, place at parent
+                                  const parent = imageContainer.parentNode;
+                                  if (parent) {
+                                    newRange.selectNodeContents(parent);
+                                    newRange.collapse(false);
+                                  }
+                                }
+                                
+                                // Remove the image
+                                imageContainer.remove();
+                                
+                                // Restore cursor position
+                                selection.removeAllRanges();
+                                selection.addRange(newRange);
+                                
+                                // Update content
+                                const content = articleContentRef.current?.innerHTML || '';
+                                setArticleFormData(prev => ({ ...prev, content }));
+                              }
+                            }
+                          }}
                           onPaste={(e) => {
                             // Allow default paste behavior first to maintain undo history
                             // Then clean up the pasted content and update state
@@ -3600,9 +4433,16 @@ export default function CounselorResourcesPage() {
                                 if (!articleContentRef.current) return;
                                 
                                 // Clean up all color styles in the entire editor
+                                // But preserve iframes and their containers
                                 const allElements = articleContentRef.current.querySelectorAll('*');
                                 allElements.forEach((el) => {
                                   const element = el as HTMLElement;
+                                  
+                                  // Skip iframe containers and iframes themselves - preserve their styles
+                                  if (element.tagName === 'IFRAME' || 
+                                      (element.tagName === 'DIV' && element.style.position === 'relative' && element.querySelector('iframe'))) {
+                                    return;
+                                  }
                                   
                                   // Remove color and background-color from inline styles
                                   if (element.style.color) {
@@ -3644,6 +4484,64 @@ export default function CounselorResourcesPage() {
                               }, 10);
                             });
                           }}
+                          onDragOver={(e) => {
+                            if (draggedImageRef.current) {
+                              e.preventDefault();
+                              e.dataTransfer!.dropEffect = 'move';
+                            }
+                          }}
+                          onDrop={(e) => {
+                            if (!draggedImageRef.current || !articleContentRef.current) return;
+                            
+                            e.preventDefault();
+                            e.stopPropagation();
+                            
+                            const selection = window.getSelection();
+                            if (!selection) return;
+                            
+                            // Get drop position using caretRangeFromPoint or current selection
+                            let range: Range | null = null;
+                            if (document.caretRangeFromPoint) {
+                              range = document.caretRangeFromPoint(e.clientX, e.clientY);
+                            } else if (selection.rangeCount > 0) {
+                              range = selection.getRangeAt(0);
+                            }
+                            
+                            if (range && articleContentRef.current.contains(range.commonAncestorContainer)) {
+                              // Find the best insertion point
+                              let insertNode: Node | null = range.commonAncestorContainer;
+                              
+                              // If dropped on text, find nearest block element
+                              if (insertNode.nodeType === Node.TEXT_NODE) {
+                                insertNode = insertNode.parentElement;
+                              }
+                              
+                              // Skip if trying to drop on itself
+                              if (insertNode && insertNode !== draggedImageRef.current && 
+                                  !draggedImageRef.current.contains(insertNode)) {
+                                // Remove from old position
+                                const draggedElement = draggedImageRef.current;
+                                draggedElement.remove();
+                                
+                                // Insert at new position
+                                if (insertNode.parentNode) {
+                                  // Determine if we should insert before or after
+                                  const rect = (insertNode as HTMLElement).getBoundingClientRect();
+                                  if (e.clientY < rect.top + rect.height / 2) {
+                                    insertNode.parentNode.insertBefore(draggedElement, insertNode);
+                                  } else {
+                                    insertNode.parentNode.insertBefore(draggedElement, insertNode.nextSibling);
+                                  }
+                                }
+                                
+                                const content = articleContentRef.current.innerHTML;
+                                setArticleFormData(prev => ({ ...prev, content }));
+                                
+                                // Reset dragged element
+                                draggedImageRef.current = null;
+                              }
+                            }
+                          }}
                           className="border-0 resize-none focus:outline-none text-base leading-relaxed p-6 bg-transparent min-h-[500px] text-foreground dark:text-foreground"
                           style={{ 
                             whiteSpace: 'pre-wrap',
@@ -3664,6 +4562,84 @@ export default function CounselorResourcesPage() {
                         }
                         [contenteditable] * {
                           color: inherit !important;
+                        }
+                        [contenteditable] img {
+                          max-width: 100%;
+                          height: auto;
+                          display: block;
+                          margin: 1rem auto;
+                          border-radius: 0.5rem;
+                        }
+                        [contenteditable] .article-image-container {
+                          position: relative;
+                          display: inline-block;
+                          width: 100%;
+                          max-width: 100%;
+                          margin: 1rem 0;
+                          cursor: move;
+                        }
+                        [contenteditable] .article-image-container:hover {
+                          outline: 2px dashed rgba(59, 130, 246, 0.5);
+                          outline-offset: 2px;
+                        }
+                        [contenteditable] .article-image-container img {
+                          margin: 0;
+                          width: 100%;
+                        }
+                        [contenteditable] .article-image-delete {
+                          position: absolute;
+                          top: 0.5rem;
+                          right: 0.5rem;
+                          width: 24px;
+                          height: 24px;
+                          border-radius: 50%;
+                          background: rgba(0, 0, 0, 0.7);
+                          color: white;
+                          border: none;
+                          cursor: pointer;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                          font-size: 18px;
+                          line-height: 1;
+                          z-index: 10;
+                          opacity: 0;
+                          transition: opacity 0.2s;
+                        }
+                        [contenteditable] .article-image-container:hover .article-image-delete {
+                          opacity: 1;
+                        }
+                        [contenteditable] .article-image-delete:hover {
+                          background: rgba(220, 38, 38, 0.9);
+                        }
+                        [contenteditable] iframe {
+                          border: none;
+                          display: block;
+                        }
+                        [contenteditable] div[data-embed="true"] {
+                          min-height: 200px;
+                          background: rgba(0, 0, 0, 0.02);
+                          border: 1px dashed rgba(0, 0, 0, 0.1);
+                          border-radius: 0.5rem;
+                          position: relative;
+                        }
+                        [contenteditable] div[data-embed="true"]:before {
+                          content: "Embedded Content";
+                          position: absolute;
+                          top: 50%;
+                          left: 50%;
+                          transform: translate(-50%, -50%);
+                          color: rgba(0, 0, 0, 0.4);
+                          font-size: 0.875rem;
+                          pointer-events: none;
+                          z-index: 1;
+                        }
+                        [contenteditable] div[data-embed="true"] iframe {
+                          position: relative;
+                          z-index: 2;
+                        }
+                        [contenteditable] div[style*="position: relative"] {
+                          min-height: 200px;
                         }
                         [contenteditable] p,
                         [contenteditable] div,
@@ -3929,6 +4905,59 @@ export default function CounselorResourcesPage() {
           onDownload={(a: any) => handleDownloadResource(viewingArticle)}
         />
       )}
+
+      {/* Embed URL Dialog */}
+      <Dialog open={showEmbedDialog} onOpenChange={setShowEmbedDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Insert Embed</DialogTitle>
+            <DialogDescription>
+              Enter the URL of the content you want to embed. Supported platforms: YouTube, Vimeo, SoundCloud, and more.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="embedUrl">Embed URL</Label>
+              <Input
+                id="embedUrl"
+                type="url"
+                placeholder="https://www.youtube.com/watch?v=... or https://soundcloud.com/..."
+                value={embedUrl}
+                onChange={(e) => setEmbedUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleConfirmEmbed();
+                  }
+                }}
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                Paste a YouTube, Vimeo, SoundCloud, or other embeddable URL
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+              <span className="font-medium">Examples:</span>
+              <span>youtube.com/watch?v=...</span>
+              <span>•</span>
+              <span>vimeo.com/...</span>
+              <span>•</span>
+              <span>soundcloud.com/...</span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowEmbedDialog(false);
+              setEmbedUrl('');
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmEmbed} disabled={!embedUrl.trim()}>
+              Insert Embed
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

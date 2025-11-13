@@ -36,7 +36,7 @@ export function ArticleViewerV2({ article, isOpen, onClose, onShare, onBookmark,
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent wide className="max-h-[92vh] overflow-y-auto">
+      <DialogContent wide className="max-h-[92vh] overflow-y-auto font-sans" style={{ fontFamily: 'var(--font-sans), Ubuntu, ui-sans-serif, system-ui, sans-serif' }}>
         {/* Visually hidden title for accessibility */}
         <DialogTitle className="sr-only">{article.title}</DialogTitle>
         <div className="mx-auto w-full max-w-[1000px]">
@@ -88,9 +88,90 @@ export function ArticleViewerV2({ article, isOpen, onClose, onShare, onBookmark,
           </div>
 
           {/* Article body */}
-          <article className="prose prose-lg dark:prose-invert max-w-none">
-            <div dangerouslySetInnerHTML={{ __html: article.content || article.description || '' }} />
+          <article className="w-full">
+            <div 
+              dangerouslySetInnerHTML={{ __html: article.content || article.description || '' }}
+              className="article-content border-0 text-base leading-relaxed p-6 bg-transparent text-foreground dark:text-foreground font-sans"
+              style={{ 
+                whiteSpace: 'pre-wrap',
+                wordWrap: 'break-word',
+                color: 'inherit',
+                fontFamily: 'var(--font-sans), Ubuntu, ui-sans-serif, system-ui, sans-serif'
+              }}
+            />
           </article>
+          <style jsx global>{`
+            .article-content {
+              font-family: var(--font-sans), Ubuntu, ui-sans-serif, system-ui, sans-serif !important;
+              font-weight: 500 !important;
+            }
+            .article-content * {
+              color: inherit !important;
+              font-family: inherit;
+            }
+            .article-content p,
+            .article-content div:not(.article-image-container):not([data-embed="true"]):not([style*="position: relative"]),
+            .article-content span,
+            .article-content li,
+            .article-content ul,
+            .article-content ol,
+            .article-content em,
+            .article-content i,
+            .article-content u,
+            .article-content s {
+              color: inherit !important;
+              font-family: var(--font-sans), Ubuntu, ui-sans-serif, system-ui, sans-serif !important;
+              font-weight: 500 !important;
+            }
+            .article-content h1,
+            .article-content h2,
+            .article-content h3,
+            .article-content h4,
+            .article-content h5,
+            .article-content h6,
+            .article-content strong,
+            .article-content b {
+              color: inherit !important;
+              font-family: var(--font-sans), Ubuntu, ui-sans-serif, system-ui, sans-serif !important;
+              font-weight: 700 !important;
+            }
+            .article-content img {
+              max-width: 100%;
+              height: auto;
+              display: block;
+              margin: 1rem auto;
+              border-radius: 0.5rem;
+            }
+            .article-content .article-image-container {
+              position: relative;
+              display: inline-block;
+              width: 100%;
+              max-width: 100%;
+              margin: 1rem 0;
+            }
+            .article-content .article-image-container img {
+              margin: 0;
+              width: 100%;
+            }
+            .article-content iframe {
+              border: none;
+              display: block;
+            }
+            .article-content div[data-embed="true"] {
+              min-height: 200px;
+              border-radius: 0.5rem;
+              position: relative;
+              margin: 1rem 0;
+            }
+            .article-content div[style*="position: relative"] {
+              margin: 1rem 0;
+              border-radius: 0.5rem;
+              overflow: hidden;
+            }
+            .article-content div[style*="position: relative"] iframe {
+              margin: 0;
+            }
+          `}</style>
 
           {/* Tags footer */}
           {article.tags && article.tags.length > 0 && (

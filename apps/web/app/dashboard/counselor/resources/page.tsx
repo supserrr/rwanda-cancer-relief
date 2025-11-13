@@ -1146,7 +1146,12 @@ export default function CounselorResourcesPage() {
           range = document.createRange();
           if (articleContentRef.current.childNodes.length > 0) {
             const lastNode = articleContentRef.current.childNodes[articleContentRef.current.childNodes.length - 1];
-            range.setStartAfter(lastNode);
+            if (lastNode) {
+              range.setStartAfter(lastNode);
+            } else {
+              range.selectNodeContents(articleContentRef.current);
+              range.collapse(false);
+            }
           } else {
             range.selectNodeContents(articleContentRef.current);
             range.collapse(false); // Collapse to end
@@ -1338,7 +1343,12 @@ export default function CounselorResourcesPage() {
           range = document.createRange();
           if (articleContentRef.current.childNodes.length > 0) {
             const lastNode = articleContentRef.current.childNodes[articleContentRef.current.childNodes.length - 1];
-            range.setStartAfter(lastNode);
+            if (lastNode) {
+              range.setStartAfter(lastNode);
+            } else {
+              range.selectNodeContents(articleContentRef.current);
+              range.collapse(false);
+            }
           } else {
             range.selectNodeContents(articleContentRef.current);
             range.collapse(false); // Collapse to end
@@ -2255,7 +2265,7 @@ export default function CounselorResourcesPage() {
     try {
       const tagsArray = tags.split(',').map(t => t.trim()).filter(Boolean);
 
-      const resourceData: ResourcesApi.CreateResourceInput = {
+      const resourceData: import('../../../../lib/api/resources').CreateResourceInput = {
         title: title.trim(),
         description: description.trim() || 'External link resource',
         type: isYouTube ? 'video' : 'article', // Use video for YouTube, article for other links

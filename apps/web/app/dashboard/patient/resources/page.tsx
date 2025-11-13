@@ -53,11 +53,11 @@ export default function PatientResourcesPage() {
     const params: {
       type?: 'audio' | 'pdf' | 'video' | 'article';
       search?: string;
-      isPublic?: boolean;
+      status?: 'published';
       sortBy?: 'title' | 'created_at' | 'views' | 'downloads';
       sortOrder?: 'asc' | 'desc';
     } = {
-      isPublic: true, // Only show public resources for patients
+      status: 'published', // Only show published resources for patients
       sortBy,
       sortOrder,
     };

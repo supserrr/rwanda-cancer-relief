@@ -751,6 +751,48 @@ export class AdminApi {
   }
 
   /**
+   * Get basic user profile information without admin access
+   * This method queries profiles directly and works with RLS policies
+   */
+  static async getUserProfile(userId: string): Promise<Partial<AdminUser>> {
+    const supabase = createClient();
+    if (!supabase) {
+      throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+    }
+
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, role, avatar_url, metadata')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        throw new Error('Failed to fetch user profile');
+      }
+
+      if (!profile) {
+        throw new Error('User not found');
+      }
+
+      // Get email from metadata (we can't access other users' emails from auth)
+      const email = (profile.metadata as any)?.email || (profile.metadata as any)?.contact_email || '';
+
+      return {
+        id: profile.id,
+        email,
+        fullName: profile.full_name || (profile.metadata as any)?.fullName,
+        role: this.normalizeRoleValue(profile.role) || (profile.metadata as any)?.role || 'patient',
+        avatarUrl: profile.avatar_url,
+      };
+    } catch (error) {
+      console.error('Error in getUserProfile:', error);
+      throw error instanceof Error ? error : new Error('Failed to get user profile');
+    }
+  }
+
+  /**
    * List users using Supabase Edge Function
    * Uses the admin Edge Function with service role key
    */

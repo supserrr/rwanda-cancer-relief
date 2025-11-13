@@ -29,6 +29,9 @@ import { useSessions } from '../../../../hooks/useSessions';
 import type { Session, RescheduleSessionInput } from '@/lib/api/sessions';
 import { toast } from 'sonner';
 import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
+import { AdminApi, type AdminUser } from '../../../../lib/api/admin';
+import type { Counselor } from '../../../../lib/types';
+import { normalizeAvatarUrl } from '@workspace/ui/lib/avatar';
 
 export default function PatientSessionsPage() {
   const router = useRouter();
@@ -42,6 +45,8 @@ export default function PatientSessionsPage() {
   const [isCancelOpen, setIsCancelOpen] = useState(false);
   const [selectedCounselor, setSelectedCounselor] = useState<any>(null);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+  const [counselors, setCounselors] = useState<Counselor[]>([]);
+  const [counselorsLoading, setCounselorsLoading] = useState(false);
 
   // Load sessions using the hook
   const patientSessionsParams = useMemo(
@@ -73,6 +78,84 @@ export default function PatientSessionsPage() {
 
   const allSessions = sessions;
 
+  // Load counselors on mount (for displaying names in session cards)
+  useEffect(() => {
+    if (counselors.length === 0 && !counselorsLoading && user?.id) {
+      const loadCounselors = async () => {
+        try {
+          setCounselorsLoading(true);
+          const response = await AdminApi.listUsers({ role: 'counselor' });
+          
+          // Map AdminUser to Counselor format
+          const mappedCounselors: Counselor[] = response.users
+            .filter((adminUser) => {
+              // Filter counselors based on visibility and availability
+              const metadata = (adminUser.metadata ?? {}) as Record<string, unknown>;
+              const approvalStatus = metadata.approvalStatus || (adminUser.counselorProfile as any)?.approval_status;
+              
+              // Only show approved/active counselors (relaxed check)
+              // If approval status exists and is not approved/active, filter out
+              if (approvalStatus && approvalStatus !== 'approved' && approvalStatus !== 'active') {
+                return false;
+              }
+              
+              return true;
+            })
+            .map((adminUser): Counselor => {
+              const metadata = (adminUser.metadata ?? {}) as Record<string, unknown>;
+              const counselorProfile = adminUser.counselorProfile;
+              
+              // Extract title from metadata
+              const professionalTitle = 
+                (typeof metadata.professionalTitle === 'string' ? metadata.professionalTitle : undefined) ||
+                (typeof metadata.professional_title === 'string' ? metadata.professional_title : undefined) ||
+                (typeof metadata.title === 'string' ? metadata.title : undefined) ||
+                undefined;
+              
+              const baseName = adminUser.fullName || 'Counselor';
+              const displayName = professionalTitle 
+                ? `${professionalTitle} ${baseName}`.trim()
+                : baseName;
+
+              return {
+                id: adminUser.id,
+                name: displayName,
+                title: professionalTitle,
+                email: adminUser.email || '',
+                role: 'counselor',
+                avatar: adminUser.avatarUrl || undefined,
+                createdAt: new Date(adminUser.createdAt),
+                lastLogin: adminUser.lastLogin ? new Date(adminUser.lastLogin) : undefined,
+                metadata,
+                specialty: adminUser.specialty || 'General Counseling',
+                experience: adminUser.experience || 0,
+                availability: (metadata.availability || (counselorProfile as any)?.availability_status || adminUser.availability || 'available') as 'available' | 'busy' | 'offline',
+                phoneNumber: adminUser.phoneNumber || undefined,
+                bio: (metadata.bio as string | undefined) || counselorProfile?.bio || undefined,
+                credentials: (metadata.credentials as string | undefined) || (counselorProfile as any)?.credentials || undefined,
+                languages: Array.isArray(metadata.languages) 
+                  ? metadata.languages.filter((item): item is string => typeof item === 'string')
+                  : undefined,
+                location: (metadata.location as string | undefined) || adminUser.location || undefined,
+                visibilitySettings: metadata.visibilitySettings as any,
+                approvalStatus: metadata.approvalStatus as any,
+                availabilityStatus: metadata.availabilityStatus as any,
+              };
+            });
+          
+          setCounselors(mappedCounselors);
+        } catch (error) {
+          console.error('Error loading counselors:', error);
+          toast.error('Failed to load counselors');
+        } finally {
+          setCounselorsLoading(false);
+        }
+      };
+      
+      loadCounselors();
+    }
+  }, [counselors.length, counselorsLoading, user?.id]);
+
   // Check for counselorId in URL query params on mount
   useEffect(() => {
     const counselorId = searchParams.get('counselorId');
@@ -84,6 +167,33 @@ export default function PatientSessionsPage() {
       router.replace('/dashboard/patient/sessions', { scroll: false });
     }
   }, [searchParams, router]);
+
+  // Get counselor name by ID
+  const getCounselorName = (counselorId: string) => {
+    const counselor = counselors.find(c => c.id === counselorId);
+    return counselor?.name || 'Unknown Counselor';
+  };
+
+  const getCounselorSpecialty = (counselorId: string) => {
+    const counselor = counselors.find(c => c.id === counselorId);
+    return counselor?.specialty || 'Counselor';
+  };
+
+  const getCounselorAvatar = (counselorId: string) => {
+    const counselor = counselors.find(c => c.id === counselorId);
+    if (counselor?.avatar) {
+      return normalizeAvatarUrl(counselor.avatar);
+    }
+    return undefined;
+  };
+
+  const getPatientAvatar = () => {
+    // Patient's own avatar from auth user
+    if (user?.avatar) {
+      return normalizeAvatarUrl(user.avatar);
+    }
+    return undefined;
+  };
 
   const handleJoinSession = (session: Session) => {
     router.push(`/dashboard/patient/sessions/session/${session.id}`);
@@ -154,6 +264,19 @@ export default function PatientSessionsPage() {
     try {
       if (!user?.id || !selectedCounselor?.id) {
         toast.error('Missing user or counselor information');
+        return;
+      }
+
+      // Validate counselor exists in loaded counselors list
+      const counselor = counselors.find(c => c.id === selectedCounselor.id);
+      if (!counselor) {
+        toast.error('Counselor not found. Please select a valid counselor.');
+        return;
+      }
+
+      // Ensure counselors are loaded
+      if (counselorsLoading) {
+        toast.error('Counselor data is still loading. Please wait and try again.');
         return;
       }
 
@@ -292,7 +415,10 @@ export default function PatientSessionsPage() {
                     key={session.id}
                     session={session}
                     patientName={user?.name || 'Patient'}
-                    counselorName="Loading..."
+                    patientAvatar={getPatientAvatar()}
+                    counselorName={getCounselorName(session.counselorId)}
+                    counselorSpecialty={getCounselorSpecialty(session.counselorId)}
+                    counselorAvatar={getCounselorAvatar(session.counselorId)}
                     onJoin={handleJoinSession}
                     onReschedule={handleRescheduleSession}
                     onCancel={handleCancelSession}
@@ -326,7 +452,10 @@ export default function PatientSessionsPage() {
                     key={session.id}
                     session={session}
                     patientName={user?.name || 'Patient'}
-                    counselorName="Loading..."
+                    patientAvatar={getPatientAvatar()}
+                    counselorName={getCounselorName(session.counselorId)}
+                    counselorSpecialty={getCounselorSpecialty(session.counselorId)}
+                    counselorAvatar={getCounselorAvatar(session.counselorId)}
                   />
                 ))}
               </div>
@@ -360,7 +489,10 @@ export default function PatientSessionsPage() {
                       key={session.id}
                       session={session}
                       patientName={user?.name || 'Patient'}
-                      counselorName="Loading..."
+                      patientAvatar={getPatientAvatar()}
+                      counselorName={getCounselorName(session.counselorId)}
+                      counselorSpecialty={getCounselorSpecialty(session.counselorId)}
+                      counselorAvatar={getCounselorAvatar(session.counselorId)}
                       onJoin={session.status === 'scheduled' ? handleJoinSession : undefined}
                       onReschedule={session.status === 'scheduled' ? handleRescheduleSession : undefined}
                       onCancel={session.status === 'scheduled' ? handleCancelSession : undefined}
@@ -391,7 +523,7 @@ export default function PatientSessionsPage() {
       <CounselorSelectionModal
         isOpen={isCounselorSelectionOpen}
         onClose={() => setIsCounselorSelectionOpen(false)}
-        counselors={[]} // TODO: Load from API
+        counselors={counselors}
         onSelectCounselor={handleSelectCounselor}
       />
 

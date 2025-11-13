@@ -23,6 +23,8 @@ import {
   Clock,
   Video,
   Mic,
+  MessageCircle,
+  Users,
   CheckCircle,
   AlertCircle,
   X
@@ -58,7 +60,7 @@ export function SessionBookingModal({
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [duration, setDuration] = useState('60');
-  const [sessionType, setSessionType] = useState<'video' | 'audio'>('video');
+  const [sessionType, setSessionType] = useState<'video' | 'audio' | 'chat' | 'in-person'>('video');
   const [notes, setNotes] = useState('');
   const [step, setStep] = useState(1);
 
@@ -235,6 +237,58 @@ export function SessionBookingModal({
                     )}
                   </div>
                 </button>
+
+                <button
+                  onClick={() => setSessionType('chat')}
+                  className={`p-6 border-2 rounded-lg transition-all ${
+                    sessionType === 'chat'
+                      ? 'border-primary bg-primary/5'
+                      : 'border-muted hover:border-muted-foreground/30'
+                  }`}
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                      sessionType === 'chat' ? 'bg-primary/10' : 'bg-muted'
+                    }`}>
+                      <MessageCircle className={`h-6 w-6 ${sessionType === 'chat' ? 'text-primary' : 'text-muted-foreground'}`} />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-semibold mb-1">Chat Session</p>
+                      <p className="text-xs text-muted-foreground">
+                        Text-based messaging
+                      </p>
+                    </div>
+                    {sessionType === 'chat' && (
+                      <Badge variant="default" className="mt-2">Selected</Badge>
+                    )}
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => setSessionType('in-person')}
+                  className={`p-6 border-2 rounded-lg transition-all ${
+                    sessionType === 'in-person'
+                      ? 'border-primary bg-primary/5'
+                      : 'border-muted hover:border-muted-foreground/30'
+                  }`}
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                      sessionType === 'in-person' ? 'bg-primary/10' : 'bg-muted'
+                    }`}>
+                      <Users className={`h-6 w-6 ${sessionType === 'in-person' ? 'text-primary' : 'text-muted-foreground'}`} />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-semibold mb-1">In-Person</p>
+                      <p className="text-xs text-muted-foreground">
+                        Face-to-face meeting
+                      </p>
+                    </div>
+                    {sessionType === 'in-person' && (
+                      <Badge variant="default" className="mt-2">Selected</Badge>
+                    )}
+                  </div>
+                </button>
               </div>
             </div>
 
@@ -242,10 +296,17 @@ export function SessionBookingModal({
               <div className="flex gap-2">
                 <AlertCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                 <div className="text-sm text-muted-foreground">
-                  {sessionType === 'video' ? (
+                  {sessionType === 'video' && (
                     <p>Video sessions provide better connection but require stable internet. You can switch to audio during the call if needed.</p>
-                  ) : (
+                  )}
+                  {sessionType === 'audio' && (
                     <p>Audio-only sessions use less bandwidth and are great for areas with limited connectivity.</p>
+                  )}
+                  {sessionType === 'chat' && (
+                    <p>Chat sessions allow for text-based communication, perfect for those who prefer written conversation or have limited connectivity.</p>
+                  )}
+                  {sessionType === 'in-person' && (
+                    <p>In-person sessions take place at a physical location. Your counselor will provide location details upon confirmation.</p>
                   )}
                 </div>
               </div>
@@ -298,10 +359,17 @@ export function SessionBookingModal({
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Session Type</span>
                   <Badge variant="outline" className="capitalize">
-                    {sessionType === 'video' ? (
+                    {sessionType === 'video' && (
                       <><Video className="h-3 w-3 mr-1" /> Video</>
-                    ) : (
+                    )}
+                    {sessionType === 'audio' && (
                       <><Mic className="h-3 w-3 mr-1" /> Audio Only</>
+                    )}
+                    {sessionType === 'chat' && (
+                      <><MessageCircle className="h-3 w-3 mr-1" /> Chat</>
+                    )}
+                    {sessionType === 'in-person' && (
+                      <><Users className="h-3 w-3 mr-1" /> In-Person</>
                     )}
                   </Badge>
                 </div>

@@ -65,7 +65,8 @@ import {
   TrendingUp,
   ExternalLink,
   ArrowLeft,
-  X
+  X,
+  XCircle
 } from 'lucide-react';
 import { useAuth } from '../../../../components/auth/AuthProvider';
 import { useResources } from '../../../../hooks/useResources';
@@ -96,7 +97,7 @@ export default function CounselorResourcesPage() {
     setViewingArticle,
     setIsArticleViewerOpen,
   } = useResourceViewer(true);
-  const [activeTab, setActiveTab] = useState('view');
+  const [activeTab, setActiveTab] = useState('add-resources');
   const [savedResources, setSavedResources] = useState<string[]>([]);
   
   // Enhanced state for better management
@@ -484,13 +485,21 @@ export default function CounselorResourcesPage() {
     };
   }, [activeTab, updateActiveFormatting]);
 
-  // Filter resources based on active tab (client-side for saved resources)
+  // Filter resources based on active tab and status
   const filteredResources = useMemo(() => {
-    if (activeTab === 'saved') {
-    return resources.filter(resource => savedResources.includes(resource.id));
+    // Only show counselor's own resources
+    const myResources = resources.filter(r => r.publisher === user?.id);
+    
+    if (activeTab === 'under-review') {
+      return myResources.filter(r => r.status === 'pending_review' || !r.status);
+    } else if (activeTab === 'published') {
+      return myResources.filter(r => r.status === 'published');
+    } else if (activeTab === 'rejected') {
+      return myResources.filter(r => r.status === 'rejected');
     }
-    return resources;
-  }, [resources, activeTab, savedResources]);
+    // For 'add-resources' tab, don't show resources (it's for creating new ones)
+    return [];
+  }, [resources, activeTab, user?.id]);
 
   // Get all unique tags from resources
   const allTags = useMemo(() => 
@@ -1987,6 +1996,110 @@ export default function CounselorResourcesPage() {
     }
   };
 
+  // Helper function to fetch YouTube video info for video upload form
+  const handleFetchYouTubeVideoInfo = async () => {
+    const url = uploadFormData.video.youtubeUrl.trim();
+    if (!url) {
+      toast.error('Please enter a YouTube URL');
+      return;
+    }
+
+    // Validate URL
+    try {
+      new URL(url);
+    } catch {
+      toast.error('Please enter a valid URL');
+      return;
+    }
+
+    // Check if it's a YouTube URL
+    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+    if (!isYouTube) {
+      toast.error('Please enter a valid YouTube URL');
+      return;
+    }
+
+    try {
+      // Extract video ID
+      let videoId = '';
+      if (url.includes('youtu.be')) {
+        videoId = url.split('/').pop()?.split('?')[0] || '';
+      } else {
+        const urlObj = new URL(url);
+        videoId = urlObj.searchParams.get('v') || '';
+      }
+
+      if (!videoId) {
+        throw new Error('Invalid YouTube URL');
+      }
+
+      // Fetch YouTube video metadata using oEmbed
+      const oEmbedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+      const response = await fetch(oEmbedUrl);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch YouTube video information');
+      }
+
+      const data = await response.json();
+      
+      // Try to fetch additional metadata from YouTube Data API if available
+      let duration = '';
+      let fullDescription = '';
+      let videoTags: string[] = [];
+      const youtubeApiKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
+      
+      if (youtubeApiKey) {
+        try {
+          const apiUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=contentDetails,snippet,statistics&key=${youtubeApiKey}`;
+          const apiResponse = await fetch(apiUrl);
+          if (apiResponse.ok) {
+            const apiData = await apiResponse.json();
+            if (apiData.items && apiData.items[0]) {
+              const video = apiData.items[0];
+              
+              // Get duration
+              if (video.contentDetails?.duration) {
+                duration = convertISODurationToTime(video.contentDetails.duration);
+              }
+              
+              // Get full description
+              if (video.snippet?.description) {
+                fullDescription = video.snippet.description;
+              }
+              
+              // Get video tags
+              if (video.snippet?.tags && Array.isArray(video.snippet.tags)) {
+                videoTags = video.snippet.tags.slice(0, 10);
+              }
+            }
+          }
+        } catch (apiError) {
+          console.warn('Failed to fetch additional data from YouTube API:', apiError);
+        }
+      }
+      
+      // Auto-fill form with fetched data
+      setUploadFormData(prev => ({
+        ...prev,
+        video: {
+          ...prev.video,
+          title: data.title || prev.video.title,
+          description: fullDescription || prev.video.description,
+          duration: duration || prev.video.duration,
+          tags: videoTags.length > 0 ? videoTags.join(', ') : prev.video.tags,
+          isYouTube: true,
+          youtubeUrl: url,
+        },
+      }));
+      
+      toast.success('YouTube video information fetched successfully');
+    } catch (error) {
+      console.error('Error fetching YouTube video info:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch YouTube video information');
+    }
+  };
+
   // Helper function to convert ISO 8601 duration to MM:SS or HH:MM:SS format
   const convertISODurationToTime = (isoDuration: string): string => {
     // ISO 8601 format: PT4M13S (4 minutes 13 seconds), PT1H2M3S (1 hour 2 minutes 3 seconds)
@@ -2426,291 +2539,35 @@ export default function CounselorResourcesPage() {
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="view" className="flex items-center gap-2">
-            <Eye className="h-4 w-4" />
-            <span className="hidden md:inline">View Resources</span>
-          </TabsTrigger>
-          <TabsTrigger value="saved" className="flex items-center gap-2">
-            <Download className="h-4 w-4" />
-            <span className="hidden md:inline">Saved Resources</span>
-          </TabsTrigger>
-          <TabsTrigger value="manage" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="add-resources" className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
             <span className="hidden md:inline">Add Resources</span>
+          </TabsTrigger>
+          <TabsTrigger value="under-review" className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            <span className="hidden md:inline">Under Review</span>
+            <Badge variant="secondary" className="ml-2">
+              {resources.filter(r => r.publisher === user?.id && (r.status === 'pending_review' || !r.status)).length}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="published" className="flex items-center gap-2">
+            <Globe className="h-4 w-4" />
+            <span className="hidden md:inline">Published</span>
+            <Badge variant="secondary" className="ml-2">
+              {resources.filter(r => r.publisher === user?.id && r.status === 'published').length}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="rejected" className="flex items-center gap-2">
+            <XCircle className="h-4 w-4" />
+            <span className="hidden md:inline">Rejected</span>
+            <Badge variant="secondary" className="ml-2">
+              {resources.filter(r => r.publisher === user?.id && r.status === 'rejected').length}
+            </Badge>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="view" className="mt-6">
-          {/* Enhanced Search and Filters */}
-          <div className="space-y-4">
-            {/* Main Search Bar */}
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
-                <Input
-                  placeholder="Search resources by title, description, or tags..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
-                />
-              </div>
-              
-              {/* Quick Filters */}
-              <div className="flex gap-2">
-                <Select value={selectedType} onValueChange={setSelectedType}>
-                  <SelectTrigger className="w-32 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
-                    <SelectValue placeholder="Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {resourceTypes.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-32 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statusOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={sortBy} onValueChange={(value) => setSortBy(value as 'title' | 'created_at' | 'views' | 'downloads')}>
-                  <SelectTrigger className="w-36 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10">
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sortOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                >
-                  {sortOrder === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
-                </Button>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                  onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-                >
-                  {viewMode === 'grid' ? <List className="h-4 w-4" /> : <Grid3X3 className="h-4 w-4" />}
-                </Button>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                  onClick={handleRefresh}
-                  disabled={resourcesLoading}
-                >
-                  <RefreshCw className={`h-4 w-4 ${resourcesLoading ? 'animate-spin' : ''}`} />
-                </Button>
-              </div>
-            </div>
-
-            {/* Results Summary */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <span>{filteredResources.length} resource{filteredResources.length !== 1 ? 's' : ''} found</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Resources Display */}
-          {resourcesLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <Spinner variant="bars" size={32} className="text-primary" />
-            </div>
-          ) : filteredResources.length > 0 ? (
-            viewMode === 'grid' ? (
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-8">
-                {filteredResources.map((resource, index) => {
-                  const uiResource = convertToUIResource(resource);
-                  return (
-                  <div key={resource.id} className="relative">
-                    <ResourceCard
-                        resource={uiResource}
-                      onView={(r: any) => handleViewResource(resource)}
-                      onDownload={(r: any) => handleDownloadResource(resource)}
-                      onEdit={(r: any) => handleEditResource(resource)}
-                        onDelete={(r: any) => handleDeleteResource(r.id || resource.id)}
-                      showEditActions={true}
-                      delay={index * 0.1}
-                    />
-                  </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="space-y-4 mt-8">
-                {filteredResources.map((resource, index) => (
-                  <div key={resource.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/20 dark:hover:border-primary/30 hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-primary/20 transition-all duration-200 cursor-pointer group relative">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-muted dark:bg-muted/50 rounded-lg flex items-center justify-center group-hover:bg-primary/10 dark:group-hover:bg-primary/20 transition-colors duration-200">
-                        {resource.type === 'audio' && <Play className="h-6 w-6 group-hover:text-primary dark:group-hover:text-primary transition-colors duration-200" />}
-                        {resource.type === 'pdf' && <FileText className="h-6 w-6 group-hover:text-primary dark:group-hover:text-primary transition-colors duration-200" />}
-                        {resource.type === 'video' && <Video className="h-6 w-6 group-hover:text-primary dark:group-hover:text-primary transition-colors duration-200" />}
-                        {resource.type === 'article' && <BookOpen className="h-6 w-6 group-hover:text-primary dark:group-hover:text-primary transition-colors duration-200" />}
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium group-hover:text-primary dark:group-hover:text-primary transition-colors duration-200">{resource.title}</h4>
-                        <p className="text-sm text-muted-foreground line-clamp-2">{resource.description}</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <Badge variant="outline" className="text-xs">
-                            {resource.type.toUpperCase()}
-                          </Badge>
-                          <Badge variant={resource.isPublic ? "default" : "secondary"} className="text-xs">
-                            {resource.isPublic ? "Public" : "Private"}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(resource.createdAt).toLocaleDateString()}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {resource.publisherName ? `by ${resource.publisherName}` : resource.publisher === user?.id ? 'by You' : 'by Unknown'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                        onClick={() => handleViewResource(resource)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                        onClick={() => handleEditResource(resource)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                        onClick={() => handleDuplicateResource(resource)}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                        onClick={() => handleDownloadResource(resource)}
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                        onClick={() => handleArchiveResource(resource.id)}
-                      >
-                        <Archive className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="destructive" 
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleDeleteResource(resource.id);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
-          ) : (
-            <div className="text-center py-12 mt-8">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                <FileText className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">No resources found</h3>
-              <p className="text-muted-foreground mb-4">
-                Try adjusting your search criteria
-              </p>
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="saved" className="mt-6">
-          <div className="space-y-4">
-            {/* Results Summary */}
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                {getSavedResources().length} saved resource{getSavedResources().length !== 1 ? 's' : ''}
-              </p>
-              <div className="flex items-center gap-2">
-                <Download className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Your saved resources</span>
-              </div>
-            </div>
-
-            {/* Saved Resources Grid */}
-            {getSavedResources().length > 0 ? (
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-8">
-                {getSavedResources().map((resource, index) => (
-                  <ResourceCard
-                    key={resource.id}
-                    resource={convertToUIResource(resource)}
-                    onView={(r: any) => handleViewResource(resource)}
-                    onDownload={(r: any) => handleDownloadResource(resource)}
-                    onEdit={(r: any) => handleEditResource(resource)}
-                    onDelete={(r: any) => handleDeleteResource(r.id || resource.id)}
-                    onUnsave={(r: any) => handleUnsaveResource(resource.id)}
-                    showEditActions={true}
-                    delay={index * 0.1}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 mt-8">
-                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Download className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">No saved resources</h3>
-                <p className="text-muted-foreground mb-4">
-                  Save resources by clicking the bookmark icon when viewing them
-                </p>
-                <Button 
-                  onClick={() => setActiveTab('view')}
-                >
-                  Browse All Resources
-                </Button>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="manage" className="mt-6">
+        <TabsContent value="add-resources" className="mt-6">
           <div className="space-y-8">
             {/* Header Section */}
             <div className="text-center space-y-2">
@@ -2719,130 +2576,6 @@ export default function CounselorResourcesPage() {
                 Choose how you'd like to add content to your resource library. All resources will be available to your patients.
               </p>
             </div>
-
-            {/* Drafts Section */}
-            {(() => {
-              const drafts = resources.filter(r => r.type === 'article' && !r.isPublic && r.publisher === user?.id);
-              if (drafts.length === 0) return null;
-              
-              return (
-                <AnimatedCard className="mb-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
-                        <FileText className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">Draft Articles</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {drafts.length} {drafts.length === 1 ? 'draft' : 'drafts'} saved
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    {drafts.map((draft) => (
-                      <div
-                        key={draft.id}
-                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
-                        onClick={() => {
-                          // Load draft into editor
-                          setEditingDraftId(draft.id);
-                          setArticleFormData({
-                            title: draft.title,
-                            excerpt: draft.description || '',
-                            content: draft.content || '',
-                            category: draft.category || '',
-                            readingTime: draft.readingTime || '',
-                            author: draft.publisherName || user?.name || '', // Load saved publisher name or fallback to current user
-                            tags: draft.tags.join(', '),
-                          });
-                          // Load cover image if exists
-                          if (draft.thumbnail) {
-                            setCoverImage({ file: null, preview: draft.thumbnail });
-                          } else {
-                            setCoverImage({ file: null, preview: null });
-                          }
-                          // Switch to article editor tab
-                          setActiveTab('create-article');
-                          // Force content to load after a brief delay to ensure DOM is ready
-                          setTimeout(() => {
-                            if (articleContentRef.current && draft.content) {
-                              const currentContent = articleContentRef.current.innerHTML.trim();
-                              if (!currentContent || currentContent === '<br>' || currentContent === '') {
-                                articleContentRef.current.innerHTML = draft.content;
-                              }
-                            }
-                          }, 200);
-                        }}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium truncate">{draft.title || 'Untitled Draft'}</h4>
-                          <p className="text-sm text-muted-foreground truncate">
-                            {draft.description || 'No description'}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Last updated: {new Date(draft.updatedAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 ml-4">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Set editing draft ID first
-                              setEditingDraftId(draft.id);
-                              // Set form data with draft content
-                              setArticleFormData({
-                                title: draft.title,
-                                excerpt: draft.description || '',
-                                content: draft.content || '',
-                                category: draft.category || '',
-                                readingTime: draft.readingTime || '',
-                                author: draft.publisherName || user?.name || '', // Load saved publisher name or fallback to current user
-                                tags: draft.tags.join(', '),
-                              });
-                              // Load cover image if exists
-                              if (draft.thumbnail) {
-                                setCoverImage({ file: null, preview: draft.thumbnail });
-                              } else {
-                                setCoverImage({ file: null, preview: null });
-                              }
-                              // Switch to article editor tab
-                              setActiveTab('create-article');
-                              // Force content to load after a brief delay to ensure DOM is ready
-                              setTimeout(() => {
-                                if (articleContentRef.current && draft.content) {
-                                  const currentContent = articleContentRef.current.innerHTML.trim();
-                                  if (!currentContent || currentContent === '<br>' || currentContent === '') {
-                                    articleContentRef.current.innerHTML = draft.content;
-                                  }
-                                }
-                              }, 200);
-                            }}
-                          >
-                            <Edit className="h-4 w-4 mr-1" />
-                            Continue Editing
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDraftToDelete(draft.id);
-                              setShowDeleteDraftDialog(true);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </AnimatedCard>
-              );
-            })()}
 
             {/* Resource Type Grid - 3x3 */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -3104,7 +2837,7 @@ export default function CounselorResourcesPage() {
                 size="sm" 
                 onClick={() => {
                   setEditingResource(null);
-                  setActiveTab('manage');
+                  setActiveTab('add-resources');
                 }}
                 className="flex items-center gap-2"
               >
@@ -3123,6 +2856,42 @@ export default function CounselorResourcesPage() {
 
             {/* Upload Area */}
             <AnimatedCard className="p-8">
+              {editingResource && editingResource.type === 'audio' && editingResource.url ? (
+                <div className="border-2 border-purple-200 rounded-xl p-6 bg-purple-50 dark:bg-purple-950">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+                        <Play className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-purple-900 dark:text-purple-100">Current Audio File</p>
+                        <p className="text-sm text-purple-700 dark:text-purple-300">
+                          {editingResource.url.split('/').pop() || 'Audio file'}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleChooseAudioFile}
+                      className="border-purple-300 text-purple-700 hover:bg-purple-100 dark:border-purple-700 dark:text-purple-300 dark:hover:bg-purple-900"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Replace File
+                    </Button>
+                  </div>
+                  {uploadFormData.audio.file && (
+                    <div className="mt-4 p-3 bg-white dark:bg-purple-900 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                        New file selected: {uploadFormData.audio.file.name}
+                      </p>
+                      <p className="text-xs text-purple-700 dark:text-purple-300">
+                        {(uploadFormData.audio.file.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
               <div className="border-2 border-dashed border-purple-200 rounded-xl p-12 text-center hover:border-purple-300 transition-colors">
                 <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Play className="h-10 w-10 text-purple-600" />
@@ -3141,7 +2910,10 @@ export default function CounselorResourcesPage() {
                     </p>
                   </div>
                 )}
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                </div>
+              )}
+              {!(editingResource && editingResource.type === 'audio' && editingResource.url) && (
+                <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6">
                   <Button onClick={handleChooseAudioFile} className="bg-purple-600 hover:bg-purple-700">
                     <Upload className="h-4 w-4 mr-2" />
                     {uploadFormData.audio.file ? 'Change Audio File' : 'Choose Audio File'}
@@ -3160,7 +2932,7 @@ export default function CounselorResourcesPage() {
                     Upload Guidelines
                   </Button>
                 </div>
-              </div>
+              )}
             </AnimatedCard>
 
             {/* File Details Form */}
@@ -3204,7 +2976,7 @@ export default function CounselorResourcesPage() {
               <div className="flex justify-end space-x-3 mt-6">
                 <Button variant="outline" onClick={() => {
                   setEditingResource(null);
-                  setActiveTab('manage');
+                  setActiveTab('add-resources');
                 }}>
                   Cancel
                 </Button>
@@ -3248,7 +3020,7 @@ export default function CounselorResourcesPage() {
                 size="sm" 
                 onClick={() => {
                   setEditingResource(null);
-                  setActiveTab('manage');
+                  setActiveTab('add-resources');
                 }}
                 className="flex items-center gap-2"
               >
@@ -3267,25 +3039,110 @@ export default function CounselorResourcesPage() {
 
             {/* Upload Area */}
             <AnimatedCard className="p-8">
-              <div className="border-2 border-dashed border-blue-200 rounded-xl p-12 text-center hover:border-blue-300 transition-colors">
-                <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Video className="h-10 w-10 text-blue-600" />
-                </div>
-                <h4 className="text-xl font-semibold mb-2">Drop your video file here</h4>
-                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  Supported formats: MP4, MOV, AVI, MKV. Maximum file size: 500MB
-                </p>
-                {uploadFormData.video.file && (
-                  <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
-                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                      Selected: {uploadFormData.video.file.name}
-                    </p>
-                    <p className="text-xs text-blue-700 dark:text-blue-300">
-                      {(uploadFormData.video.file.size / 1024 / 1024).toFixed(2)} MB
-                    </p>
+              {/* Show YouTube URL input when replacing a YouTube link - PRIORITIZED */}
+              {editingResource && editingResource.type === 'video' && editingResource.youtubeUrl && !uploadFormData.video.youtubeUrl ? (
+                <div className="border-2 border-dashed border-orange-200 dark:border-orange-800 rounded-xl p-12 text-center hover:border-orange-300 dark:hover:border-orange-700 transition-colors bg-orange-50 dark:bg-orange-950">
+                  <div className="w-20 h-20 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Globe className="h-10 w-10 text-orange-600 dark:text-orange-400" />
                   </div>
-                )}
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <h4 className="text-xl font-semibold mb-2">Paste your link here</h4>
+                  <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                    Supported: YouTube videos, websites, and other online resources. We'll automatically fetch the title, description, and thumbnail.
+                  </p>
+                  <div className="max-w-lg mx-auto mb-4">
+                    <div className="relative">
+                      <Input 
+                        placeholder="Paste YouTube URL or website link (e.g., https://youtube.com/watch?v=...)"
+                        className="pr-24"
+                        value={uploadFormData.video.youtubeUrl}
+                        onChange={(e) => {
+                          const url = e.target.value;
+                          setUploadFormData(prev => ({ 
+                            ...prev, 
+                            video: { 
+                              ...prev.video, 
+                              youtubeUrl: url,
+                              isYouTube: url.trim().length > 0 && (url.includes('youtube.com') || url.includes('youtu.be'))
+                            } 
+                          }));
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && uploadFormData.video.youtubeUrl.trim()) {
+                            e.preventDefault();
+                            handleFetchYouTubeVideoInfo();
+                          }
+                        }}
+                      />
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="absolute right-1 top-1/2 -translate-y-1/2 text-xs"
+                        onClick={handleFetchYouTubeVideoInfo}
+                        disabled={!uploadFormData.video.youtubeUrl.trim()}
+                      >
+                        Fetch Info
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Preview will appear here after entering URL
+                  </div>
+                </div>
+              ) : editingResource && editingResource.type === 'video' && (editingResource.url || editingResource.youtubeUrl) && 
+               !(editingResource.youtubeUrl && !uploadFormData.video.youtubeUrl) ? (
+                <div className="border-2 border-blue-200 rounded-xl p-6 bg-blue-50 dark:bg-blue-950">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                        <Video className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-blue-900 dark:text-blue-100">Current Video</p>
+                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                          {editingResource.youtubeUrl && uploadFormData.video.youtubeUrl ? 'YouTube Video' : (editingResource.url?.split('/').pop() || 'Video file')}
+                        </p>
+                        {editingResource.youtubeUrl && uploadFormData.video.youtubeUrl && (
+                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 truncate max-w-md">
+                            {uploadFormData.video.youtubeUrl || editingResource.youtubeUrl}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={editingResource.youtubeUrl && uploadFormData.video.youtubeUrl ? () => {
+                        // For YouTube videos, clear the URL so user can enter a new one
+                        setUploadFormData(prev => ({ 
+                          ...prev, 
+                          video: { 
+                            ...prev.video, 
+                            youtubeUrl: '', 
+                            isYouTube: false,
+                            file: null // Clear any file selection
+                          } 
+                        }));
+                      } : handleChooseVideoFile}
+                      className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {editingResource.youtubeUrl && uploadFormData.video.youtubeUrl ? 'Replace Link' : 'Replace File'}
+                    </Button>
+                  </div>
+                  {uploadFormData.video.file && (
+                    <div className="mt-4 p-3 bg-white dark:bg-blue-900 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                        New file selected: {uploadFormData.video.file.name}
+                      </p>
+                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                        {(uploadFormData.video.file.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+              {!(editingResource && editingResource.type === 'video' && (editingResource.url || (editingResource.youtubeUrl && uploadFormData.video.youtubeUrl))) && (
+                <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6">
                   <Button onClick={handleChooseVideoFile} className="bg-blue-600 hover:bg-blue-700">
                     <Upload className="h-4 w-4 mr-2" />
                     {uploadFormData.video.file ? 'Change Video File' : 'Choose Video File'}
@@ -3304,7 +3161,7 @@ export default function CounselorResourcesPage() {
                     Upload Guidelines
                   </Button>
                 </div>
-              </div>
+              )}
             </AnimatedCard>
 
             {/* File Details Form */}
@@ -3337,6 +3194,27 @@ export default function CounselorResourcesPage() {
                   />
                 </div>
                 <div className="md:col-span-2">
+                  <label className="text-sm font-medium text-muted-foreground mb-2 block">YouTube URL (optional)</label>
+                  <Input 
+                    placeholder="https://www.youtube.com/watch?v=..." 
+                    value={uploadFormData.video.youtubeUrl}
+                    onChange={(e) => {
+                      const url = e.target.value;
+                      setUploadFormData(prev => ({ 
+                        ...prev, 
+                        video: { 
+                          ...prev.video, 
+                          youtubeUrl: url,
+                          isYouTube: url.trim().length > 0 && (url.includes('youtube.com') || url.includes('youtu.be'))
+                        } 
+                      }));
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {uploadFormData.video.youtubeUrl ? 'YouTube video will be used instead of uploaded file' : 'Leave empty to upload a video file'}
+                  </p>
+                </div>
+                <div className="md:col-span-2">
                   <label className="text-sm font-medium text-muted-foreground mb-2 block">Tags</label>
                   <Input 
                     placeholder="Enter tags separated by commas..." 
@@ -3348,7 +3226,7 @@ export default function CounselorResourcesPage() {
               <div className="flex justify-end space-x-3 mt-6">
                 <Button variant="outline" onClick={() => {
                   setEditingResource(null);
-                  setActiveTab('manage');
+                  setActiveTab('add-resources');
                 }}>
                   Cancel
                 </Button>
@@ -3392,7 +3270,7 @@ export default function CounselorResourcesPage() {
                 size="sm" 
                 onClick={() => {
                   setEditingResource(null);
-                  setActiveTab('manage');
+                  setActiveTab('add-resources');
                 }}
                 className="flex items-center gap-2"
               >
@@ -3411,6 +3289,42 @@ export default function CounselorResourcesPage() {
 
             {/* Upload Area */}
             <AnimatedCard className="p-8">
+              {editingResource && editingResource.type === 'pdf' && editingResource.url ? (
+                <div className="border-2 border-red-200 rounded-xl p-6 bg-red-50 dark:bg-red-950">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
+                        <FileText className="h-8 w-8 text-red-600 dark:text-red-400" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-red-900 dark:text-red-100">Current PDF File</p>
+                        <p className="text-sm text-red-700 dark:text-red-300">
+                          {editingResource.url.split('/').pop() || 'PDF file'}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleChoosePdfFile}
+                      className="border-red-300 text-red-700 hover:bg-red-100 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Replace File
+                    </Button>
+                  </div>
+                  {uploadFormData.pdf.file && (
+                    <div className="mt-4 p-3 bg-white dark:bg-red-900 rounded-lg border border-red-200 dark:border-red-800">
+                      <p className="text-sm font-medium text-red-900 dark:text-red-100">
+                        New file selected: {uploadFormData.pdf.file.name}
+                      </p>
+                      <p className="text-xs text-red-700 dark:text-red-300">
+                        {(uploadFormData.pdf.file.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
               <div className="border-2 border-dashed border-red-200 rounded-xl p-12 text-center hover:border-red-300 transition-colors">
                 <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
                   <FileText className="h-10 w-10 text-red-600" />
@@ -3449,6 +3363,7 @@ export default function CounselorResourcesPage() {
                   </Button>
                 </div>
               </div>
+              )}
             </AnimatedCard>
 
             {/* File Details Form */}
@@ -3484,7 +3399,7 @@ export default function CounselorResourcesPage() {
               <div className="flex justify-end space-x-3 mt-6">
                 <Button variant="outline" onClick={() => {
                   setEditingResource(null);
-                  setActiveTab('manage');
+                  setActiveTab('add-resources');
                 }}>
                   Cancel
                 </Button>
@@ -3701,7 +3616,7 @@ export default function CounselorResourcesPage() {
                     externalLink: { url: '', title: '', description: '', tags: '', category: '', duration: '', isYouTube: false },
                   }));
                   setLinkPreview({ loading: false });
-                  setActiveTab('manage');
+                  setActiveTab('add-resources');
                 }}>
                   Cancel
                 </Button>
@@ -4835,6 +4750,260 @@ export default function CounselorResourcesPage() {
               </ul>
             </AnimatedCard>
           </div>
+        </TabsContent>
+
+      {/* New Status-Based Tabs */}
+      <TabsContent value="under-review" className="mt-6">
+        {/* Enhanced Search and Filters */}
+        <div className="space-y-4 mb-8">
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
+              <Input
+                placeholder="Search resources by title, description, or tags..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Select value={selectedType} onValueChange={setSelectedType}>
+                <SelectTrigger className="w-32 bg-primary/5 border-primary/20">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {resourceTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                onClick={handleRefresh}
+                disabled={resourcesLoading}
+              >
+                <RefreshCw className={`h-4 w-4 ${resourcesLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <span>{filteredResources.length} resource{filteredResources.length !== 1 ? 's' : ''} under review</span>
+            </div>
+          </div>
+        </div>
+
+        {resourcesLoading ? (
+          <div className="flex justify-center items-center h-64">
+            <Spinner variant="bars" size={32} className="text-primary" />
+          </div>
+        ) : filteredResources.length > 0 ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-8">
+            {filteredResources.map((resource, index) => {
+              const uiResource = convertToUIResource(resource);
+              return (
+                <div key={resource.id} className="relative">
+                  <ResourceCard
+                    resource={uiResource}
+                    onView={(r: any) => handleViewResource(resource)}
+                    onEdit={(r: any) => handleEditResource(resource)}
+                    showEditActions={true}
+                    delay={index * 0.1}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-12 mt-8">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">No resources under review</h3>
+            <p className="text-muted-foreground">Resources you create will appear here while awaiting admin review</p>
+          </div>
+        )}
+      </TabsContent>
+
+      <TabsContent value="published" className="mt-6">
+        {/* Enhanced Search and Filters */}
+        <div className="space-y-4 mb-8">
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
+              <Input
+                placeholder="Search resources by title, description, or tags..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Select value={selectedType} onValueChange={setSelectedType}>
+                <SelectTrigger className="w-32 bg-primary/5 border-primary/20">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {resourceTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                onClick={handleRefresh}
+                disabled={resourcesLoading}
+              >
+                <RefreshCw className={`h-4 w-4 ${resourcesLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <span>{filteredResources.length} published resource{filteredResources.length !== 1 ? 's' : ''}</span>
+            </div>
+          </div>
+        </div>
+
+        {resourcesLoading ? (
+          <div className="flex justify-center items-center h-64">
+            <Spinner variant="bars" size={32} className="text-primary" />
+          </div>
+        ) : filteredResources.length > 0 ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-8">
+            {filteredResources.map((resource, index) => {
+              const uiResource = convertToUIResource(resource);
+              return (
+                <div key={resource.id} className="relative">
+                  <ResourceCard
+                    resource={uiResource}
+                    onView={(r: any) => handleViewResource(resource)}
+                    onEdit={(r: any) => handleEditResource(resource)}
+                    showEditActions={true}
+                    delay={index * 0.1}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-12 mt-8">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+              <Globe className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">No published resources</h3>
+            <p className="text-muted-foreground">Published resources will appear here</p>
+          </div>
+        )}
+      </TabsContent>
+
+      <TabsContent value="rejected" className="mt-6">
+        {/* Enhanced Search and Filters */}
+        <div className="space-y-4 mb-8">
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
+              <Input
+                placeholder="Search resources by title, description, or tags..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Select value={selectedType} onValueChange={setSelectedType}>
+                <SelectTrigger className="w-32 bg-primary/5 border-primary/20">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {resourceTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                onClick={handleRefresh}
+                disabled={resourcesLoading}
+              >
+                <RefreshCw className={`h-4 w-4 ${resourcesLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <span>{filteredResources.length} rejected resource{filteredResources.length !== 1 ? 's' : ''}</span>
+            </div>
+          </div>
+        </div>
+
+        {resourcesLoading ? (
+          <div className="flex justify-center items-center h-64">
+            <Spinner variant="bars" size={32} className="text-primary" />
+          </div>
+        ) : filteredResources.length > 0 ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-8">
+            {filteredResources.map((resource, index) => {
+              const uiResource = convertToUIResource(resource);
+              return (
+                <div key={resource.id} className="relative">
+                  <ResourceCard
+                    resource={uiResource}
+                    onView={(r: any) => handleViewResource(resource)}
+                    onEdit={(r: any) => handleEditResource(resource)}
+                    onDelete={(r: any) => handleDeleteResource(r.id || resource.id)}
+                    showEditActions={true}
+                    showActions={true}
+                    delay={index * 0.1}
+                    customActions={
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                        onClick={async () => {
+                          try {
+                            await updateResource(resource.id, {
+                              status: 'pending_review',
+                            });
+                            toast.success('Resource re-submitted for review');
+                            refreshResources();
+                          } catch (error) {
+                            console.error('Error re-submitting resource:', error);
+                            toast.error('Failed to re-submit resource');
+                          }
+                        }}
+                        title="Re-submit for Review"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Re-submit
+                      </Button>
+                    }
+                  />
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-12 mt-8">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+              <XCircle className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">No rejected resources</h3>
+            <p className="text-muted-foreground">Rejected resources will appear here. You can edit and re-submit them.</p>
+          </div>
+        )}
         </TabsContent>
       </Tabs>
 

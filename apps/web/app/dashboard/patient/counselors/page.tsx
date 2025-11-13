@@ -19,6 +19,7 @@ import { Search, Filter, Star } from 'lucide-react';
 import { AdminApi, type AdminUser } from '../../../../lib/api/admin';
 import { ProfileViewModal } from '@workspace/ui/components/profile-view-modal';
 import { useAuth } from '../../../../components/auth/AuthProvider';
+import { useSessions } from '../../../../hooks/useSessions';
 import type {
   VisibilitySettings,
   CounselorApprovalStatus,
@@ -729,6 +730,19 @@ export default function PatientCounselorsPage() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [selectedProfileCounselor, setSelectedProfileCounselor] = useState<CounselorProfile | null>(null);
 
+  // Initialize sessions hook for creating sessions
+  const patientSessionsParams = useMemo(
+    () => (user?.id ? { patientId: user.id } : undefined),
+    [user?.id]
+  );
+
+  const {
+    createSession,
+    refreshSessions,
+  } = useSessions(patientSessionsParams, {
+    enabled: Boolean(user?.id),
+  });
+
   // Load counselors
   useEffect(() => {
     const loadCounselors = async () => {
@@ -870,10 +884,38 @@ export default function PatientCounselorsPage() {
     }
   };
 
-  const handleConfirmBooking = (bookingData: any) => {
-    console.log('Booking confirmed:', bookingData);
-    // Here you would typically send the booking data to your backend
-    // For now, we'll just log it
+  const handleConfirmBooking = async (bookingData: any) => {
+    try {
+      if (!user?.id || !selectedCounselor?.id) {
+        toast.error('Missing user or counselor information');
+        return;
+      }
+
+      // Validate counselor exists in loaded counselors list
+      const counselor = counselors.find(c => c.id === selectedCounselor.id);
+      if (!counselor) {
+        toast.error('Counselor not found. Please select a valid counselor.');
+        return;
+      }
+
+      await createSession({
+        patientId: user.id,
+        counselorId: selectedCounselor.id,
+        date: bookingData.date,
+        time: bookingData.time,
+        duration: bookingData.duration,
+        type: bookingData.sessionType || 'video',
+        notes: bookingData.notes,
+      });
+      
+      toast.success('Session booked successfully!');
+      setIsBookingModalOpen(false);
+      setSelectedCounselor(null);
+      await refreshSessions();
+    } catch (error) {
+      console.error('Error booking session:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to book session. Please try again.');
+    }
   };
 
   const handleCloseBookingModal = () => {

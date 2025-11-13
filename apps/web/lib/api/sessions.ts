@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 /**
  * Session type
  */
-export type SessionType = 'video' | 'audio' | 'chat';
+export type SessionType = 'video' | 'audio' | 'chat' | 'in-person';
 
 /**
  * Session status
@@ -145,6 +145,20 @@ export class SessionsApi {
     const supabase = createClient();
     if (!supabase) {
       throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+    }
+
+    // Validate that patient and counselor exist
+    const [patientCheck, counselorCheck] = await Promise.all([
+      supabase.from('profiles').select('id, role').eq('id', data.patientId).eq('role', 'patient').maybeSingle(),
+      supabase.from('profiles').select('id, role').eq('id', data.counselorId).eq('role', 'counselor').maybeSingle(),
+    ]);
+
+    if (patientCheck.error || !patientCheck.data) {
+      throw new Error('Patient not found. Please ensure the patient account exists.');
+    }
+
+    if (counselorCheck.error || !counselorCheck.data) {
+      throw new Error('Counselor not found. Please ensure the counselor account exists.');
     }
 
     const { data: session, error } = await supabase

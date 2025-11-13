@@ -56,7 +56,23 @@ export default function SessionRoomPage() {
         
         if (participantId) {
           try {
-            const participant = await AdminApi.getUser(participantId);
+            // Try admin API first, fallback to profile query if not admin
+            let participant;
+            try {
+              participant = await AdminApi.getUser(participantId);
+            } catch (adminError) {
+              // If admin access fails, use the non-admin method
+              const profile = await AdminApi.getUserProfile(participantId);
+              participant = {
+                id: profile.id || participantId,
+                email: profile.email || '',
+                fullName: profile.fullName,
+                role: profile.role || 'patient',
+                isVerified: false,
+                createdAt: '',
+                avatarUrl: profile.avatarUrl,
+              } as AdminUser;
+            }
             setOtherParticipant(participant);
           } catch (error) {
             console.error('Error loading participant:', error);
@@ -122,7 +138,7 @@ export default function SessionRoomPage() {
           roomName={`session-${session.id}`}
           displayName={user?.name || 'Participant'}
           email={user?.email}
-          sessionType={session.type === 'chat' ? 'video' : session.type || 'video'}
+          sessionType={(session.type === 'chat' || session.type === 'in-person' ? 'video' : (session.type === 'audio' ? 'audio' : 'video')) as 'audio' | 'video' | undefined}
           onMeetingEnd={handleMeetingEnd}
         />
       </div>

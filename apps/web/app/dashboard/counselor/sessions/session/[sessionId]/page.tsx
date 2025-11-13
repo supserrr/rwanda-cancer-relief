@@ -20,6 +20,7 @@ import {
 import { useAuth } from '../../../../../../components/auth/AuthProvider';
 import { SessionsApi, type Session } from '../../../../../../lib/api/sessions';
 import { AdminApi, type AdminUser } from '../../../../../../lib/api/admin';
+import { createClient } from '../../../../../../lib/supabase/client';
 import { toast } from 'sonner';
 import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
 
@@ -56,10 +57,128 @@ export default function SessionRoomPage() {
         
         if (participantId) {
           try {
-            const participant = await AdminApi.getUser(participantId);
-            setOtherParticipant(participant);
+            // Try admin API first, fallback to direct profile query if not admin
+            let participant: AdminUser | null = null;
+            try {
+              participant = await AdminApi.getUser(participantId);
+            } catch (adminError) {
+              // If admin access fails, query profiles table directly
+              console.log(`[SessionRoom] Admin API failed for ${participantId}, using direct profile query`);
+              const supabase = createClient();
+              if (supabase) {
+                // Query without role filter first - RLS will handle access control
+                let { data: profile, error: profileError } = await supabase
+                  .from('profiles')
+                  .select('*')
+                  .eq('id', participantId)
+                  .maybeSingle();
+                
+                // If no profile found, try with role filter for patient/counselor
+                if (!profile && !profileError) {
+                  console.log(`[SessionRoom] Profile not found without role filter, trying with role filter`);
+                  const expectedRole = user?.role === 'patient' ? 'counselor' : 'patient';
+                  const { data: profileWithRole, error: roleError } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', participantId)
+                    .eq('role', expectedRole)
+                    .maybeSingle();
+                  
+                  if (!roleError && profileWithRole) {
+                    profile = profileWithRole;
+                    console.log(`[SessionRoom] Found profile with role filter`);
+                  }
+                }
+                
+                if (profileError) {
+                  console.error('[SessionRoom] Error fetching profile:', profileError);
+                  console.error('[SessionRoom] Error details:', {
+                    message: profileError.message,
+                    code: profileError.code,
+                    details: profileError.details,
+                    hint: profileError.hint,
+                  });
+                } else if (profile) {
+                  console.log(`[SessionRoom] Profile found for ${participantId}:`, {
+                    id: profile.id,
+                    full_name: profile.full_name,
+                    email: profile.email,
+                    role: profile.role,
+                    hasMetadata: !!profile.metadata,
+                    metadata: profile.metadata,
+                  });
+                  
+                  const metadata = (profile.metadata || {}) as Record<string, unknown>;
+                  const fullName = 
+                    (profile.full_name && typeof profile.full_name === 'string' ? profile.full_name.trim() : undefined) ||
+                    (profile.fullName && typeof profile.fullName === 'string' ? profile.fullName.trim() : undefined) ||
+                    (profile.name && typeof profile.name === 'string' ? profile.name.trim() : undefined) ||
+                    (typeof metadata.name === 'string' ? metadata.name.trim() : undefined) ||
+                    (typeof metadata.full_name === 'string' ? metadata.full_name.trim() : undefined) ||
+                    (typeof metadata.fullName === 'string' ? metadata.fullName.trim() : undefined) ||
+                    (profile.email && typeof profile.email === 'string' ? profile.email.split('@')[0].trim() : undefined) ||
+                    'Participant';
+                  
+                  console.log(`[SessionRoom] Extracted name: "${fullName}"`);
+                  
+                  participant = {
+                    id: profile.id,
+                    email: profile.email || (typeof metadata.email === 'string' ? metadata.email : ''),
+                    fullName: fullName,
+                    role: (profile.role === 'counselor' || profile.role === 'patient' ? profile.role : 'patient') as 'counselor' | 'patient',
+                    isVerified: false,
+                    createdAt: profile.created_at || '',
+                    avatarUrl: profile.avatar_url || (typeof metadata.avatar_url === 'string' ? metadata.avatar_url : undefined),
+                  } as AdminUser;
+                  
+                  console.log(`[SessionRoom] Created participant object:`, {
+                    id: participant.id,
+                    fullName: participant.fullName,
+                    email: participant.email,
+                    role: participant.role,
+                  });
+                } else {
+                  console.warn(`[SessionRoom] Profile not found for ${participantId} (query returned null/undefined)`);
+                }
+              } else {
+                console.error('[SessionRoom] Supabase client not available');
+              }
+            }
+            
+            if (participant) {
+              console.log(`[SessionRoom] ✅ Setting participant state:`, {
+                id: participant.id,
+                fullName: participant.fullName,
+                email: participant.email,
+                role: participant.role,
+              });
+              setOtherParticipant(participant);
+              console.log(`[SessionRoom] ✅ Participant state set successfully`);
+            } else {
+              console.warn(`[SessionRoom] ❌ Could not load participant ${participantId}, using fallback`);
+              // Set a minimal participant object so the UI doesn't break
+              const fallbackParticipant = {
+                id: participantId,
+                email: '',
+                fullName: user?.role === 'patient' ? 'Counselor' : 'Patient',
+                role: (user?.role === 'patient' ? 'counselor' : 'patient') as 'counselor' | 'patient',
+                isVerified: false,
+                createdAt: '',
+              } as AdminUser;
+              console.log(`[SessionRoom] ⚠️ Setting fallback participant:`, fallbackParticipant);
+              setOtherParticipant(fallbackParticipant);
+            }
           } catch (error) {
-            console.error('Error loading participant:', error);
+            console.error('[SessionRoom] Error loading participant:', error);
+            // Set a fallback participant so the UI doesn't break
+            setOtherParticipant({
+              id: participantId,
+              email: '',
+              fullName: user?.role === 'patient' ? 'Counselor' : 'Patient',
+              role: (user?.role === 'patient' ? 'counselor' : 'patient') as 'counselor' | 'patient',
+              isVerified: false,
+              createdAt: '',
+            } as AdminUser);
           }
         }
       } catch (error) {
@@ -122,7 +241,7 @@ export default function SessionRoomPage() {
           roomName={`session-${session.id}`}
           displayName={user?.name || 'Participant'}
           email={user?.email}
-          sessionType={session.type === 'chat' ? 'video' : session.type || 'video'}
+          sessionType={(session.type === 'chat' || session.type === 'in-person' ? 'video' : (session.type === 'audio' ? 'audio' : 'video')) as 'audio' | 'video' | undefined}
           onMeetingEnd={handleMeetingEnd}
         />
       </div>

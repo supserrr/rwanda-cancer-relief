@@ -78,13 +78,14 @@ export default function AdminResourcesReviewPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [reviewTab, setReviewTab] = useState<'reviewed' | 'not-reviewed' | 'published' | 'rejected'>('not-reviewed');
+  const [reviewTab, setReviewTab] = useState<'review' | 'published' | 'rejected'>('review');
   
   // Load all resources (admin can see all)
   const { resources, loading, updateResource, deleteResource, createResourceWithFile, createResource, refreshResources } = useResources();
   
   // Modal states
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
+  const [activeTab, setActiveTab] = useState<'review' | 'upload-audio' | 'upload-video' | 'upload-pdf'>('review');
   
   // Use shared resource viewer hook for consistent behavior
   const {
@@ -233,13 +234,13 @@ export default function AdminResourcesReviewPage() {
                            (statusFilter === 'public' && resource.isPublic) ||
                            (statusFilter === 'private' && !resource.isPublic);
       // Filter by review status based on active tab
-      const matchesReviewStatus = reviewTab === 'reviewed' 
-        ? (resource.status === 'reviewed')
+      const matchesReviewStatus = reviewTab === 'review'
+        ? (resource.status === 'pending_review' || !resource.status)
         : reviewTab === 'published'
         ? (resource.status === 'published')
         : reviewTab === 'rejected'
         ? (resource.status === 'rejected')
-        : (resource.status === 'pending_review' || !resource.status); // Not reviewed or undefined
+        : false;
       
       return matchesSearch && matchesType && matchesStatus && matchesReviewStatus;
     }).sort((a, b) => {
@@ -283,9 +284,9 @@ export default function AdminResourcesReviewPage() {
       // Note: Article editing UI removed - admin can only view resources
       // If article editing is needed, it should be done through the counselor interface
     } else {
-      // For other resource types, load into upload tabs (which now support edit mode)
+      // For other resource types, switch to appropriate tab and set editing resource
       setEditingResource(resource);
-      // Set the appropriate upload tab based on resource type (they work for both create and edit)
+      // Set the appropriate form data based on resource type
       if (resource.type === 'audio') {
         setUploadFormData(prev => ({
           ...prev,
@@ -297,7 +298,7 @@ export default function AdminResourcesReviewPage() {
             duration: '',
           },
         }));
-        // Admin can only view resources, not edit them
+        setActiveTab('upload-audio');
       } else if (resource.type === 'video') {
         setUploadFormData(prev => ({
           ...prev,
@@ -311,7 +312,7 @@ export default function AdminResourcesReviewPage() {
             youtubeUrl: resource.youtubeUrl || '',
           },
         }));
-        // Admin can only view resources, not edit them
+        setActiveTab('upload-video');
       } else if (resource.type === 'pdf') {
         setUploadFormData(prev => ({
           ...prev,
@@ -322,7 +323,7 @@ export default function AdminResourcesReviewPage() {
             tags: resource.tags.join(', '),
           },
         }));
-        // Admin can only view resources, not edit them
+        setActiveTab('upload-pdf');
       }
     }
   };
@@ -497,7 +498,8 @@ export default function AdminResourcesReviewPage() {
         await updateResource(editingResource.id, updateData);
         toast.success('Audio resource updated successfully');
         setEditingResource(null);
-        // Tab removed - admin only views resources
+        setActiveTab('review');
+        await refreshResources();
       } else {
         if (!file) {
           toast.error('Please select an audio file');
@@ -588,7 +590,8 @@ export default function AdminResourcesReviewPage() {
         await updateResource(editingResource.id, updateData);
         toast.success('Video resource updated successfully');
       setEditingResource(null);
-        // Tab removed - admin only views resources
+        setActiveTab('review');
+        await refreshResources();
       } else {
         if (isYouTube) {
           await createResource({
@@ -686,7 +689,8 @@ export default function AdminResourcesReviewPage() {
         await updateResource(editingResource.id, updateData);
         toast.success('PDF resource updated successfully');
         setEditingResource(null);
-        // Tab removed - admin only views resources
+        setActiveTab('review');
+        await refreshResources();
       } else {
         if (!file) {
           toast.error('Please select a PDF file');
@@ -1790,6 +1794,110 @@ export default function AdminResourcesReviewPage() {
     }
   };
 
+  // Helper function to fetch YouTube video info for video upload form
+  const handleFetchYouTubeVideoInfo = async () => {
+    const url = uploadFormData.video.youtubeUrl.trim();
+    if (!url) {
+      toast.error('Please enter a YouTube URL');
+      return;
+    }
+
+    // Validate URL
+    try {
+      new URL(url);
+    } catch {
+      toast.error('Please enter a valid URL');
+      return;
+    }
+
+    // Check if it's a YouTube URL
+    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+    if (!isYouTube) {
+      toast.error('Please enter a valid YouTube URL');
+      return;
+    }
+
+    try {
+      // Extract video ID
+      let videoId = '';
+      if (url.includes('youtu.be')) {
+        videoId = url.split('/').pop()?.split('?')[0] || '';
+      } else {
+        const urlObj = new URL(url);
+        videoId = urlObj.searchParams.get('v') || '';
+      }
+
+      if (!videoId) {
+        throw new Error('Invalid YouTube URL');
+      }
+
+      // Fetch YouTube video metadata using oEmbed
+      const oEmbedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+      const response = await fetch(oEmbedUrl);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch YouTube video information');
+      }
+
+      const data = await response.json();
+      
+      // Try to fetch additional metadata from YouTube Data API if available
+      let duration = '';
+      let fullDescription = '';
+      let videoTags: string[] = [];
+      const youtubeApiKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
+      
+      if (youtubeApiKey) {
+        try {
+          const apiUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=contentDetails,snippet,statistics&key=${youtubeApiKey}`;
+          const apiResponse = await fetch(apiUrl);
+          if (apiResponse.ok) {
+            const apiData = await apiResponse.json();
+            if (apiData.items && apiData.items[0]) {
+              const video = apiData.items[0];
+              
+              // Get duration
+              if (video.contentDetails?.duration) {
+                duration = convertISODurationToTime(video.contentDetails.duration);
+              }
+              
+              // Get full description
+              if (video.snippet?.description) {
+                fullDescription = video.snippet.description;
+              }
+              
+              // Get video tags
+              if (video.snippet?.tags && Array.isArray(video.snippet.tags)) {
+                videoTags = video.snippet.tags.slice(0, 10);
+              }
+            }
+          }
+        } catch (apiError) {
+          console.warn('Failed to fetch additional data from YouTube API:', apiError);
+        }
+      }
+      
+      // Auto-fill form with fetched data
+      setUploadFormData(prev => ({
+        ...prev,
+        video: {
+          ...prev.video,
+          title: data.title || prev.video.title,
+          description: fullDescription || prev.video.description,
+          duration: duration || prev.video.duration,
+          tags: videoTags.length > 0 ? videoTags.join(', ') : prev.video.tags,
+          isYouTube: true,
+          youtubeUrl: url,
+        },
+      }));
+      
+      toast.success('YouTube video information fetched successfully');
+    } catch (error) {
+      console.error('Error fetching YouTube video info:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch YouTube video information');
+    }
+  };
+
   // Helper function to convert ISO 8601 duration to MM:SS or HH:MM:SS format
   const convertISODurationToTime = (isoDuration: string): string => {
     const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
@@ -2242,20 +2350,13 @@ export default function AdminResourcesReviewPage() {
       </div>
 
       {/* Review Tabs */}
-      <Tabs value={reviewTab} onValueChange={(value) => setReviewTab(value as 'reviewed' | 'not-reviewed' | 'published' | 'rejected')} className="mt-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="not-reviewed" className="flex items-center gap-2">
+      <Tabs value={reviewTab} onValueChange={(value) => setReviewTab(value as 'review' | 'published' | 'rejected')} className="mt-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="review" className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4" />
-            <span>Not Reviewed</span>
+            <span>Review</span>
             <Badge variant="secondary" className="ml-2">
               {resources.filter(r => r.status === 'pending_review' || !r.status).length}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="reviewed" className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4" />
-            <span>Reviewed</span>
-            <Badge variant="secondary" className="ml-2">
-              {resources.filter(r => r.status === 'reviewed').length}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="published" className="flex items-center gap-2">
@@ -2274,7 +2375,7 @@ export default function AdminResourcesReviewPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="not-reviewed" className="mt-6">
+        <TabsContent value="review" className="mt-6">
           {/* Enhanced Search and Filters */}
           <div className="space-y-4 mb-8">
             {/* Main Search Bar */}
@@ -2374,9 +2475,29 @@ export default function AdminResourcesReviewPage() {
                         <Button 
                           size="sm" 
                           variant="outline" 
-                          className="bg-yellow-50 border-yellow-200 hover:bg-yellow-100 hover:text-yellow-700 hover:border-yellow-300 dark:bg-yellow-900/20 dark:border-yellow-800 dark:hover:bg-yellow-900/30 dark:hover:text-yellow-300"
-                          onClick={() => handleReviewStatusChange(resource.id)}
-                          onDoubleClick={async () => {
+                          className="bg-green-50 border-green-200 hover:bg-green-100 hover:text-green-700 hover:border-green-300 dark:bg-green-900/20 dark:border-green-800 dark:hover:bg-green-900/30 dark:hover:text-green-300"
+                          onClick={async () => {
+                            try {
+                              await updateResource(resource.id, {
+                                status: 'reviewed',
+                                reviewed: true,
+                              });
+                              toast.success('Resource accepted');
+                              refreshResources();
+                            } catch (error) {
+                              console.error('Error accepting resource:', error);
+                              toast.error('Failed to accept resource');
+                            }
+                          }}
+                          title="Accept Resource"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="bg-red-50 border-red-200 hover:bg-red-100 hover:text-red-700 hover:border-red-300 dark:bg-red-900/20 dark:border-red-800 dark:hover:bg-red-900/30 dark:hover:text-red-300"
+                          onClick={async () => {
                             try {
                               await updateResource(resource.id, {
                                 status: 'rejected',
@@ -2389,9 +2510,9 @@ export default function AdminResourcesReviewPage() {
                               toast.error('Failed to reject resource');
                             }
                           }}
-                          title="Click to review, double-click to reject"
+                          title="Reject Resource"
                         >
-                          <CheckCircle className="h-4 w-4" />
+                          <XCircle className="h-4 w-4" />
                         </Button>
                         <Button 
                           size="sm" 
@@ -2417,160 +2538,6 @@ export default function AdminResourcesReviewPage() {
           <h3 className="text-lg font-semibold mb-2">No resources found</h3>
           <p className="text-muted-foreground">Try adjusting your search or filters</p>
                     </div>
-      )}
-        </TabsContent>
-
-        <TabsContent value="reviewed" className="mt-6">
-          {/* Enhanced Search and Filters - Same as not-reviewed */}
-          <div className="space-y-4 mb-8">
-        {/* Main Search Bar */}
-        <div className="flex flex-col lg:flex-row gap-4">
-          <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary h-4 w-4" />
-          <Input
-              placeholder="Search resources by title, description, or tags..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-primary/5 border-primary/20 focus:border-primary/40 focus:bg-primary/10"
-          />
-                  </div>
-
-          {/* Quick Filters */}
-          <div className="flex gap-2">
-        <Select value={selectedType} onValueChange={setSelectedType}>
-          <SelectTrigger className="w-[140px] bg-primary/5 border-primary/20">
-            <SelectValue placeholder="Type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="audio">Audio</SelectItem>
-            <SelectItem value="video">Video</SelectItem>
-            <SelectItem value="pdf">PDF</SelectItem>
-            <SelectItem value="article">Article</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[140px] bg-primary/5 border-primary/20">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            {statusOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-[160px] bg-primary/5 border-primary/20">
-            <SelectValue placeholder="Sort by" />
-          </SelectTrigger>
-          <SelectContent>
-            {sortOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-              className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-          onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                    >
-          {sortOrder === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
-                    </Button>
-                    </div>
-                  </div>
-
-        {/* Results Summary */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <span>{filteredResources.length} resource{filteredResources.length !== 1 ? 's' : ''} found</span>
-                    </div>
-                    </div>
-                  </div>
-
-      {/* Resources Display - Same as not-reviewed tab */}
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <Spinner variant="bars" size={32} className="text-primary" />
-                    </div>
-      ) : filteredResources.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-8">
-          {filteredResources.map((resource, index) => {
-              const uiResource = convertToUIResource(resource);
-            return (
-                <div key={resource.id} className="relative">
-                  <ResourceCard
-                    resource={uiResource}
-                    onView={(r: any) => handleViewResource(resource)}
-                    onDownload={(r: any) => handleDownloadResource(resource)}
-                    onEdit={(r: any) => handleEditResource(resource)}
-                    onDelete={(r: any) => handleDeleteResource(r.id || resource.id)}
-                    showEditActions={false}
-                    showActions={true}
-                    delay={index * 0.1}
-                    customActions={
-                      <>
-                    <Button
-                      size="sm"
-                          variant="outline" 
-                          className="bg-yellow-50 border-yellow-200 hover:bg-yellow-100 hover:text-yellow-700 hover:border-yellow-300 dark:bg-yellow-900/20 dark:border-yellow-800 dark:hover:bg-yellow-900/30 dark:hover:text-yellow-300"
-                          onClick={() => handleReviewStatusChange(resource.id)}
-                          title="Mark as Reviewed"
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                    </Button>
-                    <Button
-                          size="sm" 
-                      variant="outline"
-                          className="bg-green-50 border-green-200 hover:bg-green-100 hover:text-green-700 hover:border-green-300 dark:bg-green-900/20 dark:border-green-800 dark:hover:bg-green-900/30 dark:hover:text-green-300"
-                          onClick={async () => {
-                            try {
-                              await updateResource(resource.id, {
-                                status: 'published',
-                                isPublic: true,
-                              });
-                              toast.success('Resource published successfully');
-                              refreshResources();
-                            } catch (error) {
-                              console.error('Error publishing resource:', error);
-                              toast.error('Failed to publish resource');
-                            }
-                          }}
-                          title="Publish Resource"
-                        >
-                          <Globe className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                      size="sm"
-                          variant="outline" 
-                          className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                      onClick={() => handleEditResource(resource)}
-                          title="Edit resource"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                      </>
-                    }
-                  />
-                </div>
-            );
-          })}
-          </div>
-      ) : (
-        <div className="text-center py-12 mt-8">
-          <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-            <FileText className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h3 className="text-lg font-semibold mb-2">No reviewed resources found</h3>
-          <p className="text-muted-foreground">Try adjusting your search or filters</p>
-        </div>
       )}
         </TabsContent>
 
@@ -2639,21 +2606,21 @@ export default function AdminResourcesReviewPage() {
           {sortOrder === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
                     </Button>
                   </div>
-                </div>
+                  </div>
 
         {/* Results Summary */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <span>{filteredResources.length} resource{filteredResources.length !== 1 ? 's' : ''} found</span>
-          </div>
-        </div>
-      </div>
+                    </div>
+                    </div>
+                  </div>
 
       {/* Resources Display */}
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <Spinner variant="bars" size={32} className="text-primary" />
-        </div>
+                    </div>
       ) : filteredResources.length > 0 ? (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-8">
           {filteredResources.map((resource, index) => {
@@ -2671,15 +2638,36 @@ export default function AdminResourcesReviewPage() {
                     delay={index * 0.1}
                     customActions={
                       <>
-                        <Button 
-                          size="sm" 
+                    <Button
+                      size="sm"
+                          variant="outline" 
+                          className="bg-yellow-50 border-yellow-200 hover:bg-yellow-100 hover:text-yellow-700 hover:border-yellow-300 dark:bg-yellow-900/20 dark:border-yellow-800 dark:hover:bg-yellow-900/30 dark:hover:text-yellow-300"
+                          onClick={async () => {
+                            try {
+                              await updateResource(resource.id, {
+                                status: 'reviewed',
+                                isPublic: false,
+                              });
+                              toast.success('Resource set to private');
+                              refreshResources();
+                            } catch (error) {
+                              console.error('Error setting resource to private:', error);
+                              toast.error('Failed to set resource to private');
+                            }
+                          }}
+                          title="Make Private"
+                        >
+                          <Lock className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
                           variant="outline" 
                           className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                          onClick={() => handleEditResource(resource)}
+                      onClick={() => handleEditResource(resource)}
                           title="Edit resource"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
                       </>
                     }
                   />
@@ -2694,8 +2682,8 @@ export default function AdminResourcesReviewPage() {
           </div>
           <h3 className="text-lg font-semibold mb-2">No published resources found</h3>
           <p className="text-muted-foreground">Try adjusting your search or filters</p>
-        </div>
-      )}
+                    </div>
+                  )}
         </TabsContent>
 
         <TabsContent value="rejected" className="mt-6">
@@ -2754,14 +2742,14 @@ export default function AdminResourcesReviewPage() {
           </SelectContent>
         </Select>
 
-        <Button
-          variant="outline"
-              size="sm"
+                    <Button
+                      variant="outline"
+                      size="sm"
               className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
           onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-        >
+                    >
           {sortOrder === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
-        </Button>
+                    </Button>
                     </div>
         </div>
 
@@ -2795,18 +2783,18 @@ export default function AdminResourcesReviewPage() {
                     delay={index * 0.1}
                     customActions={
                       <>
-                        <Button 
-                          size="sm" 
+                    <Button
+                      size="sm"
                           variant="outline" 
                           className="bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                          onClick={() => handleEditResource(resource)}
+                      onClick={() => handleEditResource(resource)}
                           title="Edit resource"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="destructive" 
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
                           type="button"
                           onClick={(e) => {
                             e.preventDefault();
@@ -2814,15 +2802,15 @@ export default function AdminResourcesReviewPage() {
                             handleDeleteResource(resource.id);
                           }}
                           title="Delete resource"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                       </>
                     }
                   />
-                </div>
-              );
-            })}
+                  </div>
+            );
+          })}
           </div>
       ) : (
         <div className="text-center py-12 mt-8">
@@ -3020,6 +3008,625 @@ export default function AdminResourcesReviewPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Resource Tabs - Identical to Counselor Experience */}
+      {(activeTab === 'upload-audio' || activeTab === 'upload-video' || activeTab === 'upload-pdf') && (
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="mt-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="upload-audio">Audio</TabsTrigger>
+            <TabsTrigger value="upload-video">Video</TabsTrigger>
+            <TabsTrigger value="upload-pdf">PDF</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="upload-audio" className="mt-6">
+            <div className="space-y-6">
+              {/* Hidden file input */}
+              <input
+                ref={audioFileInputRef}
+                type="file"
+                accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac"
+                onChange={handleAudioFileChange}
+                className="hidden"
+              />
+
+              {/* Header with Back Button */}
+              <div className="flex items-center space-x-4">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    setEditingResource(null);
+                    setActiveTab('review');
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back
+                </Button>
+                <div>
+                  <h3 className="text-xl font-semibold">
+                    {editingResource && editingResource.type === 'audio' ? 'Edit Audio Resource' : 'Upload Audio File'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {editingResource && editingResource.type === 'audio' ? 'Update audio resource details' : 'Add audio content for your patients'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Upload Area */}
+              <AnimatedCard className="p-8">
+                {editingResource && editingResource.type === 'audio' && editingResource.url ? (
+                  <div className="border-2 border-purple-200 rounded-xl p-6 bg-purple-50 dark:bg-purple-950">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+                          <Play className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-purple-900 dark:text-purple-100">Current Audio File</p>
+                          <p className="text-sm text-purple-700 dark:text-purple-300">
+                            {editingResource.url.split('/').pop() || 'Audio file'}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleChooseAudioFile}
+                        className="border-purple-300 text-purple-700 hover:bg-purple-100 dark:border-purple-700 dark:text-purple-300 dark:hover:bg-purple-900"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Replace File
+                      </Button>
+                    </div>
+                    {uploadFormData.audio.file && (
+                      <div className="mt-4 p-3 bg-white dark:bg-purple-900 rounded-lg border border-purple-200 dark:border-purple-800">
+                        <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                          New file selected: {uploadFormData.audio.file.name}
+                        </p>
+                        <p className="text-xs text-purple-700 dark:text-purple-300">
+                          {(uploadFormData.audio.file.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-purple-200 rounded-xl p-12 text-center hover:border-purple-300 transition-colors">
+                    <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <Play className="h-10 w-10 text-purple-600" />
+                    </div>
+                    <h4 className="text-xl font-semibold mb-2">Drop your audio file here</h4>
+                    <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                      Supported formats: MP3, WAV, M4A, AAC. Maximum file size: 100MB
+                    </p>
+                    {uploadFormData.audio.file && (
+                      <div className="mb-4 p-3 bg-purple-50 dark:bg-purple-950 rounded-lg">
+                        <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                          Selected: {uploadFormData.audio.file.name}
+                        </p>
+                        <p className="text-xs text-purple-700 dark:text-purple-300">
+                          {(uploadFormData.audio.file.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {!(editingResource && editingResource.type === 'audio' && editingResource.url) && (
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6">
+                    <Button onClick={handleChooseAudioFile} className="bg-purple-600 hover:bg-purple-700">
+                      <Upload className="h-4 w-4 mr-2" />
+                      {uploadFormData.audio.file ? 'Change Audio File' : 'Choose Audio File'}
+                    </Button>
+                    {uploadFormData.audio.file && (
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setUploadFormData(prev => ({ ...prev, audio: { ...prev.audio, file: null } }))}
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Remove
+                      </Button>
+                    )}
+                    <Button variant="outline">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Upload Guidelines
+                    </Button>
+                  </div>
+                )}
+              </AnimatedCard>
+
+              {/* File Details Form */}
+              <AnimatedCard className="p-6">
+                <h4 className="font-semibold mb-4">Resource Details</h4>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Title</label>
+                    <Input 
+                      placeholder="Enter audio title..." 
+                      value={uploadFormData.audio.title}
+                      onChange={(e) => setUploadFormData(prev => ({ ...prev, audio: { ...prev.audio, title: e.target.value } }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Duration</label>
+                    <Input 
+                      placeholder="e.g., 15:30" 
+                      value={uploadFormData.audio.duration}
+                      onChange={(e) => setUploadFormData(prev => ({ ...prev, audio: { ...prev.audio, duration: e.target.value } }))}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Description</label>
+                    <Textarea 
+                      placeholder="Describe the audio content..." 
+                      rows={3}
+                      value={uploadFormData.audio.description}
+                      onChange={(e) => setUploadFormData(prev => ({ ...prev, audio: { ...prev.audio, description: e.target.value } }))}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Tags</label>
+                    <Input 
+                      placeholder="Enter tags separated by commas..." 
+                      value={uploadFormData.audio.tags}
+                      onChange={(e) => setUploadFormData(prev => ({ ...prev, audio: { ...prev.audio, tags: e.target.value } }))}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-3 mt-6">
+                  <Button variant="outline" onClick={() => {
+                    setEditingResource(null);
+                    setActiveTab('review');
+                  }}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    className="bg-purple-600 hover:bg-purple-700"
+                    onClick={handleUploadAudio}
+                    disabled={isUploading || (!uploadFormData.audio.file && !(editingResource && editingResource.type === 'audio'))}
+                  >
+                    {isUploading ? (
+                      <>
+                        <Spinner variant="bars" size={16} className="mr-2" />
+                        {editingResource && editingResource.type === 'audio' ? 'Updating...' : 'Uploading...'}
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        {editingResource && editingResource.type === 'audio' ? 'Update & Save' : 'Upload & Save'}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </AnimatedCard>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="upload-video" className="mt-6">
+            <div className="space-y-6">
+              {/* Hidden file input */}
+              <input
+                ref={videoFileInputRef}
+                type="file"
+                accept="video/*,.mp4,.mov,.avi,.mkv,.webm,.flv"
+                onChange={handleVideoFileChange}
+                className="hidden"
+              />
+
+              {/* Header with Back Button */}
+              <div className="flex items-center space-x-4">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    setEditingResource(null);
+                    setActiveTab('review');
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back
+                </Button>
+                <div>
+                  <h3 className="text-xl font-semibold">
+                    {editingResource && editingResource.type === 'video' ? 'Edit Video Resource' : 'Upload Video File'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {editingResource && editingResource.type === 'video' ? 'Update video resource details' : 'Add video content for your patients'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Upload Area */}
+              <AnimatedCard className="p-8">
+                {/* Show YouTube URL input when replacing a YouTube link - PRIORITIZED */}
+                {editingResource && editingResource.type === 'video' && editingResource.youtubeUrl && !uploadFormData.video.youtubeUrl ? (
+                  <div className="border-2 border-dashed border-orange-200 dark:border-orange-800 rounded-xl p-12 text-center hover:border-orange-300 dark:hover:border-orange-700 transition-colors bg-orange-50 dark:bg-orange-950">
+                    <div className="w-20 h-20 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <Globe className="h-10 w-10 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <h4 className="text-xl font-semibold mb-2">Paste your link here</h4>
+                    <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                      Supported: YouTube videos, websites, and other online resources. We'll automatically fetch the title, description, and thumbnail.
+                    </p>
+                    <div className="max-w-lg mx-auto mb-4">
+                      <div className="relative">
+                        <Input 
+                          placeholder="Paste YouTube URL or website link (e.g., https://youtube.com/watch?v=...)"
+                          className="pr-24"
+                          value={uploadFormData.video.youtubeUrl}
+                          onChange={(e) => {
+                            const url = e.target.value;
+                            setUploadFormData(prev => ({ 
+                              ...prev, 
+                              video: { 
+                                ...prev.video, 
+                                youtubeUrl: url,
+                                isYouTube: url.trim().length > 0 && (url.includes('youtube.com') || url.includes('youtu.be'))
+                              } 
+                            }));
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && uploadFormData.video.youtubeUrl.trim()) {
+                              e.preventDefault();
+                              handleFetchYouTubeVideoInfo();
+                            }
+                          }}
+                        />
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="absolute right-1 top-1/2 -translate-y-1/2 text-xs"
+                          onClick={handleFetchYouTubeVideoInfo}
+                          disabled={!uploadFormData.video.youtubeUrl.trim()}
+                        >
+                          Fetch Info
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Preview will appear here after entering URL
+                    </div>
+                  </div>
+                ) : editingResource && editingResource.type === 'video' && (editingResource.url || editingResource.youtubeUrl) && 
+                 !(editingResource.youtubeUrl && !uploadFormData.video.youtubeUrl) ? (
+                  <div className="border-2 border-blue-200 rounded-xl p-6 bg-blue-50 dark:bg-blue-950">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                          <Video className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-blue-900 dark:text-blue-100">Current Video</p>
+                          <p className="text-sm text-blue-700 dark:text-blue-300">
+                            {editingResource.youtubeUrl && uploadFormData.video.youtubeUrl ? 'YouTube Video' : (editingResource.url?.split('/').pop() || 'Video file')}
+                          </p>
+                          {editingResource.youtubeUrl && uploadFormData.video.youtubeUrl && (
+                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 truncate max-w-md">
+                              {uploadFormData.video.youtubeUrl || editingResource.youtubeUrl}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={editingResource.youtubeUrl && uploadFormData.video.youtubeUrl ? () => {
+                          // For YouTube videos, clear the URL so user can enter a new one
+                          setUploadFormData(prev => ({ 
+                            ...prev, 
+                            video: { 
+                              ...prev.video, 
+                              youtubeUrl: '', 
+                              isYouTube: false,
+                              file: null // Clear any file selection
+                            } 
+                          }));
+                        } : handleChooseVideoFile}
+                        className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {editingResource.youtubeUrl && uploadFormData.video.youtubeUrl ? 'Replace Link' : 'Replace File'}
+                      </Button>
+                    </div>
+                    {uploadFormData.video.file && (
+                      <div className="mt-4 p-3 bg-white dark:bg-blue-900 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                          New file selected: {uploadFormData.video.file.name}
+                        </p>
+                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                          {(uploadFormData.video.file.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+                {!(editingResource && editingResource.type === 'video' && (editingResource.url || (editingResource.youtubeUrl && uploadFormData.video.youtubeUrl))) && (
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6">
+                    <Button onClick={handleChooseVideoFile} className="bg-blue-600 hover:bg-blue-700">
+                      <Upload className="h-4 w-4 mr-2" />
+                      {uploadFormData.video.file ? 'Change Video File' : 'Choose Video File'}
+                    </Button>
+                    {uploadFormData.video.file && (
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setUploadFormData(prev => ({ ...prev, video: { ...prev.video, file: null } }))}
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Remove
+                      </Button>
+                    )}
+                    <Button variant="outline">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Upload Guidelines
+                    </Button>
+                  </div>
+                )}
+              </AnimatedCard>
+
+              {/* File Details Form */}
+              <AnimatedCard className="p-6">
+                <h4 className="font-semibold mb-4">Resource Details</h4>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Title</label>
+                    <Input 
+                      placeholder="Enter video title..." 
+                      value={uploadFormData.video.title}
+                      onChange={(e) => setUploadFormData(prev => ({ ...prev, video: { ...prev.video, title: e.target.value } }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Duration</label>
+                    <Input 
+                      placeholder="e.g., 25:45" 
+                      value={uploadFormData.video.duration}
+                      onChange={(e) => setUploadFormData(prev => ({ ...prev, video: { ...prev.video, duration: e.target.value } }))}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Description</label>
+                    <Textarea 
+                      placeholder="Describe the video content..." 
+                      rows={3}
+                      value={uploadFormData.video.description}
+                      onChange={(e) => setUploadFormData(prev => ({ ...prev, video: { ...prev.video, description: e.target.value } }))}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">YouTube URL (optional)</label>
+                    <Input 
+                      placeholder="https://www.youtube.com/watch?v=..." 
+                      value={uploadFormData.video.youtubeUrl}
+                      onChange={(e) => {
+                        const url = e.target.value;
+                        setUploadFormData(prev => ({ 
+                          ...prev, 
+                          video: { 
+                            ...prev.video, 
+                            youtubeUrl: url,
+                            isYouTube: url.trim().length > 0 && (url.includes('youtube.com') || url.includes('youtu.be'))
+                          } 
+                        }));
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {uploadFormData.video.youtubeUrl ? 'YouTube video will be used instead of uploaded file' : 'Leave empty to upload a video file'}
+                    </p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Tags</label>
+                    <Input 
+                      placeholder="Enter tags separated by commas..." 
+                      value={uploadFormData.video.tags}
+                      onChange={(e) => setUploadFormData(prev => ({ ...prev, video: { ...prev.video, tags: e.target.value } }))}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-3 mt-6">
+                  <Button variant="outline" onClick={() => {
+                    setEditingResource(null);
+                    setActiveTab('review');
+                  }}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    className="bg-blue-600 hover:bg-blue-700"
+                    onClick={handleUploadVideo}
+                    disabled={isUploading || (!uploadFormData.video.file && !uploadFormData.video.isYouTube && !(editingResource && editingResource.type === 'video'))}
+                  >
+                    {isUploading ? (
+                      <>
+                        <Spinner variant="bars" size={16} className="mr-2" />
+                        {editingResource && editingResource.type === 'video' ? 'Updating...' : 'Uploading...'}
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        {editingResource && editingResource.type === 'video' ? 'Update & Save' : 'Upload & Save'}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </AnimatedCard>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="upload-pdf" className="mt-6">
+            <div className="space-y-6">
+              {/* Hidden file input */}
+              <input
+                ref={pdfFileInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={handlePdfFileChange}
+                className="hidden"
+              />
+
+              {/* Header with Back Button */}
+              <div className="flex items-center space-x-4">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    setEditingResource(null);
+                    setActiveTab('review');
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back
+                </Button>
+                <div>
+                  <h3 className="text-xl font-semibold">
+                    {editingResource && editingResource.type === 'pdf' ? 'Edit PDF Resource' : 'Upload PDF File'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {editingResource && editingResource.type === 'pdf' ? 'Update PDF resource details' : 'Add PDF content for your patients'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Upload Area */}
+              <AnimatedCard className="p-8">
+                {editingResource && editingResource.type === 'pdf' && editingResource.url ? (
+                  <div className="border-2 border-red-200 rounded-xl p-6 bg-red-50 dark:bg-red-950">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
+                          <FileText className="h-8 w-8 text-red-600 dark:text-red-400" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-red-900 dark:text-red-100">Current PDF File</p>
+                          <p className="text-sm text-red-700 dark:text-red-300">
+                            {editingResource.url.split('/').pop() || 'PDF file'}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleChoosePdfFile}
+                        className="border-red-300 text-red-700 hover:bg-red-100 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Replace File
+                      </Button>
+                    </div>
+                    {uploadFormData.pdf.file && (
+                      <div className="mt-4 p-3 bg-white dark:bg-red-900 rounded-lg border border-red-200 dark:border-red-800">
+                        <p className="text-sm font-medium text-red-900 dark:text-red-100">
+                          New file selected: {uploadFormData.pdf.file.name}
+                        </p>
+                        <p className="text-xs text-red-700 dark:text-red-300">
+                          {(uploadFormData.pdf.file.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-red-200 rounded-xl p-12 text-center hover:border-red-300 transition-colors">
+                    <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <FileText className="h-10 w-10 text-red-600" />
+                    </div>
+                    <h4 className="text-xl font-semibold mb-2">Drop your PDF file here</h4>
+                    <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                      Supported format: PDF. Maximum file size: 50MB
+                    </p>
+                    {uploadFormData.pdf.file && (
+                      <div className="mb-4 p-3 bg-red-50 dark:bg-red-950 rounded-lg">
+                        <p className="text-sm font-medium text-red-900 dark:text-red-100">
+                          Selected: {uploadFormData.pdf.file.name}
+                        </p>
+                        <p className="text-xs text-red-700 dark:text-red-300">
+                          {(uploadFormData.pdf.file.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {!(editingResource && editingResource.type === 'pdf' && editingResource.url) && (
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6">
+                    <Button onClick={handleChoosePdfFile} className="bg-red-600 hover:bg-red-700">
+                      <Upload className="h-4 w-4 mr-2" />
+                      {uploadFormData.pdf.file ? 'Change PDF File' : 'Choose PDF File'}
+                    </Button>
+                    {uploadFormData.pdf.file && (
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setUploadFormData(prev => ({ ...prev, pdf: { ...prev.pdf, file: null } }))}
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Remove
+                      </Button>
+                    )}
+                    <Button variant="outline">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Upload Guidelines
+                    </Button>
+                  </div>
+                )}
+              </AnimatedCard>
+
+              {/* File Details Form */}
+              <AnimatedCard className="p-6">
+                <h4 className="font-semibold mb-4">Resource Details</h4>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Title</label>
+                    <Input 
+                      placeholder="Enter PDF title..." 
+                      value={uploadFormData.pdf.title}
+                      onChange={(e) => setUploadFormData(prev => ({ ...prev, pdf: { ...prev.pdf, title: e.target.value } }))}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Description</label>
+                    <Textarea 
+                      placeholder="Describe the PDF content..." 
+                      rows={3}
+                      value={uploadFormData.pdf.description}
+                      onChange={(e) => setUploadFormData(prev => ({ ...prev, pdf: { ...prev.pdf, description: e.target.value } }))}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Tags</label>
+                    <Input 
+                      placeholder="Enter tags separated by commas..." 
+                      value={uploadFormData.pdf.tags}
+                      onChange={(e) => setUploadFormData(prev => ({ ...prev, pdf: { ...prev.pdf, tags: e.target.value } }))}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-3 mt-6">
+                  <Button variant="outline" onClick={() => {
+                    setEditingResource(null);
+                    setActiveTab('review');
+                  }}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    className="bg-red-600 hover:bg-red-700"
+                    onClick={handleUploadPdf}
+                    disabled={isUploading || (!uploadFormData.pdf.file && !(editingResource && editingResource.type === 'pdf'))}
+                  >
+                    {isUploading ? (
+                      <>
+                        <Spinner variant="bars" size={16} className="mr-2" />
+                        {editingResource && editingResource.type === 'pdf' ? 'Updating...' : 'Uploading...'}
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        {editingResource && editingResource.type === 'pdf' ? 'Update & Save' : 'Upload & Save'}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </AnimatedCard>
+            </div>
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 }

@@ -30,6 +30,8 @@ import { AdminApi, type AdminUser } from '../../../../lib/api/admin';
 import type { Session, RescheduleSessionInput, CreateSessionInput } from '@/lib/api/sessions';
 import { toast } from 'sonner';
 import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
+import { createClient } from '@/lib/supabase/client';
+import { normalizeAvatarUrl } from '@workspace/ui/lib/avatar';
 
 export default function CounselorSessionsPage() {
   const router = useRouter();
@@ -42,6 +44,8 @@ export default function CounselorSessionsPage() {
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [patients, setPatients] = useState<AdminUser[]>([]);
   const [patientsLoading, setPatientsLoading] = useState(true);
+  const [counselorProfile, setCounselorProfile] = useState<AdminUser | null>(null);
+  const [patientCache, setPatientCache] = useState<Map<string, AdminUser>>(new Map());
 
   // Load sessions using the hook
   const counselorSessionsParams = useMemo(
@@ -61,25 +65,154 @@ export default function CounselorSessionsPage() {
     enabled: Boolean(user?.id),
   });
 
-  // Load patients for the schedule modal
+  // Load patients for the schedule modal and counselor profile for specialty
   useEffect(() => {
-    const fetchPatients = async () => {
+    const fetchData = async () => {
       try {
         setPatientsLoading(true);
-        const response = await AdminApi.listUsers({ role: 'patient' });
-        setPatients(response.users);
+        const [patientsResponse, counselorResponse] = await Promise.all([
+          AdminApi.listUsers({ role: 'patient' }),
+          user?.id ? AdminApi.getUser(user.id).catch(() => null) : Promise.resolve(null),
+        ]);
+        
+        // Load all patients - if pagination exists, fetch all pages
+        let allPatients = patientsResponse.users;
+        const limit = patientsResponse.limit || 50;
+        if (patientsResponse.total && patientsResponse.total > patientsResponse.users.length) {
+          // Fetch remaining pages if needed
+          const totalPages = Math.ceil(patientsResponse.total / limit);
+          const remainingPages = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
+          
+          const additionalPatients = await Promise.all(
+            remainingPages.map(page =>
+              AdminApi.listUsers({ role: 'patient', limit, offset: (page - 1) * limit })
+                .then(res => res.users)
+                .catch(() => [])
+            )
+          );
+          allPatients = [...allPatients, ...additionalPatients.flat()];
+        }
+        
+        setPatients(allPatients);
+        // Cache all loaded patients
+        const newCache = new Map<string, AdminUser>();
+        allPatients.forEach((patient) => {
+          newCache.set(patient.id, patient);
+          // Debug: Log patient data for verification
+          if (process.env.NODE_ENV === 'development') {
+            console.debug(`Loaded patient ${patient.id}:`, {
+              fullName: patient.fullName,
+              email: patient.email,
+              hasMetadata: !!patient.metadata,
+            });
+          }
+        });
+        setPatientCache(newCache);
+        
+        // Debug: Log total patients loaded
+        console.log(`Loaded ${allPatients.length} patients for counselor ${user?.id}`);
+        
+        if (counselorResponse) {
+          setCounselorProfile(counselorResponse);
+        }
       } catch (error) {
-        console.error('Error fetching patients:', error);
-        toast.error('Failed to load patients');
+        console.error('Error fetching data:', error);
+        console.error('Error details:', {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+        // Don't show toast if patients list is empty - might be expected
+        if (error instanceof Error && !error.message.includes('403')) {
+          toast.error('Failed to load data');
+        }
       } finally {
         setPatientsLoading(false);
       }
     };
 
     if (user?.id) {
-      fetchPatients();
+      fetchData();
     }
   }, [user?.id]);
+
+  // Primary: Fetch patient profiles directly from sessions immediately
+  // This runs in parallel with AdminApi.listUsers and ensures we have patient data
+  useEffect(() => {
+    if (sessions.length > 0 && user?.id) {
+      const uniquePatientIds = Array.from(new Set(sessions.map(s => s.patientId)));
+      const supabase = createClient();
+      if (!supabase) return;
+      
+      (async () => {
+        try {
+          console.log(`[PRIMARY] Fetching ${uniquePatientIds.length} patients from sessions:`, uniquePatientIds);
+          const { data: profiles, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .in('id', uniquePatientIds)
+            .eq('role', 'patient');
+          
+          if (error) {
+            console.error('[PRIMARY] Error fetching patient profiles:', error);
+            return;
+          }
+          
+          if (profiles && profiles.length > 0) {
+            const fetchedPatients: AdminUser[] = profiles.map((profile: any) => {
+              const metadata = (profile.metadata || {}) as Record<string, unknown>;
+              
+              const fullName = 
+                (profile.full_name && typeof profile.full_name === 'string' ? profile.full_name.trim() : undefined) ||
+                (profile.fullName && typeof profile.fullName === 'string' ? profile.fullName.trim() : undefined) ||
+                (profile.name && typeof profile.name === 'string' ? profile.name.trim() : undefined) ||
+                (typeof metadata.name === 'string' && metadata.name.trim() ? metadata.name.trim() : undefined) ||
+                (typeof metadata.full_name === 'string' && metadata.full_name.trim() ? metadata.full_name.trim() : undefined) ||
+                (typeof metadata.fullName === 'string' && metadata.fullName.trim() ? metadata.fullName.trim() : undefined) ||
+                (profile.email && typeof profile.email === 'string' ? profile.email.split('@')[0].trim() : undefined) ||
+                'Patient';
+              
+              console.log(`[PRIMARY] Fetched patient ${profile.id}: "${fullName}"`);
+              
+              return {
+                id: profile.id,
+                email: profile.email || '',
+                fullName: fullName,
+                role: 'patient' as const,
+                metadata: metadata,
+                createdAt: profile.created_at || new Date().toISOString(),
+                updatedAt: profile.updated_at || new Date().toISOString(),
+              } as AdminUser;
+            });
+            
+            setPatients(prev => {
+              const existingIds = new Set(prev.map(p => p.id));
+              const newPatients = fetchedPatients.filter(p => !existingIds.has(p.id));
+              if (newPatients.length > 0) {
+                console.log(`[PRIMARY] Adding ${newPatients.length} patients to list`);
+                return [...prev, ...newPatients];
+              }
+              return prev;
+            });
+            
+            setPatientCache(prev => {
+              const newCache = new Map(prev);
+              fetchedPatients.forEach((patient) => {
+                newCache.set(patient.id, patient);
+              });
+              return newCache;
+            });
+          }
+        } catch (error) {
+          console.error('[PRIMARY] Error:', error);
+        }
+      })();
+    }
+  }, [sessions.length, user?.id]);
+
+  // Note: We also load patients via AdminApi.listUsers with pagination as a backup
+  // The primary fetch above ensures we have patient data even if AdminApi fails
+  // If a patient appears in a session but not in the patient list, they may have been deleted
+  // In that case, the name will show as "Patient" which is acceptable
 
   // Filter sessions based on tab
   const upcomingSessions = sessions.filter(session => 
@@ -93,14 +226,282 @@ export default function CounselorSessionsPage() {
 
   const allSessions = sessions;
 
-  const getPatientName = (patientId: string) => {
-    const patient = patients.find(p => p.id === patientId);
-    return patient?.fullName || 'Unknown Patient';
+  // Fetch patient names directly from sessions if not in loaded list
+  // This is a fallback when AdminApi.listUsers doesn't return patients
+  useEffect(() => {
+    // Always fetch patient profiles from sessions if we have sessions
+    // This ensures we have patient data even if AdminApi.listUsers fails
+    // Run immediately if we have sessions, don't wait for patientsLoading
+    if (sessions.length > 0) {
+      const uniquePatientIds = Array.from(new Set(sessions.map(s => s.patientId)));
+      const existingPatientIds = new Set(patients.map(p => p.id));
+      const missingPatientIds = uniquePatientIds.filter(id => !existingPatientIds.has(id));
+      
+      if (missingPatientIds.length === 0) {
+        return; // All patients already loaded
+      }
+      
+      const supabase = createClient();
+      if (!supabase) return;
+      
+      // Fetch patient profiles directly from profiles table for missing patient IDs
+      (async () => {
+        try {
+          console.log(`[FALLBACK] Fetching ${missingPatientIds.length} missing patients from profiles table:`, missingPatientIds);
+          
+          // Try to fetch all columns first to see what we get
+          const { data: profiles, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .in('id', missingPatientIds)
+            .eq('role', 'patient');
+          
+          if (error) {
+            console.error('[FALLBACK] Failed to fetch patient profiles from sessions:', error);
+            console.error('[FALLBACK] Error details:', {
+              message: error.message,
+              code: error.code,
+              details: error.details,
+              hint: error.hint,
+            });
+            return;
+          }
+          
+          console.log(`[FALLBACK] Query returned ${profiles?.length || 0} profiles`);
+          
+          if (profiles && profiles.length > 0) {
+            // Map profiles to AdminUser format
+            const fetchedPatients: AdminUser[] = profiles.map((profile: any) => {
+              const metadata = (profile.metadata || {}) as Record<string, unknown>;
+              
+              // Try all possible name fields
+              const fullName = 
+                (profile.full_name && typeof profile.full_name === 'string' ? profile.full_name.trim() : undefined) ||
+                (profile.fullName && typeof profile.fullName === 'string' ? profile.fullName.trim() : undefined) ||
+                (profile.name && typeof profile.name === 'string' ? profile.name.trim() : undefined) ||
+                (typeof metadata.name === 'string' && metadata.name.trim() ? metadata.name.trim() : undefined) ||
+                (typeof metadata.full_name === 'string' && metadata.full_name.trim() ? metadata.full_name.trim() : undefined) ||
+                (typeof metadata.fullName === 'string' && metadata.fullName.trim() ? metadata.fullName.trim() : undefined) ||
+                (profile.email && typeof profile.email === 'string' ? profile.email.split('@')[0].trim() : undefined) ||
+                'Patient';
+              
+              console.log(`[FALLBACK] Fetched patient ${profile.id}:`, {
+                rawProfile: profile,
+                full_name: profile.full_name,
+                fullName: profile.fullName,
+                name: profile.name,
+                email: profile.email,
+                metadata: metadata,
+                extractedName: fullName,
+              });
+              
+              return {
+                id: profile.id,
+                email: profile.email || '',
+                fullName: fullName,
+                role: 'patient' as const,
+                metadata: metadata,
+                createdAt: profile.created_at || new Date().toISOString(),
+                updatedAt: profile.updated_at || new Date().toISOString(),
+              } as AdminUser;
+            });
+            
+            // Add to patients list and cache (merge with existing)
+            setPatients(prev => {
+              const existingIds = new Set(prev.map(p => p.id));
+              const newPatients = fetchedPatients.filter(p => !existingIds.has(p.id));
+              console.log(`[FALLBACK] Adding ${newPatients.length} new patients to list`);
+              return [...prev, ...newPatients];
+            });
+            
+            setPatientCache(prev => {
+              const newCache = new Map(prev);
+              fetchedPatients.forEach((patient) => {
+                newCache.set(patient.id, patient);
+              });
+              console.log(`[FALLBACK] Updated cache with ${fetchedPatients.length} patients. New cache size: ${newCache.size}`);
+              return newCache;
+            });
+            
+            console.log(`[FALLBACK] Successfully fetched ${fetchedPatients.length} patients from session profiles`);
+          } else {
+            console.warn(`[FALLBACK] No patient profiles found for IDs:`, missingPatientIds);
+          }
+        } catch (error) {
+          console.error('[FALLBACK] Error fetching patient profiles from sessions:', error);
+          if (error instanceof Error) {
+            console.error('[FALLBACK] Error stack:', error.stack);
+          }
+        }
+      })();
+    }
+  }, [sessions.length, patients.length]); // Run when sessions or patients change
+
+  const getPatientName = (patientId: string): string => {
+    // First check the loaded patients list
+    let patient = patients.find(p => p.id === patientId);
+    
+    // If not found, check cache
+    if (!patient) {
+      patient = patientCache.get(patientId) || undefined;
+    }
+    
+    // If found, extract name from multiple possible fields
+    if (patient) {
+      // Check fullName first (this is the primary field set by AdminApi)
+      if (patient.fullName && typeof patient.fullName === 'string' && patient.fullName.trim()) {
+        const name = patient.fullName.trim();
+        console.debug(`Found patient name for ${patientId}: "${name}" (from fullName)`);
+        return name;
+      }
+      
+      // Check metadata fields
+      if (patient.metadata && typeof patient.metadata === 'object' && patient.metadata !== null) {
+        const metadata = patient.metadata as Record<string, unknown>;
+        
+        // Try full_name
+        if (typeof metadata.full_name === 'string' && metadata.full_name.trim()) {
+          const name = metadata.full_name.trim();
+          console.debug(`Found patient name for ${patientId}: "${name}" (from metadata.full_name)`);
+          return name;
+        }
+        
+        // Try name
+        if (typeof metadata.name === 'string' && metadata.name.trim()) {
+          const name = metadata.name.trim();
+          console.debug(`Found patient name for ${patientId}: "${name}" (from metadata.name)`);
+          return name;
+        }
+        
+        // Try fullName in metadata
+        if (typeof metadata.fullName === 'string' && metadata.fullName.trim()) {
+          const name = metadata.fullName.trim();
+          console.debug(`Found patient name for ${patientId}: "${name}" (from metadata.fullName)`);
+          return name;
+        }
+      }
+      
+      // Fallback to email username
+      if (typeof patient.email === 'string' && patient.email) {
+        const emailUsername = patient.email.split('@')[0];
+        if (emailUsername && emailUsername.trim()) {
+          const name = emailUsername.trim();
+          console.debug(`Found patient name for ${patientId}: "${name}" (from email)`);
+          return name;
+        }
+      }
+      
+      // Debug: Log if patient found but no name extracted
+      console.warn(`Patient ${patientId} found but no name extracted:`, {
+        fullName: patient.fullName,
+        email: patient.email,
+        hasMetadata: !!patient.metadata,
+        metadata: patient.metadata,
+      });
+    } else {
+      // Debug: Log if patient not found - but don't spam in production
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`Patient ${patientId} not found in patients list or cache. Total patients loaded: ${patients.length}, Cache size: ${patientCache.size}`);
+      }
+    }
+    
+    // If patient not found and patients are still loading, show loading state
+    if (patientsLoading) {
+      return 'Loading...';
+    }
+    
+    // If patient is in cache but no name found, show a generic placeholder
+    // This should be rare as every account must have a name
+    console.warn(`Returning default "Patient" for ${patientId}`);
+    return 'Patient';
   };
 
   const getPatientAvatar = (patientId: string) => {
-    const patient = patients.find(p => p.id === patientId);
-    // AdminUser doesn't have avatar, but we can return undefined
+    // First check the loaded patients list
+    let patient = patients.find(p => p.id === patientId);
+    
+    // If not found, check cache
+    if (!patient) {
+      patient = patientCache.get(patientId) || undefined;
+    }
+    
+    if (patient) {
+      // Extract avatar from multiple possible fields
+      const rawAvatar = patient.avatarUrl ||
+                       (patient.metadata?.avatar_url as string) ||
+                       (patient.metadata?.avatarUrl as string) ||
+                       (patient.metadata?.avatar as string) ||
+                       undefined;
+      
+      if (rawAvatar) {
+        return normalizeAvatarUrl(rawAvatar);
+      }
+    }
+    
+    return undefined;
+  };
+
+  const getCounselorSpecialty = () => {
+    // First check counselor profile from API
+    if (counselorProfile?.specialty) {
+      return counselorProfile.specialty;
+    }
+    
+    // Check counselor profile metadata
+    if (counselorProfile?.metadata && typeof counselorProfile.metadata === 'object') {
+      const metadata = counselorProfile.metadata as Record<string, unknown>;
+      if (typeof metadata.specialty === 'string' && metadata.specialty.trim()) {
+        return metadata.specialty.trim();
+      }
+      if (Array.isArray(metadata.specialties) && metadata.specialties.length > 0) {
+        const firstSpecialty = metadata.specialties[0];
+        if (typeof firstSpecialty === 'string' && firstSpecialty.trim()) {
+          return firstSpecialty.trim();
+        }
+      }
+      if (typeof metadata.expertise === 'string' && metadata.expertise.trim()) {
+        return metadata.expertise.trim();
+      }
+    }
+    
+    // Check auth user metadata
+    if (user?.metadata && typeof user.metadata === 'object') {
+      const userMetadata = user.metadata as Record<string, unknown>;
+      if (typeof userMetadata.specialty === 'string' && userMetadata.specialty.trim()) {
+        return userMetadata.specialty.trim();
+      }
+      if (Array.isArray(userMetadata.specialties) && userMetadata.specialties.length > 0) {
+        const firstSpecialty = userMetadata.specialties[0];
+        if (typeof firstSpecialty === 'string' && firstSpecialty.trim()) {
+          return firstSpecialty.trim();
+        }
+      }
+      if (typeof userMetadata.expertise === 'string' && userMetadata.expertise.trim()) {
+        return userMetadata.expertise.trim();
+      }
+    }
+    
+    // Final fallback
+    return 'General Counseling';
+  };
+
+  const getCounselorAvatar = () => {
+    // Get counselor's own avatar from their profile or auth user
+    if (counselorProfile?.avatarUrl) {
+      return normalizeAvatarUrl(counselorProfile.avatarUrl);
+    }
+    if (user?.avatar) {
+      return normalizeAvatarUrl(user.avatar);
+    }
+    // Check metadata
+    const metadata = (counselorProfile?.metadata ?? {}) as Record<string, unknown>;
+    const rawAvatar = (metadata.avatar_url as string) ||
+                      (metadata.avatarUrl as string) ||
+                      (metadata.avatar as string) ||
+                      undefined;
+    if (rawAvatar) {
+      return normalizeAvatarUrl(rawAvatar);
+    }
     return undefined;
   };
 
@@ -172,6 +573,19 @@ export default function CounselorSessionsPage() {
         toast.error('User not authenticated');
         return;
       }
+
+      // Validate patient exists in loaded patients list
+      const patient = patients.find(p => p.id === sessionData.patientId);
+      if (!patient) {
+        toast.error('Patient not found. Please select a valid patient.');
+        return;
+      }
+
+      // Ensure patients are loaded
+      if (patientsLoading) {
+        toast.error('Patient data is still loading. Please wait and try again.');
+        return;
+      }
       
       // Type guard: after the check above, user.id is definitely a string
       // TypeScript doesn't narrow after return, so we use a type assertion
@@ -189,6 +603,7 @@ export default function CounselorSessionsPage() {
       await createSession(createData);
       toast.success('Session scheduled successfully! Patient has been notified.');
       setIsScheduleOpen(false);
+      await refreshSessions();
     } catch (error) {
       console.error('Error scheduling session:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to schedule session. Please try again.');
@@ -330,8 +745,10 @@ export default function CounselorSessionsPage() {
                     key={session.id}
                     session={session}
                     patientName={getPatientName(session.patientId)}
-                    counselorName={user?.name || 'Counselor'}
                     patientAvatar={getPatientAvatar(session.patientId)}
+                    counselorName={user?.name || 'Counselor'}
+                    counselorSpecialty={getCounselorSpecialty()}
+                    counselorAvatar={getCounselorAvatar()}
                     onJoin={handleJoinSession}
                     onReschedule={handleRescheduleSession}
                     onCancel={handleCancelSession}
@@ -365,8 +782,10 @@ export default function CounselorSessionsPage() {
                     key={session.id}
                     session={session}
                     patientName={getPatientName(session.patientId)}
-                    counselorName={user?.name || 'Counselor'}
                     patientAvatar={getPatientAvatar(session.patientId)}
+                    counselorName={user?.name || 'Counselor'}
+                    counselorSpecialty={getCounselorSpecialty()}
+                    counselorAvatar={getCounselorAvatar()}
                   />
                 ))}
               </div>
@@ -397,11 +816,13 @@ export default function CounselorSessionsPage() {
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {allSessions.map((session) => (
                     <SessionCard
-                      key={session.id}
+                    key={session.id}
                     session={session}
                     patientName={getPatientName(session.patientId)}
-                    counselorName={user?.name || 'Counselor'}
                     patientAvatar={getPatientAvatar(session.patientId)}
+                    counselorName={user?.name || 'Counselor'}
+                    counselorSpecialty={getCounselorSpecialty()}
+                    counselorAvatar={getCounselorAvatar()}
                     onJoin={session.status === 'scheduled' ? handleJoinSession : undefined}
                     onReschedule={session.status === 'scheduled' ? handleRescheduleSession : undefined}
                     onCancel={session.status === 'scheduled' ? handleCancelSession : undefined}

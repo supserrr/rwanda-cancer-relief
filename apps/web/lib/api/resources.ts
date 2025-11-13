@@ -119,6 +119,7 @@ export interface ResourceQueryParams {
   tag?: string;
   search?: string;
   isPublic?: boolean;
+  status?: ResourceStatus;
   publisher?: string;
   limit?: number;
   offset?: number;
@@ -600,6 +601,9 @@ export class ResourcesApi {
     if (params?.isPublic !== undefined) {
       query = query.eq('is_public', params.isPublic);
     }
+    if (params?.status) {
+      query = query.eq('status', params.status);
+    }
     if (params?.publisher) {
       query = query.eq('publisher', params.publisher);
     }
@@ -637,6 +641,11 @@ export class ResourcesApi {
     resourceId: string,
     data: UpdateResourceInput
   ): Promise<Resource> {
+    // Validate input
+    if (!data || Object.keys(data).length === 0) {
+      throw new Error('No data provided to update');
+    }
+    
     const supabase = createClient();
     if (!supabase) {
       throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
@@ -649,34 +658,17 @@ export class ResourcesApi {
     if (data.url !== undefined) updateData.url = data.url;
     if (data.thumbnail !== undefined) updateData.thumbnail = data.thumbnail;
     if (data.tags !== undefined) updateData.tags = data.tags;
-    if (data.isPublic !== undefined) updateData.is_public = data.isPublic;
+    // Don't set isPublic directly if status is being set to rejected (it will be handled by status logic)
+    if (data.isPublic !== undefined && data.status !== 'rejected') {
+      updateData.is_public = data.isPublic;
+    }
     if (data.youtubeUrl !== undefined) updateData.youtube_url = data.youtubeUrl;
     if (data.content !== undefined) updateData.content = data.content;
     if (data.category !== undefined) updateData.category = data.category;
     if (data.readingTime !== undefined) updateData.reading_time = data.readingTime;
     if (data.publisherName !== undefined) updateData.publisher_name = data.publisherName;
-    if (data.reviewed !== undefined) {
-      updateData.reviewed = data.reviewed;
-      // Get current user for reviewed_by
-      const { data: { user } } = await supabase.auth.getUser();
-      if (data.reviewed) {
-        // When marking as reviewed, set reviewed_at, reviewed_by, and status
-        updateData.reviewed_at = new Date().toISOString();
-        if (user) {
-          updateData.reviewed_by = user.id;
-        }
-        // Set status to 'reviewed' (unless already published)
-        if (data.status !== 'published') {
-          updateData.status = 'reviewed';
-        }
-      } else {
-        // When marking as not reviewed, clear reviewed_at, reviewed_by, and set status to pending_review
-        updateData.reviewed_at = null;
-        updateData.reviewed_by = null;
-        updateData.status = 'pending_review';
-      }
-    }
     
+    // Handle status changes first (this takes priority)
     if (data.status !== undefined) {
       updateData.status = data.status;
       // When status changes, update related fields
@@ -692,6 +684,17 @@ export class ResourcesApi {
         }
       } else if (data.status === 'published') {
         // Publishing requires reviewed status
+        // First check if resource is reviewed
+        const { data: existingResource } = await supabase
+          .from('resources')
+          .select('reviewed, status')
+          .eq('id', resourceId)
+          .single();
+        
+        if (existingResource && !existingResource.reviewed) {
+          throw new Error('Resource must be reviewed before it can be published');
+        }
+        
         updateData.reviewed = true;
         updateData.is_public = true;
         if (!updateData.reviewed_at) {
@@ -706,11 +709,46 @@ export class ResourcesApi {
         updateData.reviewed = false;
         updateData.reviewed_at = null;
         updateData.reviewed_by = null;
+      } else if (data.status === 'rejected') {
+        // Rejecting a resource
+        updateData.reviewed = false;
+        updateData.is_public = false;
+        // Keep reviewed_at and reviewed_by to track who rejected it
       }
     }
     
+    // Handle reviewed flag separately (but don't override status if it's being set explicitly)
+    // If status is being set to rejected, don't run this logic (it's already handled above)
+    if (data.reviewed !== undefined && data.status === undefined) {
+      // Only handle reviewed flag when status is not being explicitly set
+      updateData.reviewed = data.reviewed;
+      // Get current user for reviewed_by
+      const { data: { user } } = await supabase.auth.getUser();
+      if (data.reviewed) {
+        // When marking as reviewed, set reviewed_at, reviewed_by, and status
+        updateData.reviewed_at = new Date().toISOString();
+        if (user) {
+          updateData.reviewed_by = user.id;
+        }
+        // Set status to 'reviewed' (unless already published)
+        if (!updateData.status || updateData.status === 'pending_review') {
+          updateData.status = 'reviewed';
+        }
+      } else {
+        // When marking as not reviewed, clear reviewed_at, reviewed_by, and set status to pending_review
+        updateData.reviewed_at = null;
+        updateData.reviewed_by = null;
+        if (!updateData.status || updateData.status === 'reviewed') {
+          updateData.status = 'pending_review';
+        }
+      }
+    }
+    // Note: If reviewed is set along with status, the status logic above handles it
+    // We don't need to handle reviewed separately when status is explicitly set
+    
     // Handle isPublic changes in relation to status
-    if (data.isPublic !== undefined) {
+    // Only run this logic if isPublic is explicitly set AND status is not being set to rejected
+    if (data.isPublic !== undefined && data.status !== 'rejected') {
       updateData.is_public = data.isPublic;
       // If publishing, ensure status is 'published' and resource is reviewed
       if (data.isPublic) {
@@ -729,7 +767,8 @@ export class ResourcesApi {
         }
       } else {
         // If unpublishing, set status back to 'reviewed' (if it was published)
-        if (updateData.status === 'published' || !updateData.status) {
+        // But only if status is not being explicitly set
+        if (data.status === undefined && (updateData.status === 'published' || !updateData.status)) {
           const { data: existingResource } = await supabase
             .from('resources')
             .select('status')
@@ -743,6 +782,12 @@ export class ResourcesApi {
       }
     }
 
+    // Ensure updateData is not empty
+    if (Object.keys(updateData).length === 0) {
+      console.error('Update data is empty. Input data:', data);
+      throw new Error('No fields to update');
+    }
+
     const { data: resource, error } = await supabase
       .from('resources')
       .update(updateData)
@@ -754,6 +799,7 @@ export class ResourcesApi {
       console.error('Supabase update error:', error);
       console.error('Update data:', updateData);
       console.error('Resource ID:', resourceId);
+      console.error('Input data:', data);
       throw new Error(error.message || 'Failed to update resource');
     }
 

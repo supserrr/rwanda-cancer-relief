@@ -10,6 +10,7 @@ import {
   Video, 
   Mic,
   MessageCircle,
+  Users,
   CheckCircle,
   XCircle,
   AlertCircle
@@ -21,6 +22,7 @@ interface SessionCardProps {
   session: Session;
   patientName?: string;
   counselorName?: string;
+  counselorSpecialty?: string;
   patientAvatar?: string;
   counselorAvatar?: string;
   onJoin?: (session: Session) => void;
@@ -33,6 +35,7 @@ export function SessionCard({
   session,
   patientName,
   counselorName,
+  counselorSpecialty,
   patientAvatar,
   counselorAvatar,
   onJoin,
@@ -96,10 +99,17 @@ export function SessionCard({
             </Badge>
           </div>
           <Badge variant="outline" className="flex items-center gap-1">
-            {session.type === 'audio' ? (
+            {session.type === 'audio' && (
               <><Mic className="h-3 w-3" /> Audio Only</>
-            ) : (
+            )}
+            {session.type === 'video' && (
               <><Video className="h-3 w-3" /> Video</>
+            )}
+            {session.type === 'chat' && (
+              <><MessageCircle className="h-3 w-3" /> Chat</>
+            )}
+            {session.type === 'in-person' && (
+              <><Users className="h-3 w-3" /> In-Person</>
             )}
           </Badge>
         </div>
@@ -115,7 +125,9 @@ export function SessionCard({
             </Avatar>
             <div className="flex-1">
               <p className="text-sm font-medium">{patientName || 'Patient'}</p>
-              <p className="text-xs text-muted-foreground">Patient</p>
+              <p className="text-xs text-muted-foreground">
+                {patientName === 'Loading...' ? 'Loading...' : 'Patient'}
+              </p>
             </div>
           </div>
 
@@ -128,7 +140,7 @@ export function SessionCard({
             </Avatar>
             <div className="flex-1">
               <p className="text-sm font-medium">{counselorName || 'Counselor'}</p>
-              <p className="text-xs text-muted-foreground">Counselor</p>
+              <p className="text-xs text-muted-foreground">{counselorSpecialty || 'Counselor'}</p>
             </div>
           </div>
         </div>

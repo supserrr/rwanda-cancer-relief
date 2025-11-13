@@ -28,6 +28,7 @@ export interface Resource {
   youtubeUrl?: string;
   content?: string;
   category?: string;
+  readingTime?: string;
   views: number;
   downloads: number;
   createdAt: string;
@@ -76,6 +77,7 @@ export interface CreateResourceInput {
   youtubeUrl?: string;
   content?: string;
   category?: string;
+  readingTime?: string;
 }
 
 /**
@@ -92,6 +94,7 @@ export interface UpdateResourceInput {
   youtubeUrl?: string;
   content?: string;
   category?: string;
+  readingTime?: string;
 }
 
 /**
@@ -161,6 +164,7 @@ export class ResourcesApi {
         youtube_url: data.youtubeUrl,
         content: data.content,
         category: data.category,
+        reading_time: data.readingTime,
         views: 0,
         downloads: 0,
       })
@@ -391,6 +395,7 @@ export class ResourcesApi {
           youtube_url: data.youtubeUrl,
           content: data.content,
           category: data.category,
+          reading_time: data.readingTime,
           views: 0,
           downloads: 0,
         })
@@ -631,6 +636,7 @@ export class ResourcesApi {
     if (data.youtubeUrl !== undefined) updateData.youtube_url = data.youtubeUrl;
     if (data.content !== undefined) updateData.content = data.content;
     if (data.category !== undefined) updateData.category = data.category;
+    if (data.readingTime !== undefined) updateData.reading_time = data.readingTime;
 
     const { data: resource, error } = await supabase
       .from('resources')
@@ -796,6 +802,7 @@ export class ResourcesApi {
       youtubeUrl: dbResource.youtube_url as string | undefined,
       content: dbResource.content as string | undefined,
       category: dbResource.category as string | undefined,
+      readingTime: dbResource.reading_time as string | undefined,
       views: dbResource.views as number || 0,
       downloads: dbResource.downloads as number || 0,
       createdAt: dbResource.created_at as string,

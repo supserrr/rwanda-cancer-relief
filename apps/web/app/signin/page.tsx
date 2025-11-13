@@ -9,6 +9,17 @@ import { createClient } from '@/lib/supabase/client';
 import { GoogleOneTap } from '@/components/auth/GoogleOneTap';
 import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
 import { env } from '@/src/env';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@workspace/ui/components/dialog';
+import { Input } from '@workspace/ui/components/input';
+import { Label } from '@workspace/ui/components/label';
+import { Button } from '@workspace/ui/components/button';
+import { toast } from 'sonner';
 
 const sampleTestimonials: Testimonial[] = [
   {
@@ -126,9 +137,44 @@ export default function SignInPageDemo() {
     }
   };
   
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetSuccess, setResetSuccess] = useState(false);
+
   const handleResetPassword = () => {
-    // For now, just show a message - password reset would be implemented here
-    alert("Password reset functionality will be implemented");
+    setShowResetPassword(true);
+    setResetEmail('');
+    setResetError(null);
+    setResetSuccess(false);
+  }
+
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetError(null);
+    setResetSuccess(false);
+
+    if (!resetEmail || !resetEmail.includes('@')) {
+      setResetError('Please enter a valid email address');
+      return;
+    }
+
+    setResetLoading(true);
+
+    try {
+      const { AuthApi } = await import('@/lib/api/auth');
+      await AuthApi.forgotPassword(resetEmail);
+      setResetSuccess(true);
+      toast.success('Password reset email sent! Please check your inbox.');
+    } catch (err) {
+      console.error('Password reset error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send reset email. Please try again.';
+      setResetError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setResetLoading(false);
+    }
   }
 
   const handleCreateAccount = () => {
@@ -165,6 +211,85 @@ export default function SignInPageDemo() {
         </div>
       )}
       <GoogleOneTap />
+
+      {/* Reset Password Dialog */}
+      <Dialog open={showResetPassword} onOpenChange={setShowResetPassword}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Enter your email address and we'll send you a link to reset your password.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {resetSuccess ? (
+            <div className="space-y-4">
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md space-y-2">
+                <p className="text-sm text-green-700 dark:text-green-400 font-medium">
+                  Password reset email sent!
+                </p>
+                <p className="text-sm text-green-700 dark:text-green-400">
+                  Please check your inbox (and spam folder) for the password reset link. The link will expire in 1 hour.
+                </p>
+              </div>
+              <Button
+                onClick={() => {
+                  setShowResetPassword(false);
+                  setResetSuccess(false);
+                }}
+                className="w-full"
+              >
+                Close
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
+              {resetError && (
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-400">
+                  {resetError}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="resetEmail">Email Address</Label>
+                <Input
+                  id="resetEmail"
+                  type="email"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  placeholder="Enter your email address"
+                  required
+                  disabled={resetLoading}
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowResetPassword(false);
+                    setResetError(null);
+                    setResetEmail('');
+                  }}
+                  className="flex-1"
+                  disabled={resetLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="flex-1"
+                  disabled={resetLoading}
+                >
+                  {resetLoading ? 'Sending...' : 'Send Reset Link'}
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

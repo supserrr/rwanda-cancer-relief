@@ -2064,13 +2064,43 @@ export class AuthApi {
       throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
     }
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset-password`,
+    // Get the current origin for the redirect URL
+    const redirectTo = typeof window !== 'undefined' 
+      ? `${window.location.origin}/auth/reset-password`
+      : `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/reset-password`;
+
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectTo,
     });
 
     if (error) {
-      throw new Error(error.message || 'Failed to send password reset email');
+      console.error('Supabase password reset error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        name: error.name,
+        redirectTo: redirectTo,
+      });
+      
+      // Provide more helpful error messages
+      let errorMessage = error.message || 'Failed to send password reset email';
+      
+      // Check for common error scenarios
+      if (error.status === 500) {
+        errorMessage = 'Email sending failed. Please verify:\n1. SMTP is properly configured in Supabase Dashboard\n2. Resend API key is correct\n3. Redirect URL is whitelisted in Supabase (Authentication → URL Configuration)\n4. Check Resend dashboard for delivery status';
+      } else if (error.message?.includes('Email address not authorized')) {
+        errorMessage = 'Email sending is not configured. Please configure SMTP in Supabase Dashboard (Authentication → Settings → SMTP Settings).';
+      } else if (error.message?.includes('rate limit') || error.status === 429) {
+        errorMessage = 'Too many password reset requests. Please wait a few minutes before trying again.';
+      } else if (error.status === 400) {
+        errorMessage = `Invalid email address or redirect URL not whitelisted. Please add "${redirectTo}" to allowed redirect URLs in Supabase Dashboard (Authentication → URL Configuration).`;
+      }
+      
+      throw new Error(errorMessage);
     }
+
+    // Log success for debugging
+    console.log('Password reset email sent successfully to:', email);
   }
 
   /**

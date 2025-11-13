@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { AnimatedPageHeader } from '@workspace/ui/components/animated-page-header';
 import { AnimatedCard } from '@workspace/ui/components/animated-card';
 import { ResourceCard } from '../../../../components/dashboard/shared/ResourceCard';
@@ -91,6 +91,8 @@ export default function CounselorResourcesPage() {
   const videoFileInputRef = useRef<HTMLInputElement>(null);
   const pdfFileInputRef = useRef<HTMLInputElement>(null);
   const bulkFileInputRef = useRef<HTMLInputElement>(null);
+  const coverImageInputRef = useRef<HTMLInputElement>(null);
+  const articleContentRef = useRef<HTMLDivElement>(null);
 
   // Upload form state
   const [uploadFormData, setUploadFormData] = useState<{
@@ -106,6 +108,53 @@ export default function CounselorResourcesPage() {
   });
 
   const [isUploading, setIsUploading] = useState(false);
+  const [coverImage, setCoverImage] = useState<{ file: File | null; preview: string | null }>({
+    file: null,
+    preview: null,
+  });
+
+  // Article editor form state
+  const [articleFormData, setArticleFormData] = useState({
+    title: '',
+    excerpt: '',
+    content: '',
+    category: '',
+    readingTime: '',
+    author: '',
+    tags: '',
+  });
+
+  // Track active formatting states
+  const [activeFormatting, setActiveFormatting] = useState<{
+    bold: boolean;
+    italic: boolean;
+    underline: boolean;
+    strikethrough: boolean;
+    heading: 'h1' | 'h2' | 'h3' | null;
+    list: 'ordered' | 'unordered' | null;
+    align: 'left' | 'center' | 'right' | null;
+  }>({
+    bold: false,
+    italic: false,
+    underline: false,
+    strikethrough: false,
+    heading: null,
+    list: null,
+    align: null,
+  });
+
+  // Advanced article settings
+  const [articleSettings, setArticleSettings] = useState({
+    allowComments: true,
+    featuredArticle: false,
+    seoDescription: '',
+  });
+
+  // Preview state
+  const [previewArticle, setPreviewArticle] = useState<Resource | null>(null);
+
+  // Track which draft is being edited
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
 
   const resourceTypes = ['all', 'audio', 'pdf', 'video', 'article'] as const;
 
@@ -165,6 +214,155 @@ export default function CounselorResourcesPage() {
     deleteResource,
     refreshResources,
   } = useResources(queryParams);
+
+  // Clean up cover image preview URL and reset form when switching away from article editor
+  useEffect(() => {
+    if (activeTab !== 'create-article') {
+      if (coverImage.preview && coverImage.preview.startsWith('blob:')) {
+        URL.revokeObjectURL(coverImage.preview);
+      }
+      setCoverImage({ file: null, preview: null });
+      // Reset article form data when switching away (but keep if we're loading a draft)
+      if (!editingDraftId) {
+        setArticleFormData({
+          title: '',
+          excerpt: '',
+          content: '',
+          category: '',
+          readingTime: '',
+          author: '',
+          tags: '',
+        });
+      }
+    }
+  }, [activeTab, editingDraftId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Initialize and sync contentEditable with state
+  useEffect(() => {
+    if (articleContentRef.current && activeTab === 'create-article') {
+      const currentContent = articleContentRef.current.innerHTML.trim();
+      const stateContent = articleFormData.content || '';
+      
+      // If we have state content and the editor is empty or just has <br>, load the state content
+      // This handles loading drafts
+      if (stateContent && (!currentContent || currentContent === '<br>' || currentContent === '')) {
+        articleContentRef.current.innerHTML = stateContent;
+      } else if (stateContent && currentContent !== stateContent) {
+        // Only update if the element doesn't have focus (user isn't typing)
+        // This prevents overwriting user input while they're typing
+        if (document.activeElement !== articleContentRef.current) {
+          articleContentRef.current.innerHTML = stateContent;
+        }
+      } else if (!stateContent && (!currentContent || currentContent === '<br>')) {
+        // Initialize with <br> for placeholder to work and ensure it's editable
+        articleContentRef.current.innerHTML = '<br>';
+        // Ensure the element is properly set up as contentEditable
+        articleContentRef.current.setAttribute('contenteditable', 'true');
+      }
+    }
+  }, [articleFormData.content, activeTab]);
+
+  // Update active formatting states based on cursor position
+  const updateActiveFormatting = useCallback(() => {
+    if (!articleContentRef.current) return;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const range = selection.getRangeAt(0);
+    let node = range.commonAncestorContainer;
+
+    // If it's a text node, get the parent element
+    if (node.nodeType === Node.TEXT_NODE) {
+      node = node.parentElement || node;
+    }
+
+    // Find the containing element
+    let element = node.nodeType === Node.ELEMENT_NODE ? node as HTMLElement : (node as Node).parentElement;
+    
+    if (!element) return;
+
+    // Check formatting states
+    const isBold = document.queryCommandState('bold') || 
+                   element.closest('strong, b') !== null ||
+                   window.getComputedStyle(element).fontWeight === '700' ||
+                   parseInt(window.getComputedStyle(element).fontWeight) >= 700;
+    
+    const isItalic = document.queryCommandState('italic') || 
+                     element.closest('em, i') !== null ||
+                     window.getComputedStyle(element).fontStyle === 'italic';
+    
+    const isUnderline = document.queryCommandState('underline') || 
+                        element.closest('u') !== null ||
+                        window.getComputedStyle(element).textDecoration?.includes('underline');
+    
+    const isStrikethrough = document.queryCommandState('strikeThrough') || 
+                            element.closest('s, strike, del') !== null ||
+                            window.getComputedStyle(element).textDecoration?.includes('line-through');
+
+    // Check heading
+    let heading: 'h1' | 'h2' | 'h3' | null = null;
+    const headingElement = element.closest('h1, h2, h3');
+    if (headingElement) {
+      const tagName = headingElement.tagName.toLowerCase();
+      if (tagName === 'h1') heading = 'h1';
+      else if (tagName === 'h2') heading = 'h2';
+      else if (tagName === 'h3') heading = 'h3';
+    }
+
+    // Check list
+    let list: 'ordered' | 'unordered' | null = null;
+    const listElement = element.closest('ul, ol, li');
+    if (listElement) {
+      if (listElement.tagName.toLowerCase() === 'ol' || listElement.closest('ol')) {
+        list = 'ordered';
+      } else if (listElement.tagName.toLowerCase() === 'ul' || listElement.closest('ul')) {
+        list = 'unordered';
+      }
+    }
+
+    // Check alignment
+    let align: 'left' | 'center' | 'right' | null = null;
+    const textAlign = window.getComputedStyle(element).textAlign;
+    if (textAlign === 'center') align = 'center';
+    else if (textAlign === 'right') align = 'right';
+    else if (textAlign === 'left' || textAlign === 'start') align = 'left';
+
+    setActiveFormatting({
+      bold: isBold,
+      italic: isItalic,
+      underline: isUnderline,
+      strikethrough: isStrikethrough,
+      heading,
+      list,
+      align,
+    });
+  }, []);
+
+  // Update formatting states on selection change
+  useEffect(() => {
+    if (activeTab !== 'create-article') return;
+
+    const handleSelectionChange = () => {
+      if (articleContentRef.current && document.activeElement === articleContentRef.current) {
+        updateActiveFormatting();
+      }
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    if (articleContentRef.current) {
+      articleContentRef.current.addEventListener('keyup', updateActiveFormatting);
+      articleContentRef.current.addEventListener('mouseup', updateActiveFormatting);
+    }
+
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      if (articleContentRef.current) {
+        articleContentRef.current.removeEventListener('keyup', updateActiveFormatting);
+        articleContentRef.current.removeEventListener('mouseup', updateActiveFormatting);
+      }
+    };
+  }, [activeTab, updateActiveFormatting]);
 
   // Filter resources based on active tab (client-side for saved resources)
   const filteredResources = useMemo(() => {
@@ -473,6 +671,22 @@ export default function CounselorResourcesPage() {
   };
 
   const handleCloseArticleEditor = () => {
+    // Clean up cover image preview URL to prevent memory leaks
+    if (coverImage.preview && coverImage.preview.startsWith('blob:')) {
+      URL.revokeObjectURL(coverImage.preview);
+    }
+    setCoverImage({ file: null, preview: null });
+    // Reset article form data
+    setArticleFormData({
+      title: '',
+      excerpt: '',
+      content: '',
+      category: '',
+      readingTime: '',
+      author: '',
+      tags: '',
+    });
+    setEditingDraftId(null);
     setIsArticleEditorOpen(false);
     setEditingArticle(null);
   };
@@ -492,6 +706,542 @@ export default function CounselorResourcesPage() {
 
   const handleChooseBulkFiles = () => {
     bulkFileInputRef.current?.click();
+  };
+
+  const handleChooseCoverImage = () => {
+    coverImageInputRef.current?.click();
+  };
+
+  // Formatting handlers for article editor
+  const handleFormatCommand = (command: string, value?: string) => {
+    if (!articleContentRef.current) {
+      console.warn('Article content ref not available');
+      return;
+    }
+    
+    // Ensure the editor is focused and has content
+    articleContentRef.current.focus();
+    
+    // Ensure there's at least a <br> for commands to work
+    if (!articleContentRef.current.innerHTML.trim()) {
+      articleContentRef.current.innerHTML = '<br>';
+    }
+    
+    // Set cursor position if no selection
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount === 0) {
+      const range = document.createRange();
+      range.selectNodeContents(articleContentRef.current);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    
+    // Small delay to ensure focus is set
+    setTimeout(() => {
+      if (articleContentRef.current) {
+        try {
+          const success = document.execCommand(command, false, value);
+          console.log(`Command ${command} executed:`, success);
+          
+          if (!success) {
+            console.warn(`Command ${command} failed. Trying alternative approach...`);
+            // Fallback: try to apply formatting to selected text
+            if (selection && selection.rangeCount > 0) {
+              const range = selection.getRangeAt(0);
+              if (!range.collapsed) {
+                // There's a selection, try wrapping it
+                const selectedText = range.toString();
+                if (command === 'bold') {
+                  const strong = document.createElement('strong');
+                  strong.textContent = selectedText;
+                  range.deleteContents();
+                  range.insertNode(strong);
+                } else if (command === 'italic') {
+                  const em = document.createElement('em');
+                  em.textContent = selectedText;
+                  range.deleteContents();
+                  range.insertNode(em);
+                }
+              }
+            }
+          }
+          
+          // Update content after formatting
+          const content = articleContentRef.current.innerHTML;
+          setArticleFormData(prev => ({ ...prev, content }));
+          
+          // Keep focus on the editor
+          articleContentRef.current.focus();
+        } catch (error) {
+          console.error(`Error executing command ${command}:`, error);
+        }
+      }
+    }, 50);
+  };
+
+  const handleFormatHeading = (level: number) => {
+    if (!articleContentRef.current) return;
+    
+    articleContentRef.current.focus();
+    
+    setTimeout(() => {
+      if (articleContentRef.current) {
+        const success = document.execCommand('formatBlock', false, `h${level}`);
+        console.log(`Heading H${level} executed:`, success);
+        
+        const content = articleContentRef.current.innerHTML;
+        setArticleFormData(prev => ({ ...prev, content }));
+        articleContentRef.current.focus();
+      }
+    }, 10);
+  };
+
+  const handleInsertList = (ordered: boolean) => {
+    if (!articleContentRef.current) return;
+    
+    articleContentRef.current.focus();
+    
+    setTimeout(() => {
+      if (articleContentRef.current) {
+        const command = ordered ? 'insertOrderedList' : 'insertUnorderedList';
+        const success = document.execCommand(command, false);
+        console.log(`List command ${command} executed:`, success);
+        
+        const content = articleContentRef.current.innerHTML;
+        setArticleFormData(prev => ({ ...prev, content }));
+        articleContentRef.current.focus();
+      }
+    }, 10);
+  };
+
+  const handleUndo = () => {
+    articleContentRef.current?.focus();
+    document.execCommand('undo', false);
+    if (articleContentRef.current) {
+      const content = articleContentRef.current.innerHTML;
+      setArticleFormData(prev => ({ ...prev, content }));
+    }
+  };
+
+  const handleRedo = () => {
+    articleContentRef.current?.focus();
+    document.execCommand('redo', false);
+    if (articleContentRef.current) {
+      const content = articleContentRef.current.innerHTML;
+      setArticleFormData(prev => ({ ...prev, content }));
+    }
+  };
+
+  const handleAlignText = (alignment: 'left' | 'center' | 'right' | 'justify') => {
+    if (!articleContentRef.current) return;
+    
+    articleContentRef.current.focus();
+    
+    setTimeout(() => {
+      if (articleContentRef.current) {
+        let command = 'justifyLeft';
+        if (alignment === 'center') {
+          command = 'justifyCenter';
+        } else if (alignment === 'right') {
+          command = 'justifyRight';
+        } else if (alignment === 'justify') {
+          command = 'justifyFull';
+        }
+        
+        const success = document.execCommand(command, false);
+        console.log(`Alignment ${alignment} executed:`, success);
+        
+        const content = articleContentRef.current.innerHTML;
+        setArticleFormData(prev => ({ ...prev, content }));
+        articleContentRef.current.focus();
+      }
+    }, 10);
+  };
+
+  const handleInsertLink = () => {
+    if (!articleContentRef.current) return;
+    
+    articleContentRef.current.focus();
+    
+    setTimeout(() => {
+      if (articleContentRef.current) {
+        const url = prompt('Enter URL:');
+        if (url) {
+          const success = document.execCommand('createLink', false, url);
+          console.log('Link command executed:', success);
+          
+          const content = articleContentRef.current.innerHTML;
+          setArticleFormData(prev => ({ ...prev, content }));
+          articleContentRef.current.focus();
+        }
+      }
+    }, 10);
+  };
+
+  const handleInsertImage = () => {
+    if (!articleContentRef.current) return;
+    
+    articleContentRef.current.focus();
+    
+    setTimeout(() => {
+      if (articleContentRef.current) {
+        const url = prompt('Enter image URL:');
+        if (url) {
+          const success = document.execCommand('insertImage', false, url);
+          console.log('Image command executed:', success);
+          
+          const content = articleContentRef.current.innerHTML;
+          setArticleFormData(prev => ({ ...prev, content }));
+          articleContentRef.current.focus();
+        }
+      }
+    }, 10);
+  };
+
+  const handleInsertQuote = () => {
+    articleContentRef.current?.focus();
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const blockquote = document.createElement('blockquote');
+      blockquote.style.borderLeft = '4px solid currentColor';
+      blockquote.style.paddingLeft = '1rem';
+      blockquote.style.margin = '1rem 0';
+      blockquote.style.fontStyle = 'italic';
+      blockquote.style.color = 'inherit';
+      
+      if (range.collapsed) {
+        blockquote.innerHTML = '<br>';
+      } else {
+        blockquote.appendChild(range.extractContents());
+      }
+      
+      range.insertNode(blockquote);
+      range.setStartAfter(blockquote);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      
+      if (articleContentRef.current) {
+        const content = articleContentRef.current.innerHTML;
+        setArticleFormData(prev => ({ ...prev, content }));
+      }
+    }
+  };
+
+  const handleInsertCodeBlock = () => {
+    articleContentRef.current?.focus();
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const pre = document.createElement('pre');
+      const code = document.createElement('code');
+      code.style.color = 'inherit';
+      code.style.backgroundColor = 'transparent';
+      
+      if (range.collapsed) {
+        code.innerHTML = '<br>';
+      } else {
+        code.appendChild(range.extractContents());
+      }
+      
+      pre.appendChild(code);
+      range.insertNode(pre);
+      range.setStartAfter(pre);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      
+      if (articleContentRef.current) {
+        const content = articleContentRef.current.innerHTML;
+        setArticleFormData(prev => ({ ...prev, content }));
+      }
+    }
+  };
+
+  const handleInsertHorizontalRule = () => {
+    if (!articleContentRef.current) return;
+    
+    articleContentRef.current.focus();
+    
+    setTimeout(() => {
+      if (articleContentRef.current) {
+        const success = document.execCommand('insertHorizontalRule', false);
+        console.log('Horizontal rule executed:', success);
+        
+        const content = articleContentRef.current.innerHTML;
+        setArticleFormData(prev => ({ ...prev, content }));
+        articleContentRef.current.focus();
+      }
+    }, 10);
+  };
+
+  // Article actions
+  const handlePreviewArticle = () => {
+    if (!articleFormData.title.trim()) {
+      toast.error('Please enter an article title to preview');
+      return;
+    }
+    
+    // Create a preview article object
+    const preview: Resource = {
+      id: 'preview',
+      title: articleFormData.title,
+      description: articleFormData.excerpt || articleFormData.title,
+      type: 'article',
+      content: articleFormData.content,
+      category: articleFormData.category,
+      tags: articleFormData.tags.split(',').map(t => t.trim()).filter(t => t),
+      isPublic: true,
+      publisher: user?.id || '',
+      publisherName: articleFormData.author || user?.name || 'Unknown',
+      thumbnail: coverImage.preview || undefined,
+      views: 0,
+      downloads: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    setPreviewArticle(preview);
+    setIsArticleViewerOpen(true);
+  };
+
+  const handleSaveDraft = async () => {
+    if (!articleFormData.title.trim()) {
+      toast.error('Please enter an article title');
+      return;
+    }
+
+    try {
+      // Get the latest content directly from the contentEditable div
+      const currentContent = articleContentRef.current?.innerHTML || articleFormData.content || '';
+      
+      // Ensure content is not just empty tags
+      const cleanedContent = currentContent.trim() === '<br>' || currentContent.trim() === '' ? '' : currentContent;
+      
+      const tags = articleFormData.tags
+        .split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0);
+
+      // Upload cover image if a new file was selected
+      let thumbnailUrl: string | undefined = undefined;
+      if (coverImage.file) {
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        if (!supabase) {
+          throw new Error('Supabase is not configured');
+        }
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error('User not authenticated');
+        }
+
+        const fileExt = coverImage.file.name.split('.').pop()?.toLowerCase() || 'jpg';
+        const fileName = `${user.id}-cover-${Date.now()}.${fileExt}`;
+        const filePath = fileName;
+
+        const { error: uploadError } = await supabase.storage
+          .from('resources')
+          .upload(filePath, coverImage.file, {
+            cacheControl: '3600',
+            upsert: false,
+          });
+
+        if (uploadError) {
+          throw new Error(`Failed to upload cover image: ${uploadError.message}`);
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('resources')
+          .getPublicUrl(filePath);
+        
+        thumbnailUrl = publicUrl;
+      } else if (coverImage.preview && coverImage.preview.startsWith('http')) {
+        // Use existing URL if it's already a URL (from loaded draft)
+        thumbnailUrl = coverImage.preview;
+      }
+
+      const resourceData = {
+        title: articleFormData.title,
+        description: articleFormData.excerpt || articleFormData.title,
+        type: 'article' as const,
+        content: cleanedContent,
+        category: articleFormData.category || undefined,
+        tags,
+        isPublic: false, // Draft is not public
+        thumbnail: thumbnailUrl,
+        readingTime: articleFormData.readingTime || undefined,
+      };
+      
+      console.log('Saving draft with content length:', cleanedContent.length);
+      console.log('Content preview:', cleanedContent.substring(0, 100));
+
+      // Update existing draft or create new one
+      if (editingDraftId) {
+        await updateResource(editingDraftId, resourceData);
+        toast.success('Draft updated successfully');
+      } else {
+        await createResource(resourceData);
+        toast.success('Draft saved successfully');
+      }
+      
+      // Update state with the saved content
+      setArticleFormData(prev => ({ ...prev, content: currentContent }));
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to save draft');
+    }
+  };
+
+  const handlePublishArticle = async () => {
+    if (!articleFormData.title.trim()) {
+      toast.error('Please enter an article title');
+      return;
+    }
+
+    // Get the latest content directly from the contentEditable div
+    const currentContent = articleContentRef.current?.innerHTML || articleFormData.content || '';
+    
+    // Ensure content is not just empty tags
+    const cleanedContent = currentContent.trim() === '<br>' || currentContent.trim() === '' ? '' : currentContent;
+    
+    if (!cleanedContent.trim()) {
+      toast.error('Please add article content');
+      return;
+    }
+
+    try {
+      const tags = articleFormData.tags
+        .split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0);
+
+      // Upload cover image if a new file was selected
+      let thumbnailUrl: string | undefined = undefined;
+      if (coverImage.file) {
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        if (!supabase) {
+          throw new Error('Supabase is not configured');
+        }
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error('User not authenticated');
+        }
+
+        const fileExt = coverImage.file.name.split('.').pop()?.toLowerCase() || 'jpg';
+        const fileName = `${user.id}-cover-${Date.now()}.${fileExt}`;
+        const filePath = fileName;
+
+        const { error: uploadError } = await supabase.storage
+          .from('resources')
+          .upload(filePath, coverImage.file, {
+            cacheControl: '3600',
+            upsert: false,
+          });
+
+        if (uploadError) {
+          throw new Error(`Failed to upload cover image: ${uploadError.message}`);
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('resources')
+          .getPublicUrl(filePath);
+        
+        thumbnailUrl = publicUrl;
+      } else if (coverImage.preview && coverImage.preview.startsWith('http')) {
+        // Use existing URL if it's already a URL (from loaded draft)
+        thumbnailUrl = coverImage.preview;
+      }
+
+      const resourceData = {
+        title: articleFormData.title,
+        description: articleFormData.excerpt || articleFormData.title,
+        type: 'article' as const,
+        content: cleanedContent,
+        category: articleFormData.category || undefined,
+        tags,
+        isPublic: true, // Published articles are public
+        thumbnail: thumbnailUrl,
+        readingTime: articleFormData.readingTime || undefined,
+      };
+      
+      console.log('Publishing article with content length:', cleanedContent.length);
+
+      // Update existing draft or create new one
+      if (editingDraftId) {
+        await updateResource(editingDraftId, resourceData);
+        toast.success('Article published successfully');
+      } else {
+        await createResource(resourceData);
+        toast.success('Article published successfully');
+      }
+      
+      // Reset form
+      setArticleFormData({
+        title: '',
+        excerpt: '',
+        content: '',
+        category: '',
+        readingTime: '',
+        author: '',
+        tags: '',
+      });
+      if (coverImage.preview && coverImage.preview.startsWith('blob:')) {
+        URL.revokeObjectURL(coverImage.preview);
+      }
+      setCoverImage({ file: null, preview: null });
+      setArticleSettings({
+        allowComments: true,
+        featuredArticle: false,
+        seoDescription: '',
+      });
+      setEditingDraftId(null);
+      setActiveTab('manage');
+    } catch (error) {
+      console.error('Error publishing article:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to publish article');
+    }
+  };
+
+  const handleCoverImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type (images only)
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file (JPEG, PNG, WebP, etc.)');
+        if (event.target) {
+          event.target.value = '';
+        }
+        return;
+      }
+
+      // Validate file size (10MB limit for cover images)
+      const maxFileSize = 10 * 1024 * 1024; // 10MB
+      if (file.size > maxFileSize) {
+        toast.error(
+          `Image size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds the maximum allowed size of 10MB. ` +
+          `Please compress your image or choose a smaller file.`
+        );
+        if (event.target) {
+          event.target.value = '';
+        }
+        return;
+      }
+
+      // Create preview URL
+      const preview = URL.createObjectURL(file);
+      setCoverImage({ file, preview });
+      toast.success('Cover image selected');
+    }
+    // Reset input value to allow selecting the same file again
+    if (event.target) {
+      event.target.value = '';
+    }
   };
 
   // File selection handlers
@@ -1056,6 +1806,114 @@ export default function CounselorResourcesPage() {
               </p>
             </div>
 
+            {/* Drafts Section */}
+            {(() => {
+              const drafts = resources.filter(r => r.type === 'article' && !r.isPublic && r.publisher === user?.id);
+              if (drafts.length === 0) return null;
+              
+              return (
+                <AnimatedCard className="mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
+                        <FileText className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">Draft Articles</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {drafts.length} {drafts.length === 1 ? 'draft' : 'drafts'} saved
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {drafts.map((draft) => (
+                      <div
+                        key={draft.id}
+                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => {
+                          // Load draft into editor
+                          setEditingDraftId(draft.id);
+                          setArticleFormData({
+                            title: draft.title,
+                            excerpt: draft.description || '',
+                            content: draft.content || '',
+                            category: draft.category || '',
+                            readingTime: draft.readingTime || '',
+                            author: user?.name || '',
+                            tags: draft.tags.join(', '),
+                          });
+                          // Load cover image if exists
+                          if (draft.thumbnail) {
+                            setCoverImage({ file: null, preview: draft.thumbnail });
+                          } else {
+                            setCoverImage({ file: null, preview: null });
+                          }
+                          setActiveTab('create-article');
+                        }}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium truncate">{draft.title || 'Untitled Draft'}</h4>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {draft.description || 'No description'}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Last updated: {new Date(draft.updatedAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 ml-4">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingDraftId(draft.id);
+                              setArticleFormData({
+                                title: draft.title,
+                                excerpt: draft.description || '',
+                                content: draft.content || '',
+                                category: draft.category || '',
+                                readingTime: draft.readingTime || '',
+                                author: user?.name || '',
+                                tags: draft.tags.join(', '),
+                              });
+                              // Load cover image if exists
+                              if (draft.thumbnail) {
+                                setCoverImage({ file: null, preview: draft.thumbnail });
+                              } else {
+                                setCoverImage({ file: null, preview: null });
+                              }
+                              setActiveTab('create-article');
+                            }}
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Continue Editing
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (confirm('Are you sure you want to delete this draft?')) {
+                                try {
+                                  await deleteResource(draft.id);
+                                  toast.success('Draft deleted');
+                                } catch (error) {
+                                  toast.error('Failed to delete draft');
+                                }
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </AnimatedCard>
+              );
+            })()}
+
             {/* Resource Type Grid - 3x3 */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {/* Audio Upload */}
@@ -1187,7 +2045,10 @@ export default function CounselorResourcesPage() {
                   <Button 
                     size="sm" 
                     className="w-full bg-green-600 hover:bg-green-700"
-                    onClick={() => setActiveTab('create-article')}
+                    onClick={() => {
+                      setEditingDraftId(null);
+                      setActiveTab('create-article');
+                    }}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Create Article
@@ -1949,14 +2810,26 @@ export default function CounselorResourcesPage() {
                 Back to Resources
               </Button>
               <div className="flex items-center gap-3">
-                <Button variant="outline" size="sm">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handlePreviewArticle}
+                >
                   <Eye className="h-4 w-4 mr-2" />
                   Preview
                 </Button>
-                <Button variant="outline" size="sm">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleSaveDraft}
+                >
                   Save Draft
                 </Button>
-                <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                <Button 
+                  size="sm" 
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={handlePublishArticle}
+                >
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Publish
                 </Button>
@@ -1968,11 +2841,56 @@ export default function CounselorResourcesPage() {
               <div className="space-y-6">
                 {/* Cover Image Section */}
                 <div className="relative bg-muted/30 border-b">
-                  <div className="aspect-[21/9] flex items-center justify-center bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900">
-                    <Button variant="outline" className="gap-2">
+                  <input
+                    ref={coverImageInputRef}
+                    type="file"
+                    accept="image/*,.jpg,.jpeg,.png,.webp,.gif"
+                    onChange={handleCoverImageChange}
+                    className="hidden"
+                  />
+                  <div className="aspect-[21/9] flex items-center justify-center bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 relative overflow-hidden">
+                    {coverImage.preview ? (
+                      <>
+                        <img
+                          src={coverImage.preview}
+                          alt="Cover preview"
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-3 opacity-0 hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="outline"
+                            className="gap-2 bg-white/90 hover:bg-white"
+                            onClick={handleChooseCoverImage}
+                          >
+                            <Upload className="h-4 w-4" />
+                            Change Image
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="gap-2 bg-white/90 hover:bg-white"
+                            onClick={() => {
+                              if (coverImage.preview) {
+                                URL.revokeObjectURL(coverImage.preview);
+                              }
+                              setCoverImage({ file: null, preview: null });
+                              toast.success('Cover image removed');
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                            Remove
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        className="gap-2"
+                        onClick={handleChooseCoverImage}
+                      >
                       <Upload className="h-4 w-4" />
                       Add Cover Image
                     </Button>
+                    )}
                   </div>
                 </div>
 
@@ -1982,7 +2900,14 @@ export default function CounselorResourcesPage() {
                   <div>
                     <Input 
                       placeholder="Article Title" 
-                      className="text-4xl font-bold border-0 px-0 focus-visible:ring-0 placeholder:text-muted-foreground/40"
+                      value={articleFormData.title}
+                      onChange={(e) => setArticleFormData(prev => ({ ...prev, title: e.target.value }))}
+                      className="text-4xl font-bold border-0 px-0 focus-visible:ring-0 placeholder:text-muted-foreground/60 text-foreground dark:text-foreground bg-transparent font-extrabold tracking-tight"
+                      style={{
+                        color: 'inherit',
+                        fontSize: '2.25rem',
+                        lineHeight: '2.5rem',
+                      }}
                     />
                   </div>
 
@@ -1990,7 +2915,7 @@ export default function CounselorResourcesPage() {
                   <div className="flex flex-wrap gap-4 pb-6 border-b">
                     <div className="flex-1 min-w-[200px]">
                       <label className="text-xs font-medium text-muted-foreground mb-2 block uppercase tracking-wide">Category</label>
-                      <Select>
+                      <Select value={articleFormData.category} onValueChange={(value) => setArticleFormData(prev => ({ ...prev, category: value }))}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
@@ -2006,11 +2931,19 @@ export default function CounselorResourcesPage() {
                     </div>
                     <div className="flex-1 min-w-[200px]">
                       <label className="text-xs font-medium text-muted-foreground mb-2 block uppercase tracking-wide">Reading Time</label>
-                      <Input placeholder="e.g., 5 min read" />
+                      <Input 
+                        placeholder="e.g., 5 min read" 
+                        value={articleFormData.readingTime}
+                        onChange={(e) => setArticleFormData(prev => ({ ...prev, readingTime: e.target.value }))}
+                      />
                     </div>
                     <div className="flex-1 min-w-[200px]">
                       <label className="text-xs font-medium text-muted-foreground mb-2 block uppercase tracking-wide">Author</label>
-                      <Input placeholder={user?.name || "Author name"} defaultValue={user?.name} />
+                      <Input 
+                        placeholder={user?.name || "Author name"} 
+                        value={articleFormData.author || user?.name || ''}
+                        onChange={(e) => setArticleFormData(prev => ({ ...prev, author: e.target.value }))}
+                      />
                     </div>
                   </div>
 
@@ -2020,6 +2953,8 @@ export default function CounselorResourcesPage() {
                     <Textarea 
                       placeholder="Write a compelling summary that will appear in previews and search results (150-200 characters recommended)..." 
                       rows={3}
+                      value={articleFormData.excerpt}
+                      onChange={(e) => setArticleFormData(prev => ({ ...prev, excerpt: e.target.value }))}
                       className="resize-none"
                     />
                     <p className="text-xs text-muted-foreground mt-1">This will be displayed in article previews and search results</p>
@@ -2029,114 +2964,495 @@ export default function CounselorResourcesPage() {
                   <div>
                     <label className="text-sm font-medium mb-2 block">Article Content</label>
                     
+                    <div className="border rounded-lg bg-background">
                     {/* Formatting Toolbar */}
-                    <div className="border border-b-0 rounded-t-lg p-2 bg-muted/30 flex flex-wrap gap-1">
+                      <div className="border-b p-2 flex flex-wrap gap-1">
                       {/* Text Formatting */}
                       <div className="flex gap-1 pr-2 border-r">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Bold">
+                        <Button 
+                          variant={activeFormatting.bold ? "secondary" : "ghost"}
+                          size="sm" 
+                          className={`h-8 w-8 p-0 ${activeFormatting.bold ? 'bg-muted' : ''}`}
+                          title="Bold"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleFormatCommand('bold');
+                            setTimeout(updateActiveFormatting, 100);
+                          }}
+                        >
                           <span className="font-bold text-sm">B</span>
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Italic">
+                        <Button 
+                          variant={activeFormatting.italic ? "secondary" : "ghost"}
+                          size="sm" 
+                          className={`h-8 w-8 p-0 ${activeFormatting.italic ? 'bg-muted' : ''}`}
+                          title="Italic"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleFormatCommand('italic');
+                            setTimeout(updateActiveFormatting, 100);
+                          }}
+                        >
                           <span className="italic text-sm">I</span>
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Underline">
+                        <Button 
+                          variant={activeFormatting.underline ? "secondary" : "ghost"}
+                          size="sm" 
+                          className={`h-8 w-8 p-0 ${activeFormatting.underline ? 'bg-muted' : ''}`}
+                          title="Underline"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleFormatCommand('underline');
+                            setTimeout(updateActiveFormatting, 100);
+                          }}
+                        >
                           <span className="underline text-sm">U</span>
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Strikethrough">
+                        <Button 
+                          variant={activeFormatting.strikethrough ? "secondary" : "ghost"}
+                          size="sm" 
+                          className={`h-8 w-8 p-0 ${activeFormatting.strikethrough ? 'bg-muted' : ''}`}
+                          title="Strikethrough"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleFormatCommand('strikeThrough');
+                            setTimeout(updateActiveFormatting, 100);
+                          }}
+                        >
                           <span className="line-through text-sm">S</span>
                         </Button>
                       </div>
 
                       {/* Headings */}
                       <div className="flex gap-1 pr-2 border-r">
-                        <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" title="Heading 1">
+                        <Button 
+                          variant={activeFormatting.heading === 'h1' ? "secondary" : "ghost"}
+                          size="sm" 
+                          className={`h-8 px-2 text-xs ${activeFormatting.heading === 'h1' ? 'bg-muted' : ''}`}
+                          title="Heading 1"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleFormatHeading(1);
+                            setTimeout(updateActiveFormatting, 100);
+                          }}
+                        >
                           H1
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" title="Heading 2">
+                        <Button 
+                          variant={activeFormatting.heading === 'h2' ? "secondary" : "ghost"}
+                          size="sm" 
+                          className={`h-8 px-2 text-xs ${activeFormatting.heading === 'h2' ? 'bg-muted' : ''}`}
+                          title="Heading 2"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleFormatHeading(2);
+                            setTimeout(updateActiveFormatting, 100);
+                          }}
+                        >
                           H2
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" title="Heading 3">
+                        <Button 
+                          variant={activeFormatting.heading === 'h3' ? "secondary" : "ghost"}
+                          size="sm" 
+                          className={`h-8 px-2 text-xs ${activeFormatting.heading === 'h3' ? 'bg-muted' : ''}`}
+                          title="Heading 3"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleFormatHeading(3);
+                            setTimeout(updateActiveFormatting, 100);
+                          }}
+                        >
                           H3
                         </Button>
                       </div>
 
                       {/* Lists */}
                       <div className="flex gap-1 pr-2 border-r">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Bullet List">
+                        <Button 
+                          variant={activeFormatting.list === 'unordered' ? "secondary" : "ghost"}
+                          size="sm" 
+                          className={`h-8 w-8 p-0 ${activeFormatting.list === 'unordered' ? 'bg-muted' : ''}`}
+                          title="Bullet List"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleInsertList(false);
+                            setTimeout(updateActiveFormatting, 100);
+                          }}
+                        >
                           <List className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Numbered List">
+                        <Button 
+                          variant={activeFormatting.list === 'ordered' ? "secondary" : "ghost"}
+                          size="sm" 
+                          className={`h-8 w-8 p-0 ${activeFormatting.list === 'ordered' ? 'bg-muted' : ''}`}
+                          title="Numbered List"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleInsertList(true);
+                            setTimeout(updateActiveFormatting, 100);
+                          }}
+                        >
                           <span className="text-xs font-semibold">1.</span>
                         </Button>
                       </div>
 
                       {/* Alignment */}
                       <div className="flex gap-1 pr-2 border-r">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Align Left">
+                        <Button 
+                          variant={activeFormatting.align === 'left' ? "secondary" : "ghost"}
+                          size="sm" 
+                          className={`h-8 w-8 p-0 ${activeFormatting.align === 'left' ? 'bg-muted' : ''}`}
+                          title="Align Left"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleAlignText('left');
+                            setTimeout(updateActiveFormatting, 100);
+                          }}
+                        >
                           <span className="text-xs">⊣</span>
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Align Center">
+                        <Button 
+                          variant={activeFormatting.align === 'center' ? "secondary" : "ghost"}
+                          size="sm" 
+                          className={`h-8 w-8 p-0 ${activeFormatting.align === 'center' ? 'bg-muted' : ''}`}
+                          title="Align Center"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleAlignText('center');
+                            setTimeout(updateActiveFormatting, 100);
+                          }}
+                        >
                           <span className="text-xs">≡</span>
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Align Right">
+                        <Button 
+                          variant={activeFormatting.align === 'right' ? "secondary" : "ghost"}
+                          size="sm" 
+                          className={`h-8 w-8 p-0 ${activeFormatting.align === 'right' ? 'bg-muted' : ''}`}
+                          title="Align Right"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleAlignText('right');
+                            setTimeout(updateActiveFormatting, 100);
+                          }}
+                        >
                           <span className="text-xs">⊢</span>
                         </Button>
                       </div>
 
                       {/* Insert Elements */}
                       <div className="flex gap-1 pr-2 border-r">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Insert Link">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0" 
+                          title="Insert Link"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleInsertLink();
+                          }}
+                        >
                           <ExternalLink className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Insert Image">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0" 
+                          title="Insert Image"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleInsertImage();
+                          }}
+                        >
                           <Upload className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Insert Quote">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0" 
+                          title="Insert Quote"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleInsertQuote();
+                          }}
+                        >
                           <span className="text-sm">"</span>
                         </Button>
                       </div>
 
                       {/* Additional Tools */}
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Code Block">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0" 
+                          title="Code Block"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleInsertCodeBlock();
+                          }}
+                        >
                           <span className="text-xs font-mono">{'<>'}</span>
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Horizontal Rule">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0" 
+                          title="Horizontal Rule"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleInsertHorizontalRule();
+                          }}
+                        >
                           <span className="text-xs">—</span>
                         </Button>
                       </div>
 
                       <div className="ml-auto flex gap-1">
-                        <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" title="Undo">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 px-2 text-xs" 
+                          title="Undo"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleUndo();
+                          }}
+                        >
                           ↶
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" title="Redo">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 px-2 text-xs" 
+                          title="Redo"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleRedo();
+                          }}
+                        >
                           ↷
                         </Button>
                       </div>
                     </div>
 
                     {/* Editor Content Area */}
-                    <div className="border rounded-b-lg min-h-[500px] bg-background">
-                      <Textarea 
-                        placeholder="Start writing your article here...
-
-You can include:
-• Personal stories and experiences
-• Evidence-based information
-• Practical tips and advice
-• Step-by-step guides
-• Resources and references
-
-Remember to:
-- Use clear, accessible language
-- Break content into sections with headings
-- Include examples where helpful
-- Cite sources for medical/clinical information
-                        "
-                        rows={24}
-                        className="border-0 rounded-t-none resize-none focus-visible:ring-0 text-base leading-relaxed p-6"
-                      />
+                      <div className="min-h-[500px]">
+                        <div
+                          ref={articleContentRef}
+                          contentEditable
+                          suppressContentEditableWarning
+                          onFocus={() => {
+                            // Ensure editor is ready when focused
+                            if (articleContentRef.current && !articleContentRef.current.innerHTML.trim()) {
+                              articleContentRef.current.innerHTML = '<br>';
+                            }
+                          }}
+                          onInput={(e) => {
+                            const content = e.currentTarget.innerHTML;
+                            // Always update to ensure state is in sync
+                            setArticleFormData(prev => ({ ...prev, content }));
+                          }}
+                          onBlur={(e) => {
+                            const content = e.currentTarget.innerHTML;
+                            setArticleFormData(prev => ({ ...prev, content }));
+                          }}
+                          onPaste={(e) => {
+                            // Allow default paste behavior first to maintain undo history
+                            // Then clean up the pasted content and update state
+                            
+                            // Use requestAnimationFrame to ensure paste completes first
+                            requestAnimationFrame(() => {
+                              // Use setTimeout to ensure DOM is updated
+                              setTimeout(() => {
+                                if (!articleContentRef.current) return;
+                                
+                                // Clean up all color styles in the entire editor
+                                const allElements = articleContentRef.current.querySelectorAll('*');
+                                allElements.forEach((el) => {
+                                  const element = el as HTMLElement;
+                                  
+                                  // Remove color and background-color from inline styles
+                                  if (element.style.color) {
+                                    element.style.removeProperty('color');
+                                  }
+                                  if (element.style.backgroundColor) {
+                                    element.style.removeProperty('background-color');
+                                  }
+                                  
+                                  // Clean up style attribute
+                                  if (element.getAttribute('style')) {
+                                    const style = element.getAttribute('style') || '';
+                                    const cleanedStyle = style
+                                      .split(';')
+                                      .filter((prop) => {
+                                        const lowerProp = prop.toLowerCase().trim();
+                                        return !lowerProp.startsWith('color') && 
+                                               !lowerProp.startsWith('background-color') &&
+                                               prop.trim() !== '';
+                                      })
+                                      .join(';');
+                                    if (cleanedStyle.trim()) {
+                                      element.setAttribute('style', cleanedStyle);
+                                    } else {
+                                      element.removeAttribute('style');
+                                    }
+                                  }
+                                  
+                                  // Remove color attribute
+                                  element.removeAttribute('color');
+                                });
+                                
+                                // Update state with the cleaned content
+                                const content = articleContentRef.current.innerHTML;
+                                setArticleFormData(prev => {
+                                  // Force update even if content appears the same
+                                  return { ...prev, content };
+                                });
+                              }, 10);
+                            });
+                          }}
+                          className="border-0 resize-none focus:outline-none text-base leading-relaxed p-6 bg-transparent min-h-[500px] text-foreground dark:text-foreground"
+                          style={{ 
+                            whiteSpace: 'pre-wrap',
+                            wordWrap: 'break-word',
+                            color: 'inherit'
+                          }}
+                          data-placeholder="Start writing your article here..."
+                        />
+                      </div>
+                      <style jsx global>{`
+                        [contenteditable][data-placeholder]:empty:before {
+                          content: attr(data-placeholder);
+                          color: rgb(161 161 170);
+                          pointer-events: none;
+                        }
+                        [contenteditable] {
+                          color: inherit !important;
+                        }
+                        [contenteditable] * {
+                          color: inherit !important;
+                        }
+                        [contenteditable] p,
+                        [contenteditable] div,
+                        [contenteditable] span,
+                        [contenteditable] h1,
+                        [contenteditable] h2,
+                        [contenteditable] h3,
+                        [contenteditable] h4,
+                        [contenteditable] h5,
+                        [contenteditable] h6,
+                        [contenteditable] li,
+                        [contenteditable] ul,
+                        [contenteditable] ol,
+                        [contenteditable] strong,
+                        [contenteditable] b,
+                        [contenteditable] em,
+                        [contenteditable] i,
+                        [contenteditable] u,
+                        [contenteditable] s {
+                          color: inherit !important;
+                        }
+                        /* Ensure headings are visible and styled */
+                        [contenteditable] h1 {
+                          font-size: 2em;
+                          font-weight: bold;
+                          margin: 0.67em 0;
+                          color: inherit !important;
+                        }
+                        [contenteditable] h2 {
+                          font-size: 1.5em;
+                          font-weight: bold;
+                          margin: 0.75em 0;
+                          color: inherit !important;
+                        }
+                        [contenteditable] h3 {
+                          font-size: 1.17em;
+                          font-weight: bold;
+                          margin: 0.83em 0;
+                          color: inherit !important;
+                        }
+                        /* Ensure lists are visible */
+                        [contenteditable] ul,
+                        [contenteditable] ol {
+                          margin: 1em 0;
+                          padding-left: 2em;
+                          color: inherit !important;
+                        }
+                        [contenteditable] li {
+                          margin: 0.5em 0;
+                          color: inherit !important;
+                        }
+                        /* Ensure strong/bold is visible */
+                        [contenteditable] strong,
+                        [contenteditable] b {
+                          font-weight: bold;
+                          color: inherit !important;
+                        }
+                        /* Ensure italic is visible */
+                        [contenteditable] em,
+                        [contenteditable] i {
+                          font-style: italic;
+                          color: inherit !important;
+                        }
+                        /* Ensure underline is visible */
+                        [contenteditable] u {
+                          text-decoration: underline;
+                          color: inherit !important;
+                        }
+                        /* Ensure strikethrough is visible */
+                        [contenteditable] s,
+                        [contenteditable] strike,
+                        [contenteditable] del {
+                          text-decoration: line-through;
+                          color: inherit !important;
+                        }
+                        /* Override any inline styles with black color */
+                        [contenteditable] [style*="color: black"],
+                        [contenteditable] [style*="color:#000"],
+                        [contenteditable] [style*="color:#000000"],
+                        [contenteditable] [style*="color: rgb(0, 0, 0)"],
+                        [contenteditable] [style*="color: rgba(0, 0, 0"] {
+                          color: inherit !important;
+                        }
+                      `}</style>
                     </div>
 
                     <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
@@ -2162,6 +3478,8 @@ Remember to:
                     <label className="text-sm font-medium mb-2 block">Tags</label>
                     <Input 
                       placeholder="Add tags (separate with commas): mental health, wellness, self-care..." 
+                      value={articleFormData.tags}
+                      onChange={(e) => setArticleFormData(prev => ({ ...prev, tags: e.target.value }))}
                       className="mb-1"
                     />
                     <p className="text-xs text-muted-foreground">Help patients find relevant content with descriptive tags</p>
@@ -2180,14 +3498,24 @@ Remember to:
                             <p className="text-sm font-medium">Allow Comments</p>
                             <p className="text-xs text-muted-foreground">Enable patients to comment on this article</p>
                           </div>
-                          <input type="checkbox" className="toggle" defaultChecked />
+                          <input 
+                            type="checkbox" 
+                            className="toggle" 
+                            checked={articleSettings.allowComments}
+                            onChange={(e) => setArticleSettings(prev => ({ ...prev, allowComments: e.target.checked }))}
+                          />
                         </div>
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-sm font-medium">Featured Article</p>
                             <p className="text-xs text-muted-foreground">Show this article prominently in the library</p>
                           </div>
-                          <input type="checkbox" className="toggle" />
+                          <input 
+                            type="checkbox" 
+                            className="toggle" 
+                            checked={articleSettings.featuredArticle}
+                            onChange={(e) => setArticleSettings(prev => ({ ...prev, featuredArticle: e.target.checked }))}
+                          />
                         </div>
                         <div>
                           <label className="text-sm font-medium mb-2 block">SEO Description</label>
@@ -2195,6 +3523,8 @@ Remember to:
                             placeholder="Optional: Custom description for search engines..." 
                             rows={2}
                             className="text-sm"
+                            value={articleSettings.seoDescription}
+                            onChange={(e) => setArticleSettings(prev => ({ ...prev, seoDescription: e.target.value }))}
                           />
                         </div>
                       </div>
@@ -2272,8 +3602,29 @@ Remember to:
         />
       )}
 
-      {/* Article Viewer */}
-      {viewingArticle && (
+      {/* Article Viewer - Preview */}
+      {previewArticle && isArticleViewerOpen && (
+        <ArticleViewerV2
+          article={{
+            id: previewArticle.id,
+            title: previewArticle.title,
+            content: previewArticle.content || '',
+            description: previewArticle.description,
+            publisher: previewArticle.publisher,
+            createdAt: new Date(previewArticle.createdAt),
+            thumbnail: previewArticle.thumbnail,
+            tags: previewArticle.tags,
+          }}
+          isOpen={isArticleViewerOpen}
+          onClose={() => {
+            setIsArticleViewerOpen(false);
+            setPreviewArticle(null);
+          }}
+        />
+      )}
+
+      {/* Article Viewer - Existing Article */}
+      {viewingArticle && !previewArticle && (
         <ArticleViewerV2
           article={{
             id: viewingArticle.id,

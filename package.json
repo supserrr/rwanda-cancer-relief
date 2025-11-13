@@ -9,7 +9,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "seed:dashboard": "tsx scripts/seed-dashboard-data.ts",
     "test:dashboard-data": "tsx scripts/test-dashboard-data.ts",
-    "backfill:avatars": "tsx scripts/backfill-counselor-avatars.ts"
+    "backfill:avatars": "tsx scripts/backfill-counselor-avatars.ts",
+    "configure:resend": "tsx scripts/configure-resend-smtp.ts"
   },
   "devDependencies": {
     "@workspace/eslint-config": "workspace:*",

@@ -1,119 +1,117 @@
 # Environment Variables Example
 
-This file documents all environment variables used in the Rwanda Cancer Relief application.
+This document lists all environment variables used in the Rwanda Cancer Relief application.
 
-## Production Setup
+## Supabase Configuration
 
-Copy the variables you need from below and configure them in your Vercel project dashboard under **Settings → Environment Variables**.
+```env
+# Supabase Project URL
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 
-## Required Variables
+# Supabase Anonymous Key (public, safe for client-side)
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
-### AI SDK Configuration
-**For AI Chat Features**
+# Supabase Development URL (optional, for local development)
+NEXT_PUBLIC_SUPABASE_DEV_URL=http://localhost:54321
 
-```
-AI_SDK_KEY=your_ai_sdk_key_here
-```
-
-Get your API key from: https://sdk.vercel.ai/docs/getting-started
-
-The AI SDK key is required for the chat functionality in `/api/chat/route.ts`.
-
-## Optional Variables
-
-### Perplexity API (Web Search)
-```
-PERPLEXITY_API_KEY=your_perplexity_key_here
+# Supabase Development Anonymous Key (optional)
+NEXT_PUBLIC_SUPABASE_DEV_ANON_KEY=your-dev-anon-key
 ```
 
-Allows AI chat to search the web for information. Get from: https://www.perplexity.ai/
+## Resend Email Configuration
 
-### OpenAI API (Alternative AI Provider)
-```
-OPENAI_API_KEY=your_openai_key_here
-```
+**Note**: Resend SMTP is configured directly in Supabase Dashboard, not via environment variables.
 
-Use OpenAI as an alternative AI provider. Get from: https://platform.openai.com/
+To configure Resend in Supabase:
+1. Go to Supabase Dashboard → Authentication → Settings
+2. Enable Custom SMTP
+3. Use these settings:
+   - **Host**: `smtp.resend.com`
+   - **Port**: `587`
+   - **User**: `resend`
+   - **Password**: Your Resend API key
+   - **Sender Email**: `noreply@yourdomain.com`
+   - **Sender Name**: `Rwanda Cancer Relief`
 
-### Jitsi Configuration
-**For Production Video Conferencing**
+See [RESEND_EMAIL_SETUP.md](./RESEND_EMAIL_SETUP.md) for detailed setup instructions.
 
-```
-NEXT_PUBLIC_JITSI_DOMAIN=your-jitsi-domain.com
-NEXT_PUBLIC_JITSI_APP_ID=your-app-id
-```
+## API Configuration
 
-Currently using 8x8.vc free tier in development. For production with HIPAA compliance, consider self-hosting Jitsi.
+```env
+# API Base URL (optional, defaults to same origin)
+NEXT_PUBLIC_API_URL=http://localhost:3000/api
 
-### Environment
-```
-NODE_ENV=production
-```
-
-Automatically set by Vercel in production deployments.
-
-### Debug Mode
-```
-DEBUG=false
+# Socket URL for real-time features (optional)
+NEXT_PUBLIC_SOCKET_URL=ws://localhost:3000
 ```
 
-Control debug logging in production.
+## Google OAuth
 
-## Vercel Deployment
-
-### Setting Environment Variables in Vercel
-
-1. Go to your project in Vercel Dashboard
-2. Navigate to **Settings** → **Environment Variables**
-3. Add each variable:
-   - **Key**: Variable name
-   - **Value**: Variable value
-   - **Environment**: Select which environments (Production, Preview, Development)
-4. Click **Save**
-
-### Important Notes
-
-- **NEXT_PUBLIC_*** variables are exposed to the browser
-- Keep sensitive keys (API keys) without NEXT_PUBLIC_ prefix
-- Use Vercel's environment variable encryption
-- Set different values for Production vs Preview environments
-- Never commit `.env` files to version control
-
-## Current Application State
-
-### Working Without Configuration
-The app currently works with:
-- Mock authentication (no backend required)
-- Jitsi video calls via 8x8.vc (no API key needed)
-- Basic AI chat simulation (requires API key for real responses)
-
-### Production Considerations
-
-For a production-ready deployment:
-
-1. **Add AI SDK Key** - Required for AI chat responses
-2. **Configure Jitsi** - For HIPAA-compliant video calls
-3. **Set up Backend API** - For real authentication and data storage
-4. **Configure Database** - For persistent data
-5. **Enable Monitoring** - Error tracking and analytics
-
-## Testing Configuration
-
-Test your environment variables:
-
-```bash
-# Check if variables are loaded
-echo $AI_SDK_KEY
-
-# Or in Next.js
-console.log(process.env.AI_SDK_KEY)
+```env
+# Google OAuth Client ID (for Google Sign-In)
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 ```
 
-## Security Best Practices
+## AI Assistant
 
-1. **Never commit** `.env` files
-2. **Use different keys** for development and production
-3. **Rotate keys** periodically
-4. **Monitor usage** to detect unauthorized access
-5. **Use Vercel's** built-in environment variable management
+```env
+# AI Assistant API URL (optional)
+NEXT_PUBLIC_ASSISTANT_API_URL=https://api.example.com
+```
 
+## Server-Side Only Variables
+
+These are only available on the server and should NOT be prefixed with `NEXT_PUBLIC_`:
+
+```env
+# Node Environment
+NODE_ENV=development
+
+# Supabase Service Role Key (server-side only, never expose to client)
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# Supabase Access Token (for Management API, server-side only)
+SUPABASE_ACCESS_TOKEN=your-access-token
+```
+
+## Development Setup
+
+1. **Copy the example file**:
+   ```bash
+   cp .env.example .env.local
+   ```
+
+2. **Fill in your values**:
+   - Get Supabase credentials from [supabase.com/dashboard](https://supabase.com/dashboard)
+   - Get Google OAuth credentials from [Google Cloud Console](https://console.cloud.google.com)
+   - Configure Resend in Supabase Dashboard (see [RESEND_EMAIL_SETUP.md](./RESEND_EMAIL_SETUP.md))
+
+3. **Never commit `.env.local`**:
+   - It's already in `.gitignore`
+   - Contains sensitive credentials
+
+## Production Setup (Vercel)
+
+1. **Go to Vercel Dashboard** → Your Project → Settings → Environment Variables
+
+2. **Add all required variables**:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
+   - Any other required variables
+
+3. **Set environment-specific values**:
+   - Production: Use production Supabase project
+   - Preview: Use staging Supabase project (optional)
+   - Development: Use local `.env.local`
+
+4. **Configure Resend in Supabase Dashboard**:
+   - Production project: Use production Resend API key
+   - Staging project: Use development Resend API key (optional)
+
+## Security Notes
+
+- ✅ **Safe for client-side** (NEXT_PUBLIC_*): Supabase URL, Anon Key, Google Client ID
+- ❌ **Never expose to client**: Service Role Key, Access Token, API Keys
+- 🔒 **Keep secrets secure**: Use Vercel Environment Variables for production
+- 🔄 **Rotate keys regularly**: Especially after team member changes

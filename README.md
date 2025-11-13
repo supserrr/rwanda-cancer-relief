@@ -47,6 +47,9 @@ The product delivers a secure onboarding and care-management workflow for patien
 - Vercel account (for deployments and secrets management)
 
 ## Environment Setup
+
+### Quick Start
+
 1. **Install dependencies**
    ```bash
    pnpm install
@@ -54,6 +57,7 @@ The product delivers a secure onboarding and care-management workflow for patien
 2. **Create environment files**
    - Create `apps/web/.env.local`
    - Populate Supabase, Vercel AI Gateway, and analytics keys using the matrix in `docs/deployment/ENV_EXAMPLE.md`
+   - For email configuration, see `docs/deployment/RESEND_EMAIL_SETUP.md`
 3. **Link Supabase project**
    ```bash
    supabase link --project-ref <your-project-ref>
@@ -112,6 +116,15 @@ The product delivers a secure onboarding and care-management workflow for patien
   All migrations reside in `supabase/migrations/`. Generate new migration files with:
   ```bash
   supabase migration new <descriptive_name>
+  ```
+- **Configure Resend Email (SMTP)**
+  Set up Resend for password reset and authentication emails:
+  ```bash
+  # Option 1: Use the automated script (requires env vars)
+  pnpm configure:resend
+  
+  # Option 2: Manual setup via Supabase Dashboard
+  # See docs/deployment/RESEND_EMAIL_SETUP.md for detailed instructions
   ```
 
 Legacy REST API materials remain available for reference in `docs/legacy/backend/`, but they are no longer part of the active architecture.

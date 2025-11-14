@@ -21,6 +21,10 @@ export interface RealtimeMessage {
   file_url?: string;
   is_read: boolean;
   created_at: string;
+  reactions?: Record<string, string[]>;
+  reply_to_id?: string;
+  edited_at?: string;
+  deleted_at?: string;
 }
 
 export interface RealtimeNotification {

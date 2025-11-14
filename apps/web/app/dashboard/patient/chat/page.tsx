@@ -11,6 +11,14 @@ import { Avatar, AvatarFallback, AvatarImage } from '@workspace/ui/components/av
 import { Card, CardContent, CardHeader } from '@workspace/ui/components/card';
 import { ScrollArea } from '@workspace/ui/components/scroll-area';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@workspace/ui/components/dialog';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -42,6 +50,10 @@ import { ProfileViewModal } from '@workspace/ui/components/profile-view-modal';
 import { SessionBookingModal } from '../../../../components/session/SessionBookingModal';
 import { toast } from 'sonner';
 import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
+import { MessageBubble, type Message as MessageBubbleMessage } from '@workspace/ui/components/message-bubble';
+import { MessageInput } from '@workspace/ui/components/message-input';
+import { TypingIndicator } from '@workspace/ui/components/typing-indicator';
+import type { Message } from '@/lib/api/chat';
 
 export default function PatientChatPage() {
   const router = useRouter();
@@ -58,6 +70,9 @@ export default function PatientChatPage() {
   const [counselors, setCounselors] = useState<AdminUser[]>([]);
   const [counselorsLoading, setCounselorsLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [chatToDelete, setChatToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Load chats using the hook
   const chatParams = useMemo(
@@ -73,9 +88,17 @@ export default function PatientChatPage() {
     error: chatsError,
     sendMessage,
     selectChat,
+    deleteChat,
+    reactToMessage,
+    editMessage,
+    deleteMessage,
     refreshChats,
     realtimeConnected,
   } = useChat(chatParams);
+  
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
 
   // Load counselors for profile view and booking
   useEffect(() => {
@@ -146,35 +169,111 @@ export default function PatientChatPage() {
   const currentCounselorId = currentChat ? getCounselorId(currentChat) : null;
   const currentCounselorInfo = currentCounselorId ? getCounselorInfo(currentCounselorId) : null;
 
-  const handleSendMessage = async (e?: React.MouseEvent | React.FormEvent) => {
-    // Prevent form submission and page reload
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    
-    if (!newMessage.trim() || !currentChat || !user) return;
+  const handleSendMessage = async (content: string) => {
+    if (!content.trim() || !currentChat || !user) return;
     
     try {
-      await sendMessage({
-        chatId: currentChat.id,
-        content: newMessage.trim(),
-        type: 'text',
-      });
+      if (editingMessage) {
+        // Edit existing message
+        await editMessage(editingMessage.id, content.trim());
+        setEditingMessage(null);
+        toast.success('Message edited');
+      } else {
+        // Send new message
+        await sendMessage({
+          chatId: currentChat.id,
+          content: content.trim(),
+          type: 'text',
+          replyToId: replyTo?.id,
+        });
+        setReplyTo(null);
+      }
       setNewMessage('');
-      // Message will be added to messages via Realtime subscription
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to send message');
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
+  const handleReact = async (messageId: string, emoji: string) => {
+    try {
+      await reactToMessage(messageId, emoji);
+    } catch (error) {
+      console.error('Error reacting to message:', error);
+      toast.error('Failed to react to message');
     }
   };
+
+  const handleEdit = (message: Message) => {
+    setEditingMessage(message);
+    setNewMessage(message.content);
+    setReplyTo(null);
+  };
+
+  const handleDelete = async (messageId: string) => {
+    try {
+      await deleteMessage(messageId);
+      toast.success('Message deleted');
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      toast.error('Failed to delete message');
+    }
+  };
+
+  const handleCopy = (content: string) => {
+    toast.success('Message copied to clipboard');
+  };
+
+  // Helper function to format date separators
+  const formatDateSeparator = (date: Date): string => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const messageDate = new Date(date);
+    messageDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    yesterday.setHours(0, 0, 0, 0);
+    
+    if (messageDate.getTime() === today.getTime()) {
+      return 'Today';
+    } else if (messageDate.getTime() === yesterday.getTime()) {
+      return 'Yesterday';
+    } else {
+      return messageDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+  };
+
+  // Group messages by date
+  const groupedMessages = useMemo(() => {
+    const groups: Array<{ date: string; messages: Message[] }> = [];
+    let currentDate = '';
+    
+    const sortedMessages = [...messages]
+      .filter((message, index, self) => 
+        index === self.findIndex((m) => m.id === message.id)
+      )
+      .sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateA - dateB;
+      });
+    
+    sortedMessages.forEach((message) => {
+      const messageDate = new Date(message.createdAt);
+      const dateKey = messageDate.toDateString();
+      const dateLabel = formatDateSeparator(messageDate);
+      
+      if (dateKey !== currentDate) {
+        currentDate = dateKey;
+        groups.push({ date: dateLabel, messages: [] });
+      }
+      
+      groups[groups.length - 1].messages.push(message);
+    });
+    
+    return groups;
+  }, [messages]);
 
   const handleViewProfile = () => {
     setIsProfileOpen(true);
@@ -197,9 +296,29 @@ export default function PatientChatPage() {
   };
 
   const handleDeleteChat = () => {
-    console.log('Delete chat');
-    if (confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
-      alert('Conversation deleted');
+    if (!currentChat) return;
+    setChatToDelete(currentChat.id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteChat = async () => {
+    if (!chatToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteChat(chatToDelete);
+      toast.success('Conversation deleted successfully');
+      setIsDeleteDialogOpen(false);
+      setChatToDelete(null);
+      // Navigate away if we deleted the current chat
+      if (currentChat?.id === chatToDelete) {
+        router.push('/dashboard/patient/chat');
+      }
+    } catch (error) {
+      console.error('Error deleting chat:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to delete conversation');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -488,51 +607,65 @@ export default function PatientChatPage() {
                 <CardContent className="flex-1 p-0">
                   <ScrollArea className="h-[400px] p-4">
                     <div className="space-y-4">
-                      {messages.length > 0 ? (
+                      {groupedMessages.length > 0 ? (
                         <>
-                          {messages
-                            .filter((message, index, self) => 
-                              // Deduplicate messages by ID - keep first occurrence
-                              index === self.findIndex((m) => m.id === message.id)
-                            )
-                            .sort((a, b) => {
-                              // Ensure messages are sorted by createdAt (ascending - oldest first)
-                              const dateA = new Date(a.createdAt).getTime();
-                              const dateB = new Date(b.createdAt).getTime();
-                              return dateA - dateB;
-                            })
-                            .map((message) => {
-                            const isOwnMessage = message.senderId === user?.id;
-                            const senderName = isOwnMessage ? 'You' : 
-                              getCounselorInfo(message.senderId)?.fullName || 
-                              getCounselorInfo(message.senderId)?.email || 
-                              'Counselor';
-                            
-                            return (
-                              <div
-                                key={message.id}
-                                className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}
-                              >
-                                <div
-                                  className={`max-w-[70%] rounded-lg p-3 ${
-                                    isOwnMessage
-                                      ? 'bg-primary text-primary-foreground'
-                                      : 'bg-muted'
-                                  }`}
-                                >
-                                  <p className="text-sm">{message.content}</p>
+                          {groupedMessages.map((group, groupIndex) => (
+                            <div key={group.date}>
+                              {groupIndex > 0 && (
+                                <div className="flex items-center justify-center my-4">
+                                  <div className="px-3 py-1 bg-muted/50 rounded-full text-xs text-muted-foreground">
+                                    {group.date}
+                                  </div>
                                 </div>
-                                <p className={`text-xs mt-1 px-1 ${
-                                  isOwnMessage ? 'text-primary/70' : 'text-muted-foreground'
-                                }`}>
-                                  {new Date(message.createdAt).toLocaleTimeString([], { 
-                                    hour: '2-digit', 
-                                    minute: '2-digit' 
-                                  })}
-                                </p>
-                              </div>
-                            );
-                          })}
+                              )}
+                              {group.messages.map((message, msgIndex) => {
+                                const isOwnMessage = message.senderId === user?.id;
+                                const senderInfo = isOwnMessage
+                                  ? { name: 'You', avatar: undefined }
+                                  : {
+                                      name: getCounselorInfo(message.senderId)?.fullName || 
+                                            getCounselorInfo(message.senderId)?.email || 
+                                            'Counselor',
+                                      avatar: getCounselorInfo(message.senderId)?.avatar_url,
+                                    };
+                                
+                                // Find replyTo message if replyToId exists
+                                const replyToMessage = message.replyToId
+                                  ? messages.find((m) => m.id === message.replyToId)
+                                  : message.replyTo;
+                                
+                                // Determine message status (simplified - would need real status tracking)
+                                const status: 'sending' | 'sent' | 'delivered' | 'read' = 
+                                  isOwnMessage
+                                    ? message.isRead
+                                      ? 'read'
+                                      : 'sent'
+                                    : 'sent';
+                                
+                                return (
+                                  <MessageBubble
+                                    key={message.id}
+                                    message={{
+                                      ...message,
+                                      replyTo: replyToMessage,
+                                    } as MessageBubbleMessage}
+                                    isOwn={isOwnMessage}
+                                    senderInfo={senderInfo}
+                                    currentUserId={user?.id}
+                                    showDateSeparator={msgIndex === 0 && groupIndex > 0}
+                                    dateSeparator={msgIndex === 0 && groupIndex > 0 ? group.date : undefined}
+                                    onReply={(msg) => setReplyTo(msg as Message)}
+                                    onReact={handleReact}
+                                    onEdit={isOwnMessage ? handleEdit : undefined}
+                                    onDelete={isOwnMessage ? handleDelete : undefined}
+                                    onCopy={handleCopy}
+                                    status={isOwnMessage ? status : undefined}
+                                  />
+                                );
+                              })}
+                            </div>
+                          ))}
+                          <TypingIndicator isVisible={isTyping} />
                           <div ref={messagesEndRef} />
                         </>
                       ) : (
@@ -547,47 +680,19 @@ export default function PatientChatPage() {
 
                 {/* Message Input */}
                 <div className="p-2 md:p-4 border-t">
-                  <form 
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      handleSendMessage(e);
+                  <MessageInput
+                    value={newMessage}
+                    onChange={setNewMessage}
+                    onSend={handleSendMessage}
+                    onTyping={setIsTyping}
+                    replyTo={replyTo}
+                    onCancelReply={() => {
+                      setReplyTo(null);
+                      setEditingMessage(null);
+                      setNewMessage('');
                     }}
-                    className="flex items-center gap-2"
-                  >
-                    <Button 
-                      type="button"
-                      size="sm" 
-                      variant="ghost" 
-                      title="Attach file" 
-                      className="h-10 w-10 p-0"
-                    >
-                      <Paperclip className="h-5 w-5" />
-                    </Button>
-                    <div className="flex-1 relative">
-                      <Input
-                        placeholder="Type your message..."
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        className="pr-10 h-10"
-                      />
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
-                      >
-                        <Smile className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <Button 
-                      type="submit"
-                      disabled={!newMessage.trim()} 
-                      className="h-10 w-10 p-0"
-                    >
-                      <Send className="h-5 w-5" />
-                    </Button>
-                  </form>
+                    placeholder={editingMessage ? 'Edit your message...' : 'Type your message...'}
+                  />
                 </div>
               </>
             ) : (
@@ -640,6 +745,37 @@ export default function PatientChatPage() {
           onBookingConfirmed={handleConfirmBooking}
         />
       )}
+
+      {/* Delete Chat Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Conversation</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this conversation? This action cannot be undone and will permanently remove all messages.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDeleteDialogOpen(false);
+                setChatToDelete(null);
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteChat}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

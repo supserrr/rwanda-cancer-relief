@@ -26,6 +26,11 @@ export interface Message {
   isRead: boolean;
   createdAt: string;
   updatedAt: string;
+  reactions?: Record<string, string[]>; // {emoji: [userId1, userId2, ...]}
+  replyTo?: Message; // The message this is replying to
+  replyToId?: string; // ID of the message this is replying to
+  editedAt?: string; // Timestamp when message was edited
+  deletedAt?: string; // Timestamp when message was soft deleted
 }
 
 /**
@@ -50,6 +55,7 @@ export interface SendMessageInput {
   content: string;
   type?: MessageType;
   fileUrl?: string;
+  replyToId?: string; // ID of the message this is replying to
 }
 
 /**
@@ -248,6 +254,49 @@ export class ChatApi {
   }
 
   /**
+   * Delete a chat using Supabase (hard delete - permanently removes chat and all messages)
+   */
+  static async deleteChat(chatId: string): Promise<void> {
+    const supabase = createClient();
+    if (!supabase) {
+      throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+    }
+
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    // Verify chat exists and user is a participant
+    const { data: chat, error: chatError } = await supabase
+      .from('chats')
+      .select('id, participants')
+      .eq('id', chatId)
+      .single();
+
+    if (chatError || !chat) {
+      throw new Error('Chat not found');
+    }
+
+    // Verify user is a participant
+    const participants = chat.participants as string[];
+    if (!participants.includes(user.id)) {
+      throw new Error('You do not have permission to delete this chat');
+    }
+
+    // Delete the chat (messages will cascade delete automatically due to ON DELETE CASCADE)
+    const { error: deleteError } = await supabase
+      .from('chats')
+      .delete()
+      .eq('id', chatId);
+
+    if (deleteError) {
+      throw new Error(deleteError.message || 'Failed to delete chat');
+    }
+  }
+
+  /**
    * List chats using Supabase
    */
   static async listChats(params?: ChatQueryParams): Promise<ListChatsResponse> {
@@ -372,7 +421,7 @@ export class ChatApi {
     }
 
     // Create message
-    const messageData = {
+    const messageData: Record<string, unknown> = {
       chat_id: data.chatId,
       sender_id: user.id,
       receiver_id: receiverIdString,
@@ -381,6 +430,11 @@ export class ChatApi {
       file_url: data.fileUrl || null,
       is_read: false,
     };
+
+    // Add reply_to_id if this is a reply
+    if (data.replyToId) {
+      messageData.reply_to_id = data.replyToId;
+    }
 
     console.log('[ChatApi.sendMessage] Inserting message with data:', {
       chat_id: messageData.chat_id,
@@ -459,12 +513,12 @@ export class ChatApi {
     // This is fire-and-forget - if it fails, it won't affect message sending
     try {
       fetch('/api/notifications/events/message', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ messageId: message.id }),
-      }).catch((notificationError) => {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ messageId: message.id }),
+    }).catch((notificationError) => {
         // Silently fail - notification is not critical for message sending
         // Only log in development to avoid console noise
         if (process.env.NODE_ENV === 'development') {
@@ -496,6 +550,10 @@ export class ChatApi {
     let query = supabase.from('messages').select('*', { count: 'exact' });
 
     query = query.eq('chat_id', chatId);
+    
+    // Filter out soft-deleted messages (or show them as deleted)
+    // For now, we'll include them but mark them as deleted
+    // query = query.is('deleted_at', null); // Uncomment to exclude deleted messages
 
     if (params?.before) {
       query = query.lt('created_at', params.before);
@@ -610,6 +668,11 @@ export class ChatApi {
       (dbMessage.updatedAt as string) ??
       createdAt;
 
+    const editedAt = dbMessage.edited_at as string | undefined;
+    const deletedAt = dbMessage.deleted_at as string | undefined;
+    const replyToId = dbMessage.reply_to_id as string | undefined;
+    const reactions = dbMessage.reactions as Record<string, string[]> | undefined;
+
     return {
       id: dbMessage.id as string,
       chatId,
@@ -622,7 +685,182 @@ export class ChatApi {
       isRead: dbMessage.is_read as boolean,
       createdAt,
       updatedAt,
+      reactions: reactions || undefined,
+      replyToId: replyToId || undefined,
+      editedAt: editedAt || undefined,
+      deletedAt: deletedAt || undefined,
     };
+  }
+
+  /**
+   * React to a message (add or remove reaction)
+   */
+  static async reactToMessage(messageId: string, emoji: string): Promise<Message> {
+    const supabase = createClient();
+    if (!supabase) {
+      throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+    }
+
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    // Get current message to check reactions
+    const { data: message, error: messageError } = await supabase
+      .from('messages')
+      .select('reactions, chat_id')
+      .eq('id', messageId)
+      .single();
+
+    if (messageError || !message) {
+      throw new Error('Message not found');
+    }
+
+    // Verify user is a participant in the chat
+    const { data: chat } = await supabase
+      .from('chats')
+      .select('participants')
+      .eq('id', message.chat_id)
+      .single();
+
+    if (!chat || !Array.isArray(chat.participants) || !chat.participants.includes(user.id)) {
+      throw new Error('You are not a participant in this chat');
+    }
+
+    // Get current reactions or initialize empty object
+    const currentReactions = (message.reactions as Record<string, string[]>) || {};
+    const emojiReactions = currentReactions[emoji] || [];
+
+    // Toggle reaction: if user already reacted, remove; otherwise add
+    const hasReacted = emojiReactions.includes(user.id);
+    const updatedReactions = { ...currentReactions };
+
+    if (hasReacted) {
+      // Remove reaction
+      updatedReactions[emoji] = emojiReactions.filter((id) => id !== user.id);
+      // Remove emoji key if no reactions left
+      if (updatedReactions[emoji].length === 0) {
+        delete updatedReactions[emoji];
+      }
+    } else {
+      // Add reaction
+      updatedReactions[emoji] = [...emojiReactions, user.id];
+    }
+
+    // Update message with new reactions
+    const { data: updatedMessage, error: updateError } = await supabase
+      .from('messages')
+      .update({ reactions: updatedReactions })
+      .eq('id', messageId)
+      .select()
+      .single();
+
+    if (updateError || !updatedMessage) {
+      throw new Error(updateError?.message || 'Failed to update message reaction');
+    }
+
+    return this.mapMessageFromDb(updatedMessage);
+  }
+
+  /**
+   * Edit a message
+   */
+  static async editMessage(messageId: string, content: string): Promise<Message> {
+    const supabase = createClient();
+    if (!supabase) {
+      throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+    }
+
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    // Verify message exists and user is the sender
+    const { data: message, error: messageError } = await supabase
+      .from('messages')
+      .select('sender_id, chat_id, deleted_at')
+      .eq('id', messageId)
+      .single();
+
+    if (messageError || !message) {
+      throw new Error('Message not found');
+    }
+
+    // Check if message is deleted
+    if (message.deleted_at) {
+      throw new Error('Cannot edit a deleted message');
+    }
+
+    // Verify user is the sender
+    if (message.sender_id !== user.id) {
+      throw new Error('You can only edit your own messages');
+    }
+
+    // Update message
+    const { data: updatedMessage, error: updateError } = await supabase
+      .from('messages')
+      .update({
+        content,
+        edited_at: new Date().toISOString(),
+      })
+      .eq('id', messageId)
+      .select()
+      .single();
+
+    if (updateError || !updatedMessage) {
+      throw new Error(updateError?.message || 'Failed to edit message');
+    }
+
+    return this.mapMessageFromDb(updatedMessage);
+  }
+
+  /**
+   * Soft delete a message
+   */
+  static async deleteMessage(messageId: string): Promise<void> {
+    const supabase = createClient();
+    if (!supabase) {
+      throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+    }
+
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    // Verify message exists and user is the sender
+    const { data: message, error: messageError } = await supabase
+      .from('messages')
+      .select('sender_id')
+      .eq('id', messageId)
+      .single();
+
+    if (messageError || !message) {
+      throw new Error('Message not found');
+    }
+
+    // Verify user is the sender
+    if (message.sender_id !== user.id) {
+      throw new Error('You can only delete your own messages');
+    }
+
+    // Soft delete message
+    const { error: deleteError } = await supabase
+      .from('messages')
+      .update({
+        deleted_at: new Date().toISOString(),
+        content: 'This message was deleted', // Optionally replace content
+      })
+      .eq('id', messageId);
+
+    if (deleteError) {
+      throw new Error(deleteError.message || 'Failed to delete message');
+    }
   }
 }
 

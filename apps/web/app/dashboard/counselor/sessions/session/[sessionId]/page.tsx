@@ -147,7 +147,7 @@ export default function SessionRoomPage() {
                   // Use the exact same query pattern as the sessions list page primary fetch
                   const { data: directProfile, error: directError } = await supabase
                     .from('profiles')
-                    .select('*')
+                    .select('id,full_name,email,role,avatar_url,metadata,created_at,updated_at')
                     .in('id', [participantId])  // Use .in() instead of .eq() like the sessions list page
                     .eq('role', user?.role === 'patient' ? 'counselor' : 'patient');
                   
@@ -170,7 +170,7 @@ export default function SessionRoomPage() {
                     console.log(`[SessionRoom] Trying query without role filter`);
                     const { data: noRoleProfile, error: noRoleError } = await supabase
                       .from('profiles')
-                      .select('*')
+                      .select('id,full_name,email,role,avatar_url,metadata,created_at,updated_at')
                       .in('id', [participantId]);
                     
                     if (!noRoleError && noRoleProfile && noRoleProfile.length > 0) {

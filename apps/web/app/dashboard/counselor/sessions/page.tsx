@@ -146,21 +146,49 @@ export default function CounselorSessionsPage() {
       (async () => {
         try {
           console.log(`[PRIMARY] Fetching ${uniquePatientIds.length} patients from sessions:`, uniquePatientIds);
-          const { data: profiles, error } = await supabase
+          let { data: profiles, error } = await supabase
             .from('profiles')
-            .select('*')
+            .select('id,full_name,email,role,avatar_url,metadata,created_at,updated_at')
             .in('id', uniquePatientIds)
             .eq('role', 'patient');
           
           if (error) {
-            console.error('[PRIMARY] Error fetching patient profiles:', error);
-            return;
+            console.error('[PRIMARY] ❌ Error fetching patient profiles:', error);
+            console.error('[PRIMARY] Error details:', {
+              message: error.message,
+              code: error.code,
+              details: error.details,
+              hint: error.hint,
+            });
+            
+            // Try fallback: fetch without role filter
+            console.log('[PRIMARY] Attempting fallback query without role filter...');
+            const { data: fallbackProfiles, error: fallbackError } = await supabase
+              .from('profiles')
+              .select('id,full_name,email,role,avatar_url,metadata,created_at,updated_at')
+              .in('id', uniquePatientIds);
+            
+            if (fallbackError) {
+              console.error('[PRIMARY] ❌ Fallback query also failed:', fallbackError);
+              return;
+            }
+            
+            if (fallbackProfiles && fallbackProfiles.length > 0) {
+              console.log(`[PRIMARY] ✅ Fallback query succeeded with ${fallbackProfiles.length} profiles`);
+              profiles = fallbackProfiles;
+            } else {
+              console.warn('[PRIMARY] Fallback query returned no profiles');
+              return;
+            }
+          } else {
+            console.log(`[PRIMARY] ✅ Query returned ${profiles?.length || 0} profiles`);
           }
           
           if (profiles && profiles.length > 0) {
             const fetchedPatients: AdminUser[] = profiles.map((profile: any) => {
               const metadata = (profile.metadata || {}) as Record<string, unknown>;
               
+              // Extract full name from multiple possible sources
               const fullName = 
                 (profile.full_name && typeof profile.full_name === 'string' ? profile.full_name.trim() : undefined) ||
                 (profile.fullName && typeof profile.fullName === 'string' ? profile.fullName.trim() : undefined) ||
@@ -171,12 +199,25 @@ export default function CounselorSessionsPage() {
                 (profile.email && typeof profile.email === 'string' ? profile.email.split('@')[0].trim() : undefined) ||
                 'Patient';
               
-              console.log(`[PRIMARY] Fetched patient ${profile.id}: "${fullName}"`);
+              // Extract avatar URL and pass it as avatarUrl
+              const avatarUrl = profile.avatar_url || 
+                               (metadata.avatar_url as string) || 
+                               (metadata.avatarUrl as string) ||
+                               (metadata.avatar as string) ||
+                               undefined;
+              
+              console.log(`[PRIMARY] ✅ Fetched patient ${profile.id}: "${fullName}"`, {
+                profile_full_name: profile.full_name,
+                avatar_url: profile.avatar_url,
+                extracted_name: fullName,
+                email: profile.email,
+              });
               
               return {
                 id: profile.id,
                 email: profile.email || '',
                 fullName: fullName,
+                avatarUrl: avatarUrl,
                 role: 'patient' as const,
                 metadata: metadata,
                 createdAt: profile.created_at || new Date().toISOString(),
@@ -252,7 +293,7 @@ export default function CounselorSessionsPage() {
           // Try to fetch all columns first to see what we get
           const { data: profiles, error } = await supabase
             .from('profiles')
-            .select('*')
+            .select('id,full_name,email,role,avatar_url,metadata,created_at,updated_at')
             .in('id', missingPatientIds)
             .eq('role', 'patient');
           
@@ -285,13 +326,17 @@ export default function CounselorSessionsPage() {
                 (profile.email && typeof profile.email === 'string' ? profile.email.split('@')[0].trim() : undefined) ||
                 'Patient';
               
-              console.log(`[FALLBACK] Fetched patient ${profile.id}:`, {
-                rawProfile: profile,
+              // Extract avatar URL
+              const avatarUrl = profile.avatar_url || 
+                               (metadata.avatar_url as string) || 
+                               (metadata.avatarUrl as string) ||
+                               (metadata.avatar as string) ||
+                               undefined;
+              
+              console.log(`[FALLBACK] ✅ Fetched patient ${profile.id}: "${fullName}"`, {
                 full_name: profile.full_name,
-                fullName: profile.fullName,
-                name: profile.name,
+                avatar_url: profile.avatar_url,
                 email: profile.email,
-                metadata: metadata,
                 extractedName: fullName,
               });
               
@@ -299,6 +344,7 @@ export default function CounselorSessionsPage() {
                 id: profile.id,
                 email: profile.email || '',
                 fullName: fullName,
+                avatarUrl: avatarUrl,
                 role: 'patient' as const,
                 metadata: metadata,
                 createdAt: profile.created_at || new Date().toISOString(),
@@ -351,7 +397,7 @@ export default function CounselorSessionsPage() {
       // Check fullName first (this is the primary field set by AdminApi)
       if (patient.fullName && typeof patient.fullName === 'string' && patient.fullName.trim()) {
         const name = patient.fullName.trim();
-        console.debug(`Found patient name for ${patientId}: "${name}" (from fullName)`);
+        console.log(`[getPatientName] ✅ Found patient name for ${patientId}: "${name}" (from fullName)`);
         return name;
       }
       
@@ -401,18 +447,21 @@ export default function CounselorSessionsPage() {
     } else {
       // Debug: Log if patient not found - but don't spam in production
       if (process.env.NODE_ENV === 'development') {
-        console.warn(`Patient ${patientId} not found in patients list or cache. Total patients loaded: ${patients.length}, Cache size: ${patientCache.size}`);
+        console.warn(`[getPatientName] Patient ${patientId} not found in patients list or cache. Total patients loaded: ${patients.length}, Cache size: ${patientCache.size}`);
+        console.warn(`[getPatientName] Available patient IDs:`, patients.map(p => p.id));
+        console.warn(`[getPatientName] Cache patient IDs:`, Array.from(patientCache.keys()));
       }
     }
     
     // If patient not found and patients are still loading, show loading state
     if (patientsLoading) {
+      console.debug(`[getPatientName] Patients still loading for ${patientId}, returning "Loading..."`);
       return 'Loading...';
     }
     
     // If patient is in cache but no name found, show a generic placeholder
     // This should be rare as every account must have a name
-    console.warn(`Returning default "Patient" for ${patientId}`);
+    console.warn(`[getPatientName] Returning default "Patient" for ${patientId} - patient data may not be loaded yet`);
     return 'Patient';
   };
 
@@ -426,7 +475,7 @@ export default function CounselorSessionsPage() {
     }
     
     if (patient) {
-      // Extract avatar from multiple possible fields
+      // Extract avatar from multiple possible fields with debug logging
       const rawAvatar = patient.avatarUrl ||
                        (patient.metadata?.avatar_url as string) ||
                        (patient.metadata?.avatarUrl as string) ||
@@ -434,8 +483,19 @@ export default function CounselorSessionsPage() {
                        undefined;
       
       if (rawAvatar) {
-        return normalizeAvatarUrl(rawAvatar);
+        const normalized = normalizeAvatarUrl(rawAvatar);
+        if (normalized && process.env.NODE_ENV === 'development') {
+          console.debug(`[getPatientAvatar] ✅ Found avatar for ${patientId}: ${normalized}`);
+        }
+        return normalized;
+      } else if (process.env.NODE_ENV === 'development') {
+        console.debug(`[getPatientAvatar] Patient ${patientId} found but no avatar URL`, {
+          avatarUrl: patient.avatarUrl,
+          metadata: patient.metadata,
+        });
       }
+    } else if (process.env.NODE_ENV === 'development') {
+      console.debug(`[getPatientAvatar] Patient ${patientId} not found in patients or cache`);
     }
     
     return undefined;

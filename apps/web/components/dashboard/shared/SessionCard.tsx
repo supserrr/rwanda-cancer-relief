@@ -13,7 +13,9 @@ import {
   Users,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Eye,
+  Info
 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Session } from '@/lib/api/sessions';
@@ -30,6 +32,8 @@ interface SessionCardProps {
   onJoin?: (session: Session) => void;
   onReschedule?: (session: Session) => void;
   onCancel?: (session: Session) => void;
+  onViewPatientProfile?: (patientId: string) => void;
+  onViewSessionInfo?: (session: Session) => void;
   showActions?: boolean;
 }
 
@@ -45,6 +49,8 @@ export function SessionCard({
   onJoin,
   onReschedule,
   onCancel,
+  onViewPatientProfile,
+  onViewSessionInfo,
   showActions = true
 }: SessionCardProps) {
   const getStatusIcon = (status: Session['status']) => {
@@ -120,32 +126,69 @@ export function SessionCard({
       </CardHeader>
       <CardContent className="relative z-10 space-y-4">
         <div className="space-y-3">
-          <div className="flex items-center space-x-3">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={patientAvatar} alt={patientName} />
-              <AvatarFallback>
-                {patientName?.split(' ').map(n => n[0]).join('') || 'P'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1">
-              <p className="text-sm font-medium">{patientName || 'Patient'}</p>
-              <p className="text-xs text-muted-foreground">
-                {patientName === 'Loading...' ? 'Loading...' : 'Patient'}
-              </p>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center space-x-3 flex-1 min-w-0">
+              <Avatar className="h-8 w-8 flex-shrink-0">
+                <AvatarImage src={patientAvatar} alt={patientName} />
+                <AvatarFallback>
+                  {patientName?.split(' ').map(n => n[0]).join('') || 'P'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium truncate">{patientName || 'Patient'}</p>
+                  {onViewPatientProfile && patientId && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-2 py-0 flex-shrink-0 hover:bg-primary/10 text-primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        onViewPatientProfile(patientId);
+                      }}
+                      title="View Patient Profile"
+                      aria-label="View Patient Profile"
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      <span className="text-xs">View</span>
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {patientName === 'Loading...' ? 'Loading...' : 'Patient'}
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={counselorAvatar} alt={counselorName} />
-              <AvatarFallback>
-                {counselorName?.split(' ').map(n => n[0]).join('') || 'C'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1">
-              <p className="text-sm font-medium">{counselorName || 'Counselor'}</p>
-              <p className="text-xs text-muted-foreground">{counselorSpecialty || 'Counselor'}</p>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center space-x-3 flex-1 min-w-0">
+              <Avatar className="h-8 w-8 flex-shrink-0">
+                <AvatarImage src={counselorAvatar} alt={counselorName} />
+                <AvatarFallback>
+                  {counselorName?.split(' ').map(n => n[0]).join('') || 'C'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{counselorName || 'Counselor'}</p>
+                <p className="text-xs text-muted-foreground truncate">{counselorSpecialty || 'Counselor'}</p>
+              </div>
             </div>
+            {onViewSessionInfo && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 p-0 flex-shrink-0 hover:bg-primary/10"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewSessionInfo(session);
+                }}
+                title="View Session Info"
+              >
+                <Info className="h-4 w-4 text-primary" />
+              </Button>
+            )}
           </div>
         </div>
 

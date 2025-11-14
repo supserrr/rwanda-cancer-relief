@@ -308,24 +308,111 @@ export class ChatApi {
       throw new Error('User not authenticated');
     }
 
+    // Verify chat exists and user is a participant
+    const { data: chatCheck, error: chatCheckError } = await supabase
+      .from('chats')
+      .select('id, participants')
+      .eq('id', data.chatId)
+      .single();
+
+    if (chatCheckError || !chatCheck) {
+      console.error('[ChatApi.sendMessage] Chat not found or access denied:', {
+        chatId: data.chatId,
+        error: chatCheckError,
+      });
+      throw new Error(chatCheckError?.message || 'Chat not found or you do not have access to this chat');
+    }
+
+    if (!Array.isArray(chatCheck.participants) || !chatCheck.participants.includes(user.id)) {
+      console.error('[ChatApi.sendMessage] User is not a participant in this chat:', {
+        chatId: data.chatId,
+        userId: user.id,
+        participants: chatCheck.participants,
+      });
+      throw new Error('You are not a participant in this chat');
+    }
+
+    // Get the receiver (the other participant)
+    const participants = Array.isArray(chatCheck.participants) ? chatCheck.participants : [];
+    const receiverId = participants.find((participantId: string) => participantId !== user.id && participantId) || null;
+
+    console.log('[ChatApi.sendMessage] Participant check:', {
+      chatId: data.chatId,
+      userId: user.id,
+      participants: participants,
+      participantsType: typeof participants,
+      participantsIsArray: Array.isArray(participants),
+      participantsLength: participants.length,
+      receiverId: receiverId,
+      receiverIdType: typeof receiverId,
+    });
+
+    if (!receiverId || receiverId === null || receiverId === undefined) {
+      console.error('[ChatApi.sendMessage] No receiver found in chat participants:', {
+        chatId: data.chatId,
+        userId: user.id,
+        participants: participants,
+        participantsType: typeof participants,
+        participantsLength: participants.length,
+      });
+      throw new Error('Cannot determine message receiver. Chat must have at least 2 participants.');
+    }
+
+    // Ensure receiverId is a string
+    const receiverIdString = String(receiverId).trim();
+    if (!receiverIdString || receiverIdString === 'null' || receiverIdString === 'undefined') {
+      console.error('[ChatApi.sendMessage] Invalid receiver ID:', {
+        receiverId,
+        receiverIdString,
+        chatId: data.chatId,
+        userId: user.id,
+        participants: participants,
+      });
+      throw new Error('Invalid receiver ID. Cannot send message.');
+    }
+
     // Create message
+    const messageData = {
+      chat_id: data.chatId,
+      sender_id: user.id,
+      receiver_id: receiverIdString,
+      content: data.content,
+      type: data.type || 'text',
+      file_url: data.fileUrl || null,
+      is_read: false,
+    };
+
+    console.log('[ChatApi.sendMessage] Inserting message with data:', {
+      chat_id: messageData.chat_id,
+      sender_id: messageData.sender_id,
+      receiver_id: messageData.receiver_id,
+      receiver_id_type: typeof messageData.receiver_id,
+      receiver_id_length: messageData.receiver_id?.length,
+      content_length: messageData.content?.length,
+      type: messageData.type,
+    });
+
     const { data: message, error } = await supabase
       .from('messages')
-      .insert({
-        chat_id: data.chatId,
-        sender_id: user.id,
-        content: data.content,
-        type: data.type || 'text',
-        file_url: data.fileUrl,
-        is_read: false,
-      })
+      .insert(messageData)
       .select()
       .single();
 
     if (error || !message) {
-      throw new Error(error?.message || 'Failed to send message');
+      console.error('[ChatApi.sendMessage] Error inserting message:', {
+        error,
+        errorCode: error?.code,
+        errorMessage: error?.message,
+        errorDetails: error?.details,
+        errorHint: error?.hint,
+        chatId: data.chatId,
+        senderId: user.id,
+        content: data.content,
+      });
+      throw new Error(error?.message || error?.details || 'Failed to send message');
     }
 
+    // Fetch chat again for updating metadata (we already verified it exists above)
     const { data: chatRecord, error: chatFetchError } = await supabase
       .from('chats')
       .select('participants, unread_count')
@@ -333,6 +420,7 @@ export class ChatApi {
       .single();
 
     if (chatFetchError || !chatRecord) {
+      console.error('[ChatApi.sendMessage] Failed to fetch chat for update:', chatFetchError);
       throw new Error(chatFetchError?.message || 'Failed to update chat metadata');
     }
 

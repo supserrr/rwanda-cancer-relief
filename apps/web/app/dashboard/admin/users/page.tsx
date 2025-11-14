@@ -49,6 +49,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@workspace/ui/components/dialog';
+import { ProfileViewModal } from '@workspace/ui/components/profile-view-modal';
+import { Patient, Counselor } from '../../../../lib/types';
 
 const firstDefined = <T,>(...values: Array<T | null | undefined>): T | undefined => {
   for (const value of values) {
@@ -69,6 +71,7 @@ export default function AdminUsersPage() {
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const isMountedRef = useRef(false);
   const realtimeRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -484,14 +487,23 @@ export default function AdminUsersPage() {
     });
   }, [users, searchTerm, selectedRole, selectedStatus]);
 
-  const handleViewUser = (userId: string) => {
+  const handleViewUser = async (userId: string) => {
     const baseUser = users.find((user) => user.id === userId);
     if (!baseUser) {
       toast.error('Unable to locate user details.');
       return;
     }
-    setSelectedUser(baseUser);
-    setViewModalOpen(true);
+    // Fetch full user data with all metadata
+    try {
+      const fullUser = await AdminApi.getUser(userId);
+      setSelectedUser(fullUser);
+      setIsProfileModalOpen(true);
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+      // Fallback to cached user data
+      setSelectedUser(baseUser);
+      setIsProfileModalOpen(true);
+    }
   };
 
   const handleDeleteUser = async (userId: string) => {
@@ -1197,6 +1209,116 @@ export default function AdminUsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Profile View Modal for Patients and Counselors */}
+      {selectedUser && (() => {
+        // Debug: Log what we're passing
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[AdminUsersPage] Selected user:', {
+            id: selectedUser.id,
+            role: selectedUser.role,
+            fullName: selectedUser.fullName,
+            email: selectedUser.email,
+            hasMetadata: !!selectedUser.metadata,
+            metadataKeys: selectedUser.metadata ? Object.keys(selectedUser.metadata) : [],
+            metadata: selectedUser.metadata,
+          });
+        }
+        
+        if (selectedUser.role === 'patient') {
+          const patientUser = {
+            id: selectedUser.id,
+            name: selectedUser.fullName || selectedUser.email || 'Patient',
+            email: selectedUser.email,
+            role: 'patient' as const,
+            avatar: selectedUser.avatarUrl,
+            createdAt: new Date(selectedUser.createdAt),
+            // Pass all metadata and fields from AdminUser
+            metadata: selectedUser.metadata || {},
+            // Health info
+            diagnosis: (selectedUser as any).cancerType || (selectedUser.metadata?.diagnosis as string) || (selectedUser.metadata?.cancer_type as string),
+            treatmentStage: (selectedUser as any).treatmentStage || (selectedUser.metadata?.treatment_stage as string) || (selectedUser.metadata?.treatmentStage as string),
+            cancerType: (selectedUser as any).cancerType || (selectedUser.metadata?.cancer_type as string) || (selectedUser.metadata?.cancerType as string),
+            currentTreatment: (selectedUser.metadata?.current_treatment as string) || (selectedUser.metadata?.currentTreatment as string),
+            diagnosisDate: (selectedUser.metadata?.diagnosis_date as string) || (selectedUser.metadata?.diagnosisDate as string),
+            // Personal info
+            age: (selectedUser.metadata?.age as string) || ((selectedUser as any).age as string),
+            gender: (selectedUser.metadata?.gender as string) || ((selectedUser as any).gender as string),
+            location: (selectedUser.metadata?.location as string) || ((selectedUser as any).location as string),
+            phoneNumber: (selectedUser.metadata?.contactPhone as string) || (selectedUser.metadata?.contact_phone as string) || (selectedUser.metadata?.phone as string) || (selectedUser.metadata?.phoneNumber as string),
+            preferredLanguage: (selectedUser.metadata?.preferred_language as string) || (selectedUser.metadata?.preferredLanguage as string) || (selectedUser.metadata?.language as string),
+            // Support info
+            supportNeeds: (selectedUser.metadata?.support_needs as string[]) || (selectedUser.metadata?.supportNeeds as string[]),
+            familySupport: (selectedUser.metadata?.family_support as string) || (selectedUser.metadata?.familySupport as string),
+            consultationType: (selectedUser.metadata?.consultation_type as string[]) || (selectedUser.metadata?.consultationType as string[]),
+            specialRequests: (selectedUser.metadata?.special_requests as string) || (selectedUser.metadata?.specialRequests as string),
+            // Emergency contact
+            emergencyContactName: (selectedUser.metadata?.emergency_contact_name as string) || (selectedUser.metadata?.emergencyContactName as string),
+            emergencyContactPhone: (selectedUser.metadata?.emergency_contact_phone as string) || (selectedUser.metadata?.emergencyContactPhone as string),
+            emergencyContact: (selectedUser.metadata?.emergency_contact as string) || (selectedUser.metadata?.emergencyContact as string),
+            // Assignment
+            assignedCounselor: (selectedUser.metadata?.assigned_counselor_id as string) || ((selectedUser as any).assigned_counselor_id as string) || undefined,
+            // Progress
+            moduleProgress: (selectedUser.metadata?.module_progress as Record<string, number>) || undefined,
+          } as Patient;
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[AdminUsersPage] Patient user object:', {
+              id: patientUser.id,
+              name: patientUser.name,
+              email: patientUser.email,
+              hasMetadata: !!patientUser.metadata,
+              metadataKeys: patientUser.metadata ? Object.keys(patientUser.metadata) : [],
+              cancerType: patientUser.cancerType,
+              age: patientUser.age,
+              gender: patientUser.gender,
+              location: patientUser.location,
+            });
+          }
+          
+          return (
+            <ProfileViewModal
+              isOpen={isProfileModalOpen}
+              onClose={() => {
+                setIsProfileModalOpen(false);
+                setSelectedUser(null);
+              }}
+              user={patientUser}
+              userType="patient"
+              currentUserRole="admin"
+            />
+          );
+        }
+        
+        if (selectedUser.role === 'counselor') {
+          const counselorUser = {
+            id: selectedUser.id,
+            name: selectedUser.fullName || selectedUser.email || 'Counselor',
+            email: selectedUser.email,
+            role: 'counselor' as const,
+            avatar: selectedUser.avatarUrl,
+            createdAt: new Date(selectedUser.createdAt),
+            specialty: selectedUser.specialty || '',
+            experience: selectedUser.experience || 0,
+            availability: (selectedUser.availability as 'available' | 'busy' | 'offline') || 'available',
+          } as Counselor;
+          
+          return (
+            <ProfileViewModal
+              isOpen={isProfileModalOpen}
+              onClose={() => {
+                setIsProfileModalOpen(false);
+                setSelectedUser(null);
+              }}
+              user={counselorUser}
+              userType="counselor"
+              currentUserRole="admin"
+            />
+          );
+        }
+        
+        return null;
+      })()}
     </div>
   );
 }

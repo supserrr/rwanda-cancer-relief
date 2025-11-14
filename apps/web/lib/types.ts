@@ -121,6 +121,19 @@ export interface Patient extends User {
   language?: string;
   timezone?: string;
   languages?: string[];
+  cancerType?: string;
+  age?: string;
+  gender?: string;
+  location?: string;
+  currentTreatment?: string;
+  diagnosisDate?: string;
+  preferredLanguage?: string;
+  supportNeeds?: string[];
+  familySupport?: string;
+  consultationType?: string[];
+  specialRequests?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
 }
 
 export interface Counselor extends User {

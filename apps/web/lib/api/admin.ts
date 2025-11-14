@@ -747,6 +747,11 @@ export class AdminApi {
       isVerified: user.isVerified || user.is_verified || false,
       createdAt: user.createdAt || user.created_at,
       lastLogin: user.lastLogin || user.last_login || undefined,
+      metadata: {
+        ...(user.metadata ?? {}),
+        // Include assigned_counselor_id in metadata if present
+        ...(user.assigned_counselor_id ? { assigned_counselor_id: user.assigned_counselor_id } : {}),
+      },
     };
   }
 
@@ -2306,6 +2311,100 @@ export class AdminApi {
     return updatedCounselor;
   }
 
+  /**
+   * Assign a patient to a counselor by updating the assigned_counselor_id field.
+   * 
+   * @param patientId - The ID of the patient to assign
+   * @param counselorId - The ID of the counselor to assign the patient to (null to unassign)
+   * @returns The updated patient user object
+   */
+  static async assignPatientToCounselor(
+    patientId: string,
+    counselorId: string | null
+  ): Promise<AdminUser> {
+    const supabase = createClient();
+    if (!supabase) {
+      throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+    }
+
+    // Verify user is authenticated and get their role
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+    if (authError || !authUser) {
+      throw new Error('You must be signed in to assign patients.');
+    }
+
+    // Try to verify user role (this may be blocked by RLS, but we'll try)
+    let userRole: string | null = null;
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', authUser.id)
+        .maybeSingle();
+      userRole = profile?.role || null;
+    } catch (e) {
+      // RLS may block this, that's okay - we'll proceed
+      console.warn('[assignPatientToCounselor] Could not verify user role:', e);
+    }
+
+    // Use admin Edge Function for admin access (bypasses RLS)
+    // TODO: Replace with proper RLS policies later
+    let updatedUser: any;
+    try {
+      updatedUser = await this.invokeAdminFunction<any>(
+        supabase,
+        { 
+          action: 'assignPatientToCounselor', 
+          patientId,
+          counselorId 
+        },
+        'assignPatientToCounselor',
+      );
+    } catch (error) {
+      console.error('[assignPatientToCounselor] Edge function error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to assign patient to counselor';
+      
+      // Provide more helpful error messages
+      if (errorMessage.includes('Patient not found') || errorMessage.includes('not found or invalid')) {
+        throw new Error(`Patient not found. Please ensure the patient ID is correct and the patient exists in the system.`);
+      }
+      if (errorMessage.includes('Counselor not found') || errorMessage.includes('Counselor not found or invalid')) {
+        throw new Error(`Counselor not found. Please ensure the counselor ID is correct.`);
+      }
+      if (errorMessage.includes('permission') || errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+        const roleInfo = userRole ? ` (Your role: ${userRole})` : '';
+        throw new Error(
+          `You do not have permission to assign patients${roleInfo}. ` +
+          `The edge function may need to be deployed with the latest changes to allow counselors to assign patients. ` +
+          `Please contact an administrator or ensure the admin edge function has been deployed.`
+        );
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    // Map to AdminUser format
+    return {
+      id: updatedUser.id,
+      email: updatedUser.email || '',
+      fullName: updatedUser.fullName || updatedUser.full_name || '',
+      role: this.normalizeRoleValue(updatedUser.role) ?? ('patient' as AdminUser['role']),
+      isVerified: updatedUser.isVerified || updatedUser.is_verified || false,
+      createdAt: updatedUser.createdAt || updatedUser.created_at,
+      lastLogin: updatedUser.lastLogin || updatedUser.last_login || undefined,
+      metadata: updatedUser.metadata ?? {},
+      specialty: updatedUser.specialty,
+      experience: updatedUser.experience || updatedUser.experience_years,
+      availability: updatedUser.availability,
+      avatarUrl: updatedUser.avatarUrl || updatedUser.avatar_url,
+      visibilitySettings: updatedUser.visibilitySettings || updatedUser.visibility_settings,
+      approvalStatus: updatedUser.approvalStatus || updatedUser.approval_status,
+      approvalSubmittedAt: updatedUser.approvalSubmittedAt || updatedUser.approval_submitted_at,
+      approvalReviewedAt: updatedUser.approvalReviewedAt || updatedUser.approval_reviewed_at,
+      approvalNotes: updatedUser.approvalNotes || updatedUser.approval_notes,
+    };
+  }
+
   private static normalizeRoleValue(value: unknown): AdminUser['role'] | undefined {
     if (typeof value === 'string') {
       const normalized = value.trim().toLowerCase();
@@ -2417,9 +2516,30 @@ export class AdminApi {
 
     if (!response.ok) {
       const label = debugLabel ? ` (${debugLabel})` : '';
-      throw new Error(
-        `Edge function${label} failed. status=${response.status} body=${responseBody}`,
-      );
+      let errorMessage = `Edge function${label} failed. status=${response.status}`;
+      
+      // Try to parse error message from response
+      if (parsed?.error) {
+        errorMessage += ` error=${parsed.error}`;
+        if (typeof parsed.error === 'object' && parsed.error.message) {
+          errorMessage = parsed.error.message;
+        } else if (typeof parsed.error === 'string') {
+          errorMessage = parsed.error;
+        }
+      } else if (responseBody) {
+        errorMessage += ` body=${responseBody}`;
+      }
+      
+      // Provide helpful messages for common status codes
+      if (response.status === 403) {
+        errorMessage = 'You do not have permission to perform this action. Please ensure you are logged in as a counselor or admin.';
+      } else if (response.status === 401) {
+        errorMessage = 'Authentication failed. Please log in again.';
+      } else if (response.status === 404 && errorMessage.includes('Patient not found')) {
+        errorMessage = 'Patient not found. Please ensure the patient ID is correct.';
+      }
+      
+      throw new Error(errorMessage);
     }
 
     if (!parsed?.success) {

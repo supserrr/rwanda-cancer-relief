@@ -142,7 +142,13 @@ export function useChat(
       
       return message;
     } catch (err) {
-      const errorMessage = err instanceof ApiError ? err.message : 'Failed to send message';
+      console.error('[useChat.sendMessage] Error sending message:', {
+        error: err,
+        errorMessage: err instanceof Error ? err.message : String(err),
+        chatId: data.chatId,
+        content: data.content,
+      });
+      const errorMessage = err instanceof Error ? err.message : err instanceof ApiError ? err.message : 'Failed to send message';
       throw new Error(errorMessage);
     }
   }, [currentChat, fetchChats]);

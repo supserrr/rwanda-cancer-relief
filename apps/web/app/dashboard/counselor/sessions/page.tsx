@@ -22,7 +22,8 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  Users
+  Users,
+  Info
 } from 'lucide-react';
 import { useAuth } from '../../../../components/auth/AuthProvider';
 import { useSessions } from '../../../../hooks/useSessions';
@@ -32,6 +33,8 @@ import { toast } from 'sonner';
 import { Spinner } from '@workspace/ui/components/ui/shadcn-io/spinner';
 import { createClient } from '@/lib/supabase/client';
 import { normalizeAvatarUrl } from '@workspace/ui/lib/avatar';
+import { ProfileViewModal } from '@workspace/ui/components/profile-view-modal';
+import { Patient } from '../../../../lib/types';
 
 export default function CounselorSessionsPage() {
   const router = useRouter();
@@ -46,6 +49,9 @@ export default function CounselorSessionsPage() {
   const [patientsLoading, setPatientsLoading] = useState(true);
   const [counselorProfile, setCounselorProfile] = useState<AdminUser | null>(null);
   const [patientCache, setPatientCache] = useState<Map<string, AdminUser>>(new Map());
+  const [viewingPatient, setViewingPatient] = useState<AdminUser | null>(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [availableCounselors, setAvailableCounselors] = useState<Array<{ id: string; name: string; email?: string }>>([]);
 
   // Load sessions using the hook
   const counselorSessionsParams = useMemo(
@@ -148,7 +154,7 @@ export default function CounselorSessionsPage() {
           console.log(`[PRIMARY] Fetching ${uniquePatientIds.length} patients from sessions:`, uniquePatientIds);
           let { data: profiles, error } = await supabase
             .from('profiles')
-            .select('id,full_name,email,role,avatar_url,metadata,created_at,updated_at')
+            .select('id,full_name,role,avatar_url,metadata,created_at,updated_at')
             .in('id', uniquePatientIds)
             .eq('role', 'patient');
           
@@ -165,7 +171,7 @@ export default function CounselorSessionsPage() {
             console.log('[PRIMARY] Attempting fallback query without role filter...');
             const { data: fallbackProfiles, error: fallbackError } = await supabase
               .from('profiles')
-              .select('id,full_name,email,role,avatar_url,metadata,created_at,updated_at')
+              .select('id,full_name,role,avatar_url,metadata,created_at,updated_at')
               .in('id', uniquePatientIds);
             
             if (fallbackError) {
@@ -189,6 +195,7 @@ export default function CounselorSessionsPage() {
               const metadata = (profile.metadata || {}) as Record<string, unknown>;
               
               // Extract full name from multiple possible sources
+              const emailFromMetadata = (typeof metadata.email === 'string' ? metadata.email : '');
               const fullName = 
                 (profile.full_name && typeof profile.full_name === 'string' ? profile.full_name.trim() : undefined) ||
                 (profile.fullName && typeof profile.fullName === 'string' ? profile.fullName.trim() : undefined) ||
@@ -196,7 +203,7 @@ export default function CounselorSessionsPage() {
                 (typeof metadata.name === 'string' && metadata.name.trim() ? metadata.name.trim() : undefined) ||
                 (typeof metadata.full_name === 'string' && metadata.full_name.trim() ? metadata.full_name.trim() : undefined) ||
                 (typeof metadata.fullName === 'string' && metadata.fullName.trim() ? metadata.fullName.trim() : undefined) ||
-                (profile.email && typeof profile.email === 'string' ? profile.email.split('@')[0].trim() : undefined) ||
+                (emailFromMetadata ? (emailFromMetadata.split('@')[0]?.trim() || undefined) : undefined) ||
                 'Patient';
               
               // Extract avatar URL and pass it as avatarUrl
@@ -206,16 +213,18 @@ export default function CounselorSessionsPage() {
                                (metadata.avatar as string) ||
                                undefined;
               
+              const email = (typeof metadata.email === 'string' ? metadata.email : '') || '';
+              
               console.log(`[PRIMARY] ✅ Fetched patient ${profile.id}: "${fullName}"`, {
                 profile_full_name: profile.full_name,
                 avatar_url: profile.avatar_url,
                 extracted_name: fullName,
-                email: profile.email,
+                email: email,
               });
               
               return {
                 id: profile.id,
-                email: profile.email || '',
+                email: email,
                 fullName: fullName,
                 avatarUrl: avatarUrl,
                 role: 'patient' as const,
@@ -256,10 +265,32 @@ export default function CounselorSessionsPage() {
   // In that case, the name will show as "Patient" which is acceptable
 
   // Filter sessions based on tab
-  const upcomingSessions = sessions.filter(session => 
-    session.status === 'scheduled' &&
-    new Date(session.date) > new Date()
-  );
+  const upcomingSessions = useMemo(() => {
+    const now = new Date();
+    return sessions.filter(session => {
+      if (session.status !== 'scheduled') return false;
+      
+      // Parse date (session.date is a string in YYYY-MM-DD format)
+      const sessionDate = new Date(session.date);
+      
+      // If session has a time, combine date and time
+      if (session.time) {
+        // Parse time (format: HH:MM or HH:MM:SS)
+        const [hours, minutes] = session.time.split(':').map(Number);
+        const sessionDateTime = new Date(sessionDate);
+        sessionDateTime.setHours(hours || 0, minutes || 0, 0, 0);
+        
+        // Session is upcoming if the datetime hasn't passed
+        return sessionDateTime > now;
+      }
+      
+      // If no time specified, check if date is today or in the future
+      // Set to end of day for date-only comparison
+      const endOfSessionDate = new Date(sessionDate);
+      endOfSessionDate.setHours(23, 59, 59, 999);
+      return endOfSessionDate > now;
+    });
+  }, [sessions]);
 
   const pastSessions = sessions.filter(session => 
     session.status === 'completed' || session.status === 'cancelled'
@@ -293,7 +324,7 @@ export default function CounselorSessionsPage() {
           // Try to fetch all columns first to see what we get
           const { data: profiles, error } = await supabase
             .from('profiles')
-            .select('id,full_name,email,role,avatar_url,metadata,created_at,updated_at')
+            .select('id,full_name,role,avatar_url,metadata,created_at,updated_at')
             .in('id', missingPatientIds)
             .eq('role', 'patient');
           
@@ -316,6 +347,7 @@ export default function CounselorSessionsPage() {
               const metadata = (profile.metadata || {}) as Record<string, unknown>;
               
               // Try all possible name fields
+              const emailFromMetadata = (typeof metadata.email === 'string' ? metadata.email : '');
               const fullName = 
                 (profile.full_name && typeof profile.full_name === 'string' ? profile.full_name.trim() : undefined) ||
                 (profile.fullName && typeof profile.fullName === 'string' ? profile.fullName.trim() : undefined) ||
@@ -323,7 +355,7 @@ export default function CounselorSessionsPage() {
                 (typeof metadata.name === 'string' && metadata.name.trim() ? metadata.name.trim() : undefined) ||
                 (typeof metadata.full_name === 'string' && metadata.full_name.trim() ? metadata.full_name.trim() : undefined) ||
                 (typeof metadata.fullName === 'string' && metadata.fullName.trim() ? metadata.fullName.trim() : undefined) ||
-                (profile.email && typeof profile.email === 'string' ? profile.email.split('@')[0].trim() : undefined) ||
+                (emailFromMetadata ? (emailFromMetadata.split('@')[0]?.trim() || undefined) : undefined) ||
                 'Patient';
               
               // Extract avatar URL
@@ -333,16 +365,18 @@ export default function CounselorSessionsPage() {
                                (metadata.avatar as string) ||
                                undefined;
               
+              const email = (typeof metadata.email === 'string' ? metadata.email : '') || '';
+              
               console.log(`[FALLBACK] ✅ Fetched patient ${profile.id}: "${fullName}"`, {
                 full_name: profile.full_name,
                 avatar_url: profile.avatar_url,
-                email: profile.email,
+                email: email,
                 extractedName: fullName,
               });
               
               return {
                 id: profile.id,
-                email: profile.email || '',
+                email: email,
                 fullName: fullName,
                 avatarUrl: avatarUrl,
                 role: 'patient' as const,
@@ -675,6 +709,199 @@ export default function CounselorSessionsPage() {
     setIsCancelOpen(true);
   };
 
+  const handleViewPatientProfile = async (patientId: string) => {
+    // First check if patient is already loaded
+    let patient = patients.find(p => p.id === patientId) || patientCache.get(patientId);
+    
+    if (patient) {
+      setViewingPatient(patient);
+      setIsProfileOpen(true);
+    } else {
+      // Patient not found in cache, query through sessions to respect RLS policies
+      // This allows viewing profiles of patients in sessions, even if not yet assigned
+      try {
+        toast.loading('Loading patient information...', { id: 'loading-patient' });
+        
+        const supabase = createClient();
+        if (!supabase) {
+          throw new Error('Database connection not available');
+        }
+        
+        // Find a session with this patient to establish the relationship
+        const patientSession = sessions.find(s => s.patientId === patientId && s.counselorId === user?.id);
+        
+        if (!patientSession) {
+          throw new Error('You can only view profiles of patients you have sessions with.');
+        }
+        
+        // Query patient profile - since we have a session, RLS should allow access
+        // Use the same pattern as bulk fetch that works (query profiles directly with patient ID from session)
+        let profile = null;
+        
+        // Try direct query first (same as bulk fetch pattern)
+        console.log('[handleViewPatientProfile] Querying patient profile directly (same as bulk fetch)...');
+        const { data: profiles, error: directError } = await supabase
+          .from('profiles')
+          .select('id,full_name,role,avatar_url,metadata,created_at,updated_at,assigned_counselor_id')
+          .in('id', [patientId])
+          .eq('role', 'patient');
+        
+        if (!directError && profiles && profiles.length > 0) {
+          profile = profiles[0];
+          console.log('[handleViewPatientProfile] ✅ Direct query succeeded');
+        } else {
+          // Try without role filter as fallback
+          console.log('[handleViewPatientProfile] Direct query failed, trying without role filter...');
+          const { data: fallbackProfiles, error: fallbackError } = await supabase
+            .from('profiles')
+            .select('id,full_name,role,avatar_url,metadata,created_at,updated_at,assigned_counselor_id')
+            .in('id', [patientId]);
+          
+          if (!fallbackError && fallbackProfiles && fallbackProfiles.length > 0) {
+            profile = fallbackProfiles[0];
+            // Verify it's a patient
+            if (profile && profile.role !== 'patient') {
+              throw new Error('The requested user is not a patient');
+            }
+            console.log('[handleViewPatientProfile] ✅ Fallback query succeeded');
+          } else {
+            // RLS is blocking access - create minimal patient object from session data
+            // This allows the modal to open with limited info
+            console.warn('[handleViewPatientProfile] RLS blocking profile access, creating minimal patient object from session data');
+            
+            // Show a warning toast that profile data is limited
+            toast.warning('Profile access is limited due to security policies. Some information may not be available.', {
+              duration: 5000,
+            });
+            
+            // Create a minimal patient object from what we know from the session
+            // Don't call getPatientName/getPatientAvatar here as they also rely on cache which is empty
+            // Just use basic defaults - the modal will still open and allow assignment
+            profile = {
+              id: patientId,
+              full_name: 'Patient', // Will be updated if we can get name from session notes or other sources
+              role: 'patient' as const,
+              avatar_url: undefined,
+              metadata: {
+                // Try to extract any patient info from session notes if available
+                ...(patientSession.notes ? { session_notes: patientSession.notes } : {}),
+              } as Record<string, unknown>,
+              created_at: patientSession.createdAt || new Date().toISOString(),
+              updated_at: patientSession.updatedAt || new Date().toISOString(),
+              assigned_counselor_id: null,
+            };
+            
+            console.log('[handleViewPatientProfile] Created minimal patient object from session data');
+          }
+        }
+        
+        if (!profile) {
+          throw new Error('Patient not found. You may only view profiles of patients you have sessions with.');
+        }
+        
+        // Map profile to AdminUser format
+        const metadata = (profile.metadata || {}) as Record<string, unknown>;
+        const emailFromMetadata = (typeof metadata.email === 'string' ? metadata.email : '');
+        const fullName = 
+          (profile.full_name && typeof profile.full_name === 'string' ? profile.full_name.trim() : undefined) ||
+          (typeof metadata.name === 'string' && metadata.name.trim() ? metadata.name.trim() : undefined) ||
+          (typeof metadata.full_name === 'string' && metadata.full_name.trim() ? metadata.full_name.trim() : undefined) ||
+          (typeof metadata.fullName === 'string' && metadata.fullName.trim() ? metadata.fullName.trim() : undefined) ||
+          (emailFromMetadata ? (emailFromMetadata.split('@')[0]?.trim() || undefined) : undefined) ||
+          'Patient';
+        
+        const avatarUrl = profile.avatar_url || 
+                         (typeof metadata.avatar_url === 'string' ? metadata.avatar_url : undefined) ||
+                         (typeof metadata.avatarUrl === 'string' ? metadata.avatarUrl : undefined) ||
+                         (typeof metadata.avatar === 'string' ? metadata.avatar : undefined) ||
+                         undefined;
+        
+        patient = {
+          id: profile.id,
+          email: emailFromMetadata,
+          fullName: fullName,
+          avatarUrl: avatarUrl,
+          role: 'patient' as const,
+          metadata: metadata,
+          createdAt: profile.created_at || new Date().toISOString(),
+          updatedAt: profile.updated_at || new Date().toISOString(),
+        } as AdminUser;
+        
+        // Add to cache for future use
+        patientCache.set(patientId, patient);
+        // Update patients list if needed
+        if (!patients.find(p => p.id === patientId)) {
+          setPatients(prev => [...prev, patient!]);
+        }
+        
+        setViewingPatient(patient);
+        setIsProfileOpen(true);
+        toast.dismiss('loading-patient');
+      } catch (error) {
+        console.error('[handleViewPatientProfile] Error loading patient:', error);
+        toast.dismiss('loading-patient');
+        const errorMessage = error instanceof Error 
+          ? error.message 
+          : 'Failed to load patient information. You may only view profiles of patients you have sessions with.';
+        toast.error(errorMessage);
+      }
+    }
+  };
+
+  const handleViewSessionInfo = (session: Session) => {
+    setSelectedSession(session);
+    // For now, we can navigate to the session detail page or show a modal
+    // Since we already have session detail page, we'll navigate there
+    router.push(`/dashboard/counselor/sessions/session/${session.id}`);
+  };
+
+  const handleAssignPatient = async (patientId: string, counselorId: string) => {
+    try {
+      // assignPatientToCounselor already returns the updated patient data
+      const updatedPatient = await AdminApi.assignPatientToCounselor(patientId, counselorId);
+      toast.success('Patient assigned successfully');
+      // Use the returned patient data instead of making another API call
+      if (viewingPatient) {
+        setViewingPatient(updatedPatient);
+        // Update patient in cache
+        setPatientCache(prev => {
+          const newCache = new Map(prev);
+          newCache.set(patientId, updatedPatient);
+          return newCache;
+        });
+        // Update patient in list
+        setPatients(prev => prev.map(p => p.id === patientId ? updatedPatient : p));
+      }
+    } catch (error) {
+      console.error('Error assigning patient:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to assign patient');
+      throw error;
+    }
+  };
+
+  // Load available counselors for "Pass to Colleague" feature
+  useEffect(() => {
+    const loadCounselors = async () => {
+      try {
+        const response = await AdminApi.listUsers({ role: 'counselor' });
+        const counselors = response.users
+          .filter(c => c.id !== user?.id) // Exclude current counselor
+          .map(c => ({
+            id: c.id,
+            name: c.fullName || c.email || 'Counselor',
+            email: c.email
+          }));
+        setAvailableCounselors(counselors);
+      } catch (error) {
+        console.error('Error loading counselors:', error);
+      }
+    };
+
+    if (user?.id && isProfileOpen) {
+      loadCounselors();
+    }
+  }, [user?.id, isProfileOpen]);
+
   const handleConfirmCancel = async (sessionId: string, reason: string, notes?: string) => {
     if (!user) return;
     
@@ -781,14 +1008,10 @@ export default function CounselorSessionsPage() {
 
       {/* Sessions Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="upcoming" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
             Upcoming ({upcomingSessions.length})
-          </TabsTrigger>
-          <TabsTrigger value="past" className="flex items-center gap-2">
-            <MessageCircle className="h-4 w-4" />
-            Past ({pastSessions.length})
           </TabsTrigger>
           <TabsTrigger value="all" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
@@ -814,6 +1037,8 @@ export default function CounselorSessionsPage() {
                     onJoin={handleJoinSession}
                     onReschedule={handleRescheduleSession}
                     onCancel={handleCancelSession}
+                    onViewPatientProfile={handleViewPatientProfile}
+                    onViewSessionInfo={handleViewSessionInfo}
                   />
                 ))}
               </div>
@@ -830,38 +1055,6 @@ export default function CounselorSessionsPage() {
                   <Plus className="h-4 w-4 mr-2" />
                   Schedule Session
                 </Button>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="past" className="mt-6">
-          <div className="space-y-4">
-            {pastSessions.length > 0 ? (
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {pastSessions.map((session) => (
-                  <SessionCard
-                    key={session.id}
-                    session={session}
-                    patientName={getPatientName(session.patientId)}
-                    patientAvatar={getPatientAvatar(session.patientId)}
-                    patientId={session.patientId}
-                    counselorName={user?.name || 'Counselor'}
-                    counselorSpecialty={getCounselorSpecialty()}
-                    counselorAvatar={getCounselorAvatar()}
-                    counselorId={session.counselorId}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                  <MessageCircle className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">No past sessions</h3>
-                <p className="text-muted-foreground">
-                  Your completed sessions will appear here
-                </p>
               </div>
             )}
           </div>
@@ -892,6 +1085,8 @@ export default function CounselorSessionsPage() {
                     onJoin={session.status === 'scheduled' ? handleJoinSession : undefined}
                     onReschedule={session.status === 'scheduled' ? handleRescheduleSession : undefined}
                     onCancel={session.status === 'scheduled' ? handleCancelSession : undefined}
+                    onViewPatientProfile={handleViewPatientProfile}
+                    onViewSessionInfo={handleViewSessionInfo}
                   />
                   ))}
                 </div>
@@ -957,6 +1152,70 @@ export default function CounselorSessionsPage() {
           onSchedule={handleConfirmSchedule}
         />
       )}
+
+      {/* Patient Profile Modal */}
+      {viewingPatient && user && (() => {
+        // Debug: Log metadata to see what we're passing
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[ProfileViewModal] Patient data:', {
+            id: viewingPatient.id,
+            fullName: viewingPatient.fullName,
+            email: viewingPatient.email,
+            metadata: viewingPatient.metadata,
+            hasMetadata: !!viewingPatient.metadata,
+            metadataKeys: viewingPatient.metadata ? Object.keys(viewingPatient.metadata) : [],
+          });
+        }
+        return (
+        <ProfileViewModal
+          isOpen={isProfileOpen}
+          onClose={() => {
+            setIsProfileOpen(false);
+            setViewingPatient(null);
+          }}
+          user={{
+            id: viewingPatient.id,
+            name: viewingPatient.fullName || viewingPatient.email || 'Patient',
+            email: viewingPatient.email,
+            role: 'patient' as const,
+            avatar: viewingPatient.avatarUrl,
+            createdAt: new Date(viewingPatient.createdAt),
+            // Pass all metadata and fields from AdminUser
+            metadata: viewingPatient.metadata || {},
+            // Health info
+            diagnosis: viewingPatient.cancerType || (viewingPatient.metadata?.diagnosis as string) || (viewingPatient.metadata?.cancer_type as string),
+            treatmentStage: viewingPatient.treatmentStage || (viewingPatient.metadata?.treatment_stage as string),
+            cancerType: viewingPatient.cancerType || (viewingPatient.metadata?.cancer_type as string) || (viewingPatient.metadata?.cancerType as string),
+            currentTreatment: viewingPatient.metadata?.current_treatment as string || viewingPatient.metadata?.currentTreatment as string,
+            diagnosisDate: viewingPatient.metadata?.diagnosis_date as string || viewingPatient.metadata?.diagnosisDate as string,
+            // Personal info
+            age: (typeof viewingPatient.metadata?.age === 'string' ? viewingPatient.metadata.age : typeof viewingPatient.metadata?.age === 'number' ? String(viewingPatient.metadata.age) : undefined) || (typeof viewingPatient.age === 'string' ? viewingPatient.age : typeof viewingPatient.age === 'number' ? String(viewingPatient.age) : undefined),
+            gender: viewingPatient.metadata?.gender as string || viewingPatient.gender as string,
+            location: viewingPatient.metadata?.location as string || viewingPatient.location as string,
+            phoneNumber: viewingPatient.metadata?.contactPhone as string || viewingPatient.metadata?.contact_phone as string || viewingPatient.metadata?.phone as string || viewingPatient.metadata?.phoneNumber as string,
+            preferredLanguage: viewingPatient.metadata?.preferred_language as string || viewingPatient.metadata?.preferredLanguage as string || viewingPatient.metadata?.language as string,
+            // Support info
+            supportNeeds: viewingPatient.metadata?.support_needs as string[] || viewingPatient.metadata?.supportNeeds as string[],
+            familySupport: viewingPatient.metadata?.family_support as string || viewingPatient.metadata?.familySupport as string,
+            consultationType: viewingPatient.metadata?.consultation_type as string[] || viewingPatient.metadata?.consultationType as string[],
+            specialRequests: viewingPatient.metadata?.special_requests as string || viewingPatient.metadata?.specialRequests as string,
+            // Emergency contact
+            emergencyContactName: viewingPatient.metadata?.emergency_contact_name as string || viewingPatient.metadata?.emergencyContactName as string,
+            emergencyContactPhone: viewingPatient.metadata?.emergency_contact_phone as string || viewingPatient.metadata?.emergencyContactPhone as string,
+            emergencyContact: viewingPatient.metadata?.emergency_contact as string || viewingPatient.metadata?.emergencyContact as string,
+            // Assignment
+            assignedCounselor: (viewingPatient.metadata?.assigned_counselor_id as string) || ((viewingPatient as any).assigned_counselor_id as string) || undefined,
+            // Progress
+            moduleProgress: viewingPatient.metadata?.module_progress as Record<string, number> | undefined,
+          } as Patient}
+          userType="patient"
+          currentUserRole="counselor"
+          onAssignPatient={handleAssignPatient}
+          currentCounselorId={user.id}
+          availableCounselors={availableCounselors}
+        />
+        );
+      })()}
     </div>
   );
 }

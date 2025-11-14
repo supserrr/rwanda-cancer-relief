@@ -29,11 +29,13 @@ import {
 import { AdminApi, type AdminUser } from '../../../../lib/api/admin';
 import { useRouter } from 'next/navigation';
 import { ProfileViewModal } from '@workspace/ui/components/profile-view-modal';
+import { Patient } from '../../../../lib/types';
 import { ScheduleSessionModal } from '../../../../components/session/ScheduleSessionModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@workspace/ui/components/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@workspace/ui/components/select';
 import { useAuth } from '../../../../components/auth/AuthProvider';
 import { useSessions } from '../../../../hooks/useSessions';
+import { ChatApi } from '../../../../lib/api/chat';
 import { toast } from 'sonner';
 
 export default function CounselorPatientsPage() {
@@ -102,15 +104,38 @@ export default function CounselorPatientsPage() {
     return matchesSearch && matchesStatus && matchesModule;
   });
 
-  const handleViewPatient = (patientId: string) => {
+  const handleViewPatient = async (patientId: string) => {
     const patient = patients.find(p => p.id === patientId);
     if (!patient) return;
-    setViewingPatient(patient);
-    setIsProfileOpen(true);
+    
+    // Fetch full patient data with all metadata
+    try {
+      const fullPatient = await AdminApi.getUser(patientId);
+      setViewingPatient(fullPatient);
+      setIsProfileOpen(true);
+    } catch (error) {
+      console.error('Error fetching patient details:', error);
+      // Fallback to cached patient data
+      setViewingPatient(patient);
+      setIsProfileOpen(true);
+    }
   };
 
-  const handleSendMessage = (patientId: string) => {
-    router.push(`/dashboard/counselor/chat?patientId=${patientId}`);
+  const handleSendMessage = async (patientId: string) => {
+    if (!user?.id) {
+      toast.error('You must be logged in to send messages');
+      return;
+    }
+
+    try {
+      // createChat will return existing chat if one exists, or create a new one
+      const chat = await ChatApi.createChat({ participantId: patientId });
+      // Navigate to chat page with the chatId
+      router.push(`/dashboard/counselor/chat?chatId=${chat.id}`);
+    } catch (error) {
+      console.error('Error starting chat:', error);
+      toast.error('Failed to start conversation. Please try again.');
+    }
   };
 
   const handleScheduleSession = (patientId: string) => {
@@ -370,26 +395,65 @@ export default function CounselorPatientsPage() {
       </CardContent>
     </AnimatedCard>
     {/* Profile modal */}
-    {viewingPatient && (
-      <ProfileViewModal
-        isOpen={isProfileOpen}
-        onClose={() => setIsProfileOpen(false)}
-        user={{
+    {viewingPatient && (() => {
+      // Debug: Log what we're passing
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[CounselorPatientsPage] Patient data:', {
           id: viewingPatient.id,
-          name: viewingPatient.fullName || viewingPatient.email || 'Patient',
+          fullName: viewingPatient.fullName,
           email: viewingPatient.email,
-          role: 'patient' as const,
-          avatar: undefined,
-          createdAt: new Date(viewingPatient.createdAt),
-          diagnosis: undefined,
-          treatmentStage: undefined,
-          assignedCounselor: undefined,
-          moduleProgress: undefined,
-        }}
-        userType="patient"
-        currentUserRole="counselor"
-      />
-    )}
+          hasMetadata: !!viewingPatient.metadata,
+          metadataKeys: viewingPatient.metadata ? Object.keys(viewingPatient.metadata) : [],
+        });
+      }
+      
+      return (
+        <ProfileViewModal
+          isOpen={isProfileOpen}
+          onClose={() => {
+            setIsProfileOpen(false);
+            setViewingPatient(null);
+          }}
+          user={{
+            id: viewingPatient.id,
+            name: viewingPatient.fullName || viewingPatient.email || 'Patient',
+            email: viewingPatient.email,
+            role: 'patient' as const,
+            avatar: viewingPatient.avatarUrl,
+            createdAt: new Date(viewingPatient.createdAt),
+            // Pass all metadata and fields from AdminUser
+            metadata: viewingPatient.metadata || {},
+            // Health info
+            diagnosis: (viewingPatient as any).cancerType || (viewingPatient.metadata?.diagnosis as string) || (viewingPatient.metadata?.cancer_type as string),
+            treatmentStage: (viewingPatient as any).treatmentStage || (viewingPatient.metadata?.treatment_stage as string) || (viewingPatient.metadata?.treatmentStage as string),
+            cancerType: (viewingPatient as any).cancerType || (viewingPatient.metadata?.cancer_type as string) || (viewingPatient.metadata?.cancerType as string),
+            currentTreatment: (viewingPatient.metadata?.current_treatment as string) || (viewingPatient.metadata?.currentTreatment as string),
+            diagnosisDate: (viewingPatient.metadata?.diagnosis_date as string) || (viewingPatient.metadata?.diagnosisDate as string),
+            // Personal info
+            age: (viewingPatient.metadata?.age as string) || ((viewingPatient as any).age as string),
+            gender: (viewingPatient.metadata?.gender as string) || ((viewingPatient as any).gender as string),
+            location: (viewingPatient.metadata?.location as string) || ((viewingPatient as any).location as string),
+            phoneNumber: (viewingPatient.metadata?.contactPhone as string) || (viewingPatient.metadata?.contact_phone as string) || (viewingPatient.metadata?.phone as string) || (viewingPatient.metadata?.phoneNumber as string),
+            preferredLanguage: (viewingPatient.metadata?.preferred_language as string) || (viewingPatient.metadata?.preferredLanguage as string) || (viewingPatient.metadata?.language as string),
+            // Support info
+            supportNeeds: (viewingPatient.metadata?.support_needs as string[]) || (viewingPatient.metadata?.supportNeeds as string[]),
+            familySupport: (viewingPatient.metadata?.family_support as string) || (viewingPatient.metadata?.familySupport as string),
+            consultationType: (viewingPatient.metadata?.consultation_type as string[]) || (viewingPatient.metadata?.consultationType as string[]),
+            specialRequests: (viewingPatient.metadata?.special_requests as string) || (viewingPatient.metadata?.specialRequests as string),
+            // Emergency contact
+            emergencyContactName: (viewingPatient.metadata?.emergency_contact_name as string) || (viewingPatient.metadata?.emergencyContactName as string),
+            emergencyContactPhone: (viewingPatient.metadata?.emergency_contact_phone as string) || (viewingPatient.metadata?.emergencyContactPhone as string),
+            emergencyContact: (viewingPatient.metadata?.emergency_contact as string) || (viewingPatient.metadata?.emergencyContact as string),
+            // Assignment
+            assignedCounselor: (viewingPatient.metadata?.assigned_counselor_id as string) || ((viewingPatient as any).assigned_counselor_id as string) || undefined,
+            // Progress
+            moduleProgress: (viewingPatient.metadata?.module_progress as Record<string, number>) || undefined,
+          } as Patient}
+          userType="patient"
+          currentUserRole="counselor"
+        />
+      );
+    })()}
 
     {/* Schedule session modal */}
     <ScheduleSessionModal

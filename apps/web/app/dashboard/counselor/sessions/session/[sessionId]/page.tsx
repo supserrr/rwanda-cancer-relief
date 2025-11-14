@@ -158,7 +158,6 @@ export default function SessionRoomPage() {
                       code: directError?.code || 'No code',
                       details: directError?.details || 'No details',
                       hint: directError?.hint || 'No hint',
-                      status: directError?.status || 'No status',
                       fullError: JSON.stringify(directError),
                     });
                     profileError = directError;
@@ -184,7 +183,6 @@ export default function SessionRoomPage() {
                         console.warn('[SessionRoom] No-role query error details:', {
                           message: noRoleError?.message || 'No message',
                           code: noRoleError?.code || 'No code',
-                          status: noRoleError?.status || 'No status',
                         });
                       }
                     }

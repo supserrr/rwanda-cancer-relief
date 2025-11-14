@@ -7,7 +7,7 @@ import { Label } from '@workspace/ui/components/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@workspace/ui/components/select';
 import { Textarea } from '@workspace/ui/components/textarea';
 import { Calendar, Clock, Video, Mic, AlertTriangle, User, MessageSquare, XCircle } from 'lucide-react';
-import { Session } from '../../lib/types';
+import type { Session } from '@/lib/api/sessions';
 
 interface CancelSessionModalProps {
   isOpen: boolean;
@@ -111,7 +111,13 @@ export function CancelSessionModal({
             <div className="space-y-2 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
-                <span>{session.date.toLocaleDateString()}</span>
+                <span>
+                  {typeof session.date === 'string' 
+                    ? new Date(session.date).toLocaleDateString()
+                    : (session.date && typeof session.date === 'object' && (session.date as any) instanceof Date)
+                    ? (session.date as Date).toLocaleDateString()
+                    : String(session.date)}
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />

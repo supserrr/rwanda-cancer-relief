@@ -13,7 +13,8 @@ type AdminAction =
   | 'getUser'
   | 'updateUserRole'
   | 'deleteUser'
-  | 'updateCounselorApproval';
+  | 'updateCounselorApproval'
+  | 'assignPatientToCounselor';
 
 interface BaseAdminRequest {
   action: AdminAction;
@@ -52,12 +53,19 @@ interface DeleteUserRequest extends BaseAdminRequest {
   userId: string;
 }
 
+interface AssignPatientToCounselorRequest extends BaseAdminRequest {
+  action: 'assignPatientToCounselor';
+  patientId: string;
+  counselorId: string | null;
+}
+
 type AdminRequestBody =
   | ListUsersRequest
   | GetUserRequest
   | UpdateUserRoleRequest
   | DeleteUserRequest
-  | UpdateCounselorApprovalRequest;
+  | UpdateCounselorApprovalRequest
+  | AssignPatientToCounselorRequest;
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL');
 const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -104,6 +112,30 @@ const assertIsAdmin = async (serviceClient: SupabaseClient, userId: string): Pro
 
   if (!profile || profile.role !== 'admin') {
     const err = new Error('Forbidden: admin access required.');
+    err.name = 'ForbiddenError';
+    throw err;
+  }
+};
+
+/**
+ * Ensure the current caller is an admin or counselor.
+ *
+ * @param serviceClient Supabase service client.
+ * @param userId Authenticated user identifier.
+ */
+const assertIsAdminOrCounselor = async (serviceClient: SupabaseClient, userId: string): Promise<void> => {
+  const { data: profile, error } = await serviceClient
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    throw Object.assign(new Error('Failed to verify user role.'), { cause: error });
+  }
+
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'counselor')) {
+    const err = new Error('Forbidden: admin or counselor access required.');
     err.name = 'ForbiddenError';
     throw err;
   }
@@ -541,6 +573,126 @@ const handleDeleteUser = async (
   });
 };
 
+/**
+ * Handle assigning a patient to a counselor.
+ *
+ * @param serviceClient Supabase service client.
+ * @param payload Request payload.
+ */
+const handleAssignPatientToCounselor = async (
+  serviceClient: SupabaseClient,
+  payload: AssignPatientToCounselorRequest,
+): Promise<Response> => {
+  // Verify the patient exists and is a patient
+  // First try without role filter in case role is stored differently
+  let { data: patientProfile, error: patientError } = await serviceClient
+    .from('profiles')
+    .select('id, role, full_name')
+    .eq('id', payload.patientId)
+    .maybeSingle();
+
+  // If not found or error, try with role filter
+  if (patientError || !patientProfile) {
+    const { data, error } = await serviceClient
+      .from('profiles')
+      .select('id, role, full_name')
+      .eq('id', payload.patientId)
+      .eq('role', 'patient')
+      .maybeSingle();
+    
+    if (!error && data) {
+      patientProfile = data;
+      patientError = null;
+    } else if (error) {
+      patientError = error;
+    }
+  }
+
+  // Check if patient exists and has correct role
+  if (patientError) {
+    console.error('[handleAssignPatientToCounselor] Patient query error:', patientError);
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: `Failed to verify patient: ${patientError.message || 'Unknown error'}` 
+      }),
+      { status: 500, headers: corsHeaders },
+    );
+  }
+
+  if (!patientProfile) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Patient not found.' }),
+      { status: 404, headers: corsHeaders },
+    );
+  }
+
+  if (patientProfile.role !== 'patient') {
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: `User is not a patient. Current role: ${patientProfile.role}` 
+      }),
+      { status: 400, headers: corsHeaders },
+    );
+  }
+
+  // If assigning to a counselor, verify the counselor exists
+  if (payload.counselorId) {
+    const { data: counselorProfile, error: counselorError } = await serviceClient
+      .from('profiles')
+      .select('id, role, full_name')
+      .eq('id', payload.counselorId)
+      .eq('role', 'counselor')
+      .single();
+
+    if (counselorError || !counselorProfile) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Counselor not found or invalid.' }),
+        { status: 404, headers: corsHeaders },
+      );
+    }
+  }
+
+  // Update the assigned_counselor_id
+  const { data: updatedProfile, error: updateError } = await serviceClient
+    .from('profiles')
+    .update({ assigned_counselor_id: payload.counselorId })
+    .eq('id', payload.patientId)
+    .select(
+      'id,full_name,role,is_verified,metadata,specialty,experience_years,availability,avatar_url,assigned_counselor_id,' +
+        'created_at,updated_at,visibility_settings,approval_status,approval_submitted_at,approval_reviewed_at,' +
+        'approval_notes',
+    )
+    .single();
+
+  if (updateError || !updatedProfile) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: updateError?.message ?? 'Failed to assign patient to counselor.',
+      }),
+      { status: 500, headers: corsHeaders },
+    );
+  }
+
+  const authUser = await fetchAuthUsers(serviceClient, [payload.patientId]);
+  const authData = authUser.get(payload.patientId);
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      data: {
+        ...updatedProfile,
+        email: authData?.email ?? updatedProfile.metadata?.email ?? null,
+        lastLogin: authData?.last_login ?? updatedProfile.updated_at,
+        createdAt: authData?.created_at ?? updatedProfile.created_at,
+      },
+    }),
+    { status: 200, headers: corsHeaders },
+  );
+};
+
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -600,8 +752,66 @@ Deno.serve(async (req: Request): Promise<Response> => {
     });
   }
 
+  // Check authorization based on action
+  // Some actions require admin, others allow counselors
   try {
+    if (payload.action === 'assignPatientToCounselor') {
+      // Allow counselors to assign patients
+      await assertIsAdminOrCounselor(serviceClient, user.id);
+    } else if (payload.action === 'getUser') {
+      // Allow counselors to get user info for patients they're assigned to or have sessions with
+      const getUserPayload = payload as GetUserRequest;
+      const { data: userProfile } = await serviceClient
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+      
+      // If user is admin, allow
+      if (userProfile?.role === 'admin') {
+        // Admin can access any user
+      } else if (userProfile?.role === 'counselor') {
+        // Counselor can only access patients they're assigned to or have sessions with
+        const { data: targetProfile } = await serviceClient
+          .from('profiles')
+          .select('role, assigned_counselor_id')
+          .eq('id', getUserPayload.userId)
+          .maybeSingle();
+        
+        if (targetProfile?.role === 'patient') {
+          // Check if patient is assigned to this counselor
+          if (targetProfile.assigned_counselor_id === user.id) {
+            // Allowed - patient is assigned to this counselor
+          } else {
+            // Check if they have a session together
+            const { data: session } = await serviceClient
+              .from('sessions')
+              .select('id')
+              .eq('patient_id', getUserPayload.userId)
+              .eq('counselor_id', user.id)
+              .limit(1)
+              .maybeSingle();
+            
+            if (!session) {
+              const err = new Error('Forbidden: You can only view profiles of patients assigned to you or patients you have sessions with.');
+              err.name = 'ForbiddenError';
+              throw err;
+            }
+          }
+        } else {
+          // Counselor trying to access non-patient - not allowed
+          const err = new Error('Forbidden: You can only view patient profiles.');
+          err.name = 'ForbiddenError';
+          throw err;
+        }
+      } else {
+        // Not admin or counselor
+        await assertIsAdmin(serviceClient, user.id);
+      }
+    } else {
+      // All other actions require admin
     await assertIsAdmin(serviceClient, user.id);
+    }
   } catch (error) {
     const status = error instanceof Error && error.name === 'ForbiddenError' ? 403 : 500;
     return new Response(
@@ -624,6 +834,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return handleDeleteUser(serviceClient, payload);
     case 'updateCounselorApproval':
       return handleUpdateCounselorApproval(serviceClient, payload, user.id);
+    case 'assignPatientToCounselor':
+      return handleAssignPatientToCounselor(serviceClient, payload);
     default:
       return new Response(JSON.stringify({ success: false, error: 'Unsupported admin action.' }), {
         status: 400,

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@workspace/ui/components/dialog';
 import { Button } from '@workspace/ui/components/button';
 import { Badge } from '@workspace/ui/components/badge';
@@ -24,10 +24,14 @@ import {
   X,
   CheckCircle,
   Calendar as CalendarIcon,
-  ExternalLink
+  ExternalLink,
+  Users,
+  FileText,
+  AlertCircle
 } from 'lucide-react';
 import { Counselor, Patient } from '@workspace/ui/lib/types';
 import { normalizeAvatarUrl } from '../lib/avatar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 interface ProfileViewModalProps {
   isOpen: boolean;
@@ -35,6 +39,10 @@ interface ProfileViewModalProps {
   user: Counselor | Patient | null;
   userType: 'counselor' | 'patient';
   currentUserRole: 'patient' | 'counselor' | 'admin';
+  onAssignPatient?: (patientId: string, counselorId: string) => Promise<void>;
+  onUnassignPatient?: (patientId: string) => Promise<void>;
+  currentCounselorId?: string;
+  availableCounselors?: Array<{ id: string; name: string; email?: string }>;
 }
 
 export function ProfileViewModal({ 
@@ -42,8 +50,16 @@ export function ProfileViewModal({
   onClose, 
   user, 
   userType, 
-  currentUserRole 
+  currentUserRole,
+  onAssignPatient,
+  onUnassignPatient,
+  currentCounselorId,
+  availableCounselors = []
 }: ProfileViewModalProps) {
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [selectedCounselorId, setSelectedCounselorId] = useState<string>('');
+  const [showPassToColleague, setShowPassToColleague] = useState(false);
+  
   if (!user) return null;
 
   const isCounselor = userType === 'counselor';
@@ -276,6 +292,81 @@ export function ProfileViewModal({
     onClose();
   };
 
+  const handleMakeMyPatient = async () => {
+    if (!onAssignPatient || !currentCounselorId || !user) return;
+    
+    try {
+      setIsAssigning(true);
+      await onAssignPatient(user.id, currentCounselorId);
+      onClose();
+    } catch (error) {
+      console.error('Error assigning patient:', error);
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  const handlePassToColleague = async () => {
+    if (!onAssignPatient || !selectedCounselorId || !user) return;
+    
+    try {
+      setIsAssigning(true);
+      await onAssignPatient(user.id, selectedCounselorId);
+      setShowPassToColleague(false);
+      onClose();
+    } catch (error) {
+      console.error('Error passing patient to colleague:', error);
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  // Extract all patient information from user and metadata
+  const patientData = user as any;
+  const patientMetadata = patientData.metadata || {};
+  const allPatientInfo = {
+    // Basic info
+    name: user.name,
+    email: user.email || patientMetadata.email,
+    phoneNumber: patientData.phoneNumber || patientMetadata.phone || patientMetadata.phoneNumber || patientMetadata.contactPhone || patientMetadata.contact_phone,
+    location: patientData.location || patientMetadata.location || patientMetadata.address,
+    
+    // Health info
+    diagnosis: patientData.diagnosis || patientMetadata.diagnosis || patientMetadata.cancer_type || patientMetadata.cancerType,
+    treatmentStage: patientData.treatmentStage || patientMetadata.treatment_stage || patientMetadata.treatmentStage || patientMetadata.stage,
+    currentTreatment: patientData.currentTreatment || patientMetadata.current_treatment || patientMetadata.currentTreatment,
+    diagnosisDate: patientData.diagnosisDate || patientMetadata.diagnosis_date || patientMetadata.diagnosisDate,
+    cancerType: patientData.cancerType || patientMetadata.cancer_type || patientMetadata.cancerType,
+    
+    // Personal info
+    age: patientData.age || patientMetadata.age,
+    gender: patientData.gender || patientMetadata.gender,
+    preferredLanguage: patientData.preferredLanguage || patientMetadata.preferred_language || patientMetadata.preferredLanguage || patientMetadata.language,
+    
+    // Support info
+    supportNeeds: patientData.supportNeeds || patientMetadata.support_needs || patientMetadata.supportNeeds,
+    familySupport: patientData.familySupport || patientMetadata.family_support || patientMetadata.familySupport,
+    consultationType: patientData.consultationType || patientMetadata.consultation_type || patientMetadata.consultationType,
+    specialRequests: patientData.specialRequests || patientMetadata.special_requests || patientMetadata.specialRequests,
+    
+    // Emergency contact
+    emergencyContact: patientData.emergencyContact || patientMetadata.emergency_contact || patientMetadata.emergencyContact,
+    emergencyContactPhone: patientData.emergencyContactPhone || patientMetadata.emergency_contact_phone || patientMetadata.emergencyContactPhone,
+    emergencyContactName: patientData.emergencyContactName || patientMetadata.emergency_contact_name || patientMetadata.emergencyContactName,
+    
+    // Progress
+    moduleProgress: patientData.moduleProgress || patientMetadata.module_progress || patientMetadata.moduleProgress,
+    
+    // Assignment
+    assignedCounselor: patientData.assignedCounselor || patientMetadata.assigned_counselor_id || patientMetadata.assignedCounselor,
+    
+    // Dates
+    createdAt: patientData.createdAt || patientData.created_at || patientMetadata.created_at,
+    
+    // Additional metadata
+    ...patientMetadata
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl sm:max-w-4xl max-h-[90vh] overflow-hidden px-4 sm:px-6 py-6 flex flex-col">
@@ -315,11 +406,77 @@ export function ProfileViewModal({
                   Schedule Session
                 </Button>
               )}
-              {currentUserRole === 'counselor' && !isCounselor && (
-                <Button onClick={handleScheduleSession} className="flex items-center gap-2">
+              {(currentUserRole === 'counselor' || currentUserRole === 'admin') && !isCounselor && (
+                <>
+                  <Button 
+                    onClick={handleScheduleSession} 
+                    className="flex items-center gap-2"
+                    variant="outline"
+                  >
                   <CalendarIcon className="h-4 w-4" />
                   Schedule Session
                 </Button>
+                  {onAssignPatient && currentCounselorId && (
+                    <>
+                      <Button 
+                        onClick={handleMakeMyPatient} 
+                        className="flex items-center gap-2"
+                        disabled={isAssigning}
+                      >
+                        <Users className="h-4 w-4" />
+                        {isAssigning ? 'Assigning...' : 'Make My Patient'}
+                      </Button>
+                      {availableCounselors.length > 0 && (
+                        <>
+                          {!showPassToColleague ? (
+                            <Button 
+                              onClick={() => setShowPassToColleague(true)} 
+                              className="flex items-center gap-2"
+                              variant="outline"
+                            >
+                              <Users className="h-4 w-4" />
+                              Pass to Colleague
+                            </Button>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <Select value={selectedCounselorId} onValueChange={setSelectedCounselorId}>
+                                <SelectTrigger className="w-[200px]">
+                                  <SelectValue placeholder="Select counselor" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {availableCounselors
+                                    .filter(c => c.id !== currentCounselorId)
+                                    .map((counselor) => (
+                                      <SelectItem key={counselor.id} value={counselor.id}>
+                                        {counselor.name}
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                              <Button 
+                                onClick={handlePassToColleague} 
+                                disabled={!selectedCounselorId || isAssigning}
+                                size="sm"
+                              >
+                                {isAssigning ? 'Passing...' : 'Pass'}
+                              </Button>
+                              <Button 
+                                onClick={() => {
+                                  setShowPassToColleague(false);
+                                  setSelectedCounselorId('');
+                                }} 
+                                variant="ghost"
+                                size="sm"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -444,6 +601,235 @@ export function ProfileViewModal({
                           ))}
                         </div>
                       </div>
+                    )}
+                  </>
+                ) : patient && (currentUserRole === 'counselor' || currentUserRole === 'admin') ? (
+                  <>
+                    {/* Health Information Section */}
+                    <Separator className="my-4" />
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                        <Heart className="h-4 w-4 text-primary" />
+                        Health Information
+                      </h4>
+                      
+                      {allPatientInfo.cancerType && (
+                        <div className="p-3 rounded-lg bg-muted/30">
+                          <p className="text-sm font-medium mb-1">Cancer Type</p>
+                          <p className="text-sm text-muted-foreground capitalize">{allPatientInfo.cancerType}</p>
+                        </div>
+                      )}
+                      {allPatientInfo.diagnosis && (
+                        <div className="p-3 rounded-lg bg-muted/30">
+                          <p className="text-sm font-medium mb-1">Diagnosis</p>
+                          <p className="text-sm text-muted-foreground">{allPatientInfo.diagnosis}</p>
+                        </div>
+                      )}
+                      {allPatientInfo.diagnosisDate && (
+                        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                            <CalendarIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">Diagnosis Date</p>
+                            <p className="text-sm text-muted-foreground">
+                              {typeof allPatientInfo.diagnosisDate === 'string' 
+                                ? new Date(allPatientInfo.diagnosisDate).toLocaleDateString()
+                                : allPatientInfo.diagnosisDate}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {allPatientInfo.treatmentStage && (
+                        <div className="p-3 rounded-lg bg-muted/30">
+                          <p className="text-sm font-medium mb-1">Treatment Stage</p>
+                          <p className="text-sm text-muted-foreground capitalize">{allPatientInfo.treatmentStage.replace(/-/g, ' ')}</p>
+                        </div>
+                      )}
+                      {allPatientInfo.currentTreatment && (
+                        <div className="p-3 rounded-lg bg-muted/30">
+                          <p className="text-sm font-medium mb-1">Current Treatment</p>
+                          <p className="text-sm text-muted-foreground capitalize">{allPatientInfo.currentTreatment.replace(/-/g, ' ')}</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Personal Information Section */}
+                    {(allPatientInfo.age || allPatientInfo.gender || allPatientInfo.location || allPatientInfo.phoneNumber) && (
+                      <>
+                        <Separator className="my-4" />
+                        <div className="space-y-3">
+                          <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                            <User className="h-4 w-4 text-primary" />
+                            Personal Information
+                          </h4>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {allPatientInfo.age && (
+                              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                                <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                                  <User className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium">Age</p>
+                                  <p className="text-sm text-muted-foreground">{allPatientInfo.age}</p>
+                                </div>
+                              </div>
+                            )}
+                            {allPatientInfo.gender && (
+                              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                                <div className="p-2 rounded-lg bg-pink-100 dark:bg-pink-900/30">
+                                  <User className="h-4 w-4 text-pink-600 dark:text-pink-400" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium">Gender</p>
+                                  <p className="text-sm text-muted-foreground capitalize">{allPatientInfo.gender.replace(/-/g, ' ')}</p>
+                                </div>
+                              </div>
+                            )}
+                            {allPatientInfo.location && (
+                              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                                <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+                                  <MapPin className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium">Location</p>
+                                  <p className="text-sm text-muted-foreground">{allPatientInfo.location}</p>
+                                </div>
+                              </div>
+                            )}
+                            {allPatientInfo.phoneNumber && (
+                              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                                <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                                  <Phone className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium">Phone Number</p>
+                                  <p className="text-sm text-muted-foreground">{allPatientInfo.phoneNumber}</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {allPatientInfo.preferredLanguage && (
+                            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                                <MessageCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">Preferred Language</p>
+                                <p className="text-sm text-muted-foreground capitalize">{allPatientInfo.preferredLanguage}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                    
+                    {/* Support Information Section */}
+                    {(allPatientInfo.supportNeeds || allPatientInfo.familySupport || allPatientInfo.consultationType || allPatientInfo.specialRequests) && (
+                      <>
+                        <Separator className="my-4" />
+                        <div className="space-y-3">
+                          <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                            <Users className="h-4 w-4 text-primary" />
+                            Support & Preferences
+                          </h4>
+                          
+                          {allPatientInfo.supportNeeds && (
+                            <div className="p-3 rounded-lg bg-muted/30">
+                              <p className="text-sm font-medium mb-2">Support Needs</p>
+                              {Array.isArray(allPatientInfo.supportNeeds) && allPatientInfo.supportNeeds.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                  {allPatientInfo.supportNeeds.map((need: string, idx: number) => (
+                                    <Badge key={idx} variant="outline" className="bg-muted/60">
+                                      {need}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-muted-foreground">{String(allPatientInfo.supportNeeds)}</p>
+                              )}
+                            </div>
+                          )}
+                          {allPatientInfo.familySupport && (
+                            <div className="p-3 rounded-lg bg-muted/30">
+                              <p className="text-sm font-medium mb-1">Family Support</p>
+                              <p className="text-sm text-muted-foreground capitalize">{String(allPatientInfo.familySupport).replace(/-/g, ' ')}</p>
+                            </div>
+                          )}
+                          {allPatientInfo.consultationType && (
+                            <div className="p-3 rounded-lg bg-muted/30">
+                              <p className="text-sm font-medium mb-2">Preferred Consultation Types</p>
+                              {Array.isArray(allPatientInfo.consultationType) && allPatientInfo.consultationType.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                  {allPatientInfo.consultationType.map((type: string, idx: number) => (
+                                    <Badge key={idx} variant="outline" className="bg-muted/60 capitalize">
+                                      {type === 'chat' ? 'Text Chat' : type === 'video' ? 'Video Call' : type === 'phone' ? 'Phone Call' : type}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-muted-foreground capitalize">{String(allPatientInfo.consultationType)}</p>
+                              )}
+                            </div>
+                          )}
+                          {allPatientInfo.specialRequests && (
+                            <div className="p-3 rounded-lg bg-muted/30">
+                              <p className="text-sm font-medium mb-1">Special Requests</p>
+                              <p className="text-sm text-muted-foreground leading-relaxed">{String(allPatientInfo.specialRequests)}</p>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                    
+                    {/* Emergency Contact Section */}
+                    {(allPatientInfo.emergencyContact || allPatientInfo.emergencyContactPhone || allPatientInfo.emergencyContactName) && (
+                      <>
+                        <Separator className="my-4" />
+                        <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                          <p className="text-sm font-semibold mb-3 flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                            Emergency Contact
+                          </p>
+                          <div className="space-y-2">
+                            {allPatientInfo.emergencyContactName && (
+                              <div>
+                                <p className="text-xs font-medium text-muted-foreground mb-1">Name</p>
+                                <p className="text-sm text-foreground">{allPatientInfo.emergencyContactName}</p>
+                              </div>
+                            )}
+                            {(allPatientInfo.emergencyContact || allPatientInfo.emergencyContactPhone) && (
+                              <div>
+                                <p className="text-xs font-medium text-muted-foreground mb-1">Phone</p>
+                                <p className="text-sm text-foreground">{allPatientInfo.emergencyContactPhone || allPatientInfo.emergencyContact}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    
+                    {/* Account Information Section */}
+                    {allPatientInfo.createdAt && (
+                      <>
+                        <Separator className="my-4" />
+                        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                          <div className="p-2 rounded-lg bg-gray-100 dark:bg-gray-900/30">
+                            <Clock className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">Account Created</p>
+                            <p className="text-sm text-muted-foreground">
+                              {typeof allPatientInfo.createdAt === 'string' 
+                                ? new Date(allPatientInfo.createdAt).toLocaleDateString()
+                                : allPatientInfo.createdAt instanceof Date
+                                ? allPatientInfo.createdAt.toLocaleDateString()
+                                : 'Unknown'}
+                            </p>
+                          </div>
+                        </div>
+                      </>
                     )}
                   </>
                 ) : patient ? (

@@ -14,6 +14,9 @@ import { Button } from '@workspace/ui/components/button';
 import { Badge } from '@workspace/ui/components/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@workspace/ui/components/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@workspace/ui/components/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@workspace/ui/components/dialog';
+import { Avatar, AvatarFallback, AvatarImage } from '@workspace/ui/components/avatar';
+import { Separator } from '@workspace/ui/components/separator';
 import { 
   Calendar, 
   Clock, 
@@ -22,7 +25,10 @@ import {
   Plus,
   Filter,
   Search,
-  AlertCircle
+  AlertCircle,
+  Info,
+  User,
+  Mic
 } from 'lucide-react';
 import { useAuth } from '../../../../components/auth/AuthProvider';
 import { useSessions } from '../../../../hooks/useSessions';
@@ -47,6 +53,8 @@ export default function PatientSessionsPage() {
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [counselors, setCounselors] = useState<Counselor[]>([]);
   const [counselorsLoading, setCounselorsLoading] = useState(false);
+  const [isSessionInfoOpen, setIsSessionInfoOpen] = useState(false);
+  const [viewingSession, setViewingSession] = useState<Session | null>(null);
 
   // Load sessions using the hook
   const patientSessionsParams = useMemo(
@@ -67,10 +75,32 @@ export default function PatientSessionsPage() {
   });
 
   // Filter sessions based on tab
-  const upcomingSessions = sessions.filter(session => 
-    session.status === 'scheduled' &&
-    new Date(session.date) > new Date()
-  );
+  const upcomingSessions = useMemo(() => {
+    const now = new Date();
+    return sessions.filter(session => {
+      if (session.status !== 'scheduled') return false;
+      
+      // Parse date (session.date is a string in YYYY-MM-DD format)
+      const sessionDate = new Date(session.date);
+      
+      // If session has a time, combine date and time
+      if (session.time) {
+        // Parse time (format: HH:MM or HH:MM:SS)
+        const [hours, minutes] = session.time.split(':').map(Number);
+        const sessionDateTime = new Date(sessionDate);
+        sessionDateTime.setHours(hours || 0, minutes || 0, 0, 0);
+        
+        // Session is upcoming if the datetime hasn't passed
+        return sessionDateTime > now;
+      }
+      
+      // If no time specified, check if date is today or in the future
+      // Set to end of day for date-only comparison
+      const endOfSessionDate = new Date(sessionDate);
+      endOfSessionDate.setHours(23, 59, 59, 999);
+      return endOfSessionDate > now;
+    });
+  }, [sessions]);
 
   const pastSessions = sessions.filter(session => 
     session.status === 'completed' || session.status === 'cancelled'
@@ -300,6 +330,11 @@ export default function PatientSessionsPage() {
     }
   };
 
+  const handleViewSessionInfo = (session: Session) => {
+    setViewingSession(session);
+    setIsSessionInfoOpen(true);
+  };
+
   // Show loading state
   if (authLoading || sessionsLoading) {
     return (
@@ -391,14 +426,10 @@ export default function PatientSessionsPage() {
 
       {/* Sessions Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="upcoming" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
             Upcoming ({upcomingSessions.length})
-          </TabsTrigger>
-          <TabsTrigger value="past" className="flex items-center gap-2">
-            <MessageCircle className="h-4 w-4" />
-            Past ({pastSessions.length})
           </TabsTrigger>
           <TabsTrigger value="all" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
@@ -424,6 +455,7 @@ export default function PatientSessionsPage() {
                     onJoin={handleJoinSession}
                     onReschedule={handleRescheduleSession}
                     onCancel={handleCancelSession}
+                    onViewSessionInfo={handleViewSessionInfo}
                   />
                 ))}
               </div>
@@ -440,38 +472,6 @@ export default function PatientSessionsPage() {
                   <Plus className="h-4 w-4 mr-2" />
                   Book a Session
                 </Button>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="past" className="mt-6">
-          <div className="space-y-4">
-            {pastSessions.length > 0 ? (
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {pastSessions.map((session) => (
-                  <SessionCard
-                    key={session.id}
-                    session={session}
-                    patientName={user?.name || 'Patient'}
-                    patientAvatar={getPatientAvatar()}
-                    patientId={session.patientId}
-                    counselorName={getCounselorName(session.counselorId)}
-                    counselorSpecialty={getCounselorSpecialty(session.counselorId)}
-                    counselorAvatar={getCounselorAvatar(session.counselorId)}
-                    counselorId={session.counselorId}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                  <MessageCircle className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">No past sessions</h3>
-                <p className="text-muted-foreground">
-                  Your completed sessions will appear here
-                </p>
               </div>
             )}
           </div>
@@ -502,6 +502,7 @@ export default function PatientSessionsPage() {
                       onJoin={session.status === 'scheduled' ? handleJoinSession : undefined}
                       onReschedule={session.status === 'scheduled' ? handleRescheduleSession : undefined}
                       onCancel={session.status === 'scheduled' ? handleCancelSession : undefined}
+                      onViewSessionInfo={handleViewSessionInfo}
                     />
                   ))}
                 </div>
@@ -568,6 +569,180 @@ export default function PatientSessionsPage() {
         userRole="patient"
         onCancel={handleConfirmCancel as any}
       />
+
+      {/* Session Info Modal */}
+      {viewingSession && (
+        <Dialog open={isSessionInfoOpen} onOpenChange={setIsSessionInfoOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold">Session Information</DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-6 mt-4">
+              {/* Session Status */}
+              <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <Badge 
+                    variant={
+                      viewingSession.status === 'scheduled' ? 'default' :
+                      viewingSession.status === 'completed' ? 'default' :
+                      viewingSession.status === 'cancelled' ? 'destructive' : 'secondary'
+                    }
+                    className="mt-1"
+                  >
+                    {viewingSession.status.charAt(0).toUpperCase() + viewingSession.status.slice(1)}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Session Type</p>
+                  <Badge variant="outline" className="mt-1 capitalize">
+                    {viewingSession.type === 'audio' && <Mic className="h-3 w-3 mr-1" />}
+                    {viewingSession.type === 'video' && <Video className="h-3 w-3 mr-1" />}
+                    {viewingSession.type === 'chat' && <MessageCircle className="h-3 w-3 mr-1" />}
+                    {viewingSession.type}
+                  </Badge>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Counselor Information */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Counselor
+                </h3>
+                <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={viewingSession.counselorId ? getCounselorAvatar(viewingSession.counselorId) : undefined} />
+                    <AvatarFallback>
+                      {getCounselorName(viewingSession.counselorId).split(' ').map(n => n[0]).join('') || 'C'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-semibold">{getCounselorName(viewingSession.counselorId)}</p>
+                    <p className="text-sm text-muted-foreground">{getCounselorSpecialty(viewingSession.counselorId)}</p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Patient Information */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Patient
+                </h3>
+                <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={getPatientAvatar()} />
+                    <AvatarFallback>
+                      {(user?.name || 'P').split(' ').map(n => n[0]).join('')}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-semibold">{user?.name || 'Patient'}</p>
+                    <p className="text-sm text-muted-foreground">{user?.email || ''}</p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Session Details */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Session Details
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 bg-muted/30 rounded-lg">
+                    <p className="text-sm text-muted-foreground mb-1">Date</p>
+                    <p className="font-semibold">
+                      {new Date(viewingSession.date).toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-muted/30 rounded-lg">
+                    <p className="text-sm text-muted-foreground mb-1">Time</p>
+                    <p className="font-semibold">{viewingSession.time || 'Not specified'}</p>
+                  </div>
+                  <div className="p-4 bg-muted/30 rounded-lg">
+                    <p className="text-sm text-muted-foreground mb-1">Duration</p>
+                    <p className="font-semibold">{viewingSession.duration} minutes</p>
+                  </div>
+                  <div className="p-4 bg-muted/30 rounded-lg">
+                    <p className="text-sm text-muted-foreground mb-1">Session ID</p>
+                    <p className="font-semibold text-xs font-mono">{viewingSession.id}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Session Notes */}
+              {viewingSession.notes && (
+                <>
+                  <Separator />
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg">Notes</h3>
+                    <div className="p-4 bg-muted/30 rounded-lg">
+                      <p className="text-sm whitespace-pre-wrap">{viewingSession.notes}</p>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4">
+                {viewingSession.status === 'scheduled' && (
+                  <>
+                    <Button 
+                      onClick={() => {
+                        setIsSessionInfoOpen(false);
+                        handleJoinSession(viewingSession);
+                      }}
+                      className="flex-1"
+                    >
+                      <Video className="h-4 w-4 mr-2" />
+                      Join Session
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        setIsSessionInfoOpen(false);
+                        handleRescheduleSession(viewingSession);
+                      }}
+                    >
+                      Reschedule
+                    </Button>
+                    <Button 
+                      variant="destructive"
+                      onClick={() => {
+                        setIsSessionInfoOpen(false);
+                        handleCancelSession(viewingSession);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                )}
+                <Button 
+                  variant="outline"
+                  onClick={() => setIsSessionInfoOpen(false)}
+                  className={viewingSession.status !== 'scheduled' ? 'flex-1' : ''}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
